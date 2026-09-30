@@ -16,6 +16,7 @@ import {
 export default function HomeDashboard({
   customers,
   employees,
+  conflicts = [],
   activeUser,
   onSelectCustomer,
   onOpenCustomerSearch,
@@ -56,6 +57,7 @@ export default function HomeDashboard({
   }, [customers, filterQuery, pcQuery, managerQuery]);
 
   const hasFilters = filterQuery || pcQuery || managerQuery;
+  const activeConflictsCount = conflicts?.length || 0;
 
   return (
     <div className="space-y-4 animate-in fade-in duration-150">
@@ -83,7 +85,7 @@ export default function HomeDashboard({
             }`}
           >
             <AlertTriangle className="w-3.5 h-3.5" />
-            <span>Conflict Monitor (1 Active)</span>
+            <span>Conflict Monitor ({activeConflictsCount} Active)</span>
           </button>
 
           <button
@@ -219,27 +221,50 @@ export default function HomeDashboard({
       {activeTab === 'conflicts' && (
         <div className="bg-white rounded-xl p-5 border border-slate-200 space-y-4">
           <div className="flex items-center space-x-2">
-            <AlertTriangle className="w-5 h-5 text-amber-600" />
-            <h2 className="text-sm font-bold text-slate-900">Active Document Contradictions</h2>
+            <AlertTriangle className={`w-5 h-5 ${activeConflictsCount > 0 ? 'text-amber-600' : 'text-emerald-600'}`} />
+            <h2 className="text-sm font-bold text-slate-900">
+              {activeConflictsCount > 0 ? 'Active Document Contradictions' : 'All Contradictions Resolved'}
+            </h2>
           </div>
 
-          <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-900">Acme Logistics BV (CUST-001)</span>
-              <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-200 text-amber-900 rounded">CRITICAL</span>
+          {activeConflictsCount > 0 ? (
+            conflicts.map((conf) => {
+              const matchedCust = customers.find((c) => c.id === conf.customer_id);
+              return (
+                <div key={conf.id} className="p-4 rounded-xl bg-amber-50 border border-amber-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-900">
+                      {matchedCust?.name || conf.customer_id}
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-200 text-amber-900 rounded">
+                      {conf.impact_severity || 'CRITICAL'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-700 leading-relaxed">
+                    {conf.explanation}
+                  </p>
+                  <div className="pt-2">
+                    <button
+                      onClick={() => onSelectCustomer(conf.customer_id)}
+                      className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg"
+                    >
+                      Open Case & Resolve Dispute
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="p-6 rounded-xl bg-emerald-50/80 border border-emerald-200 text-center space-y-2">
+              <div className="w-10 h-10 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto">
+                <Building2 className="w-5 h-5" />
+              </div>
+              <h3 className="text-xs font-bold text-emerald-950">Alle Klantdossiers Volledig Gevalideerd</h3>
+              <p className="text-xs text-emerald-800 max-w-md mx-auto">
+                Er zijn momenteel geen actieve tegenstrijdigheden of juridische conflicten gedetecteerd in de klantdossiers.
+              </p>
             </div>
-            <p className="text-xs text-slate-700 leading-relaxed">
-              Contradiction detected: Ticket #421 states <strong>36h/week</strong>, whereas the signed addendum 2024 stipulates <strong>38h/week</strong>.
-            </p>
-            <div className="pt-2">
-              <button
-                onClick={() => onSelectCustomer('CUST-001')}
-                className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg"
-              >
-                Open Case & Resolve Dispute
-              </button>
-            </div>
-          </div>
+          )}
         </div>
       )}
 

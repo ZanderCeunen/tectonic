@@ -51,6 +51,17 @@ export default function App() {
       const empData = await empRes.json();
       setEmployees(empData);
 
+      // Fetch active conflicts across customers
+      try {
+        const confRes = await fetch('/api/customers/CUST-001/conflicts', { headers });
+        if (confRes.ok) {
+          const confData = await confRes.json();
+          setConflicts(confData || []);
+        }
+      } catch (e) {
+        // Ignore if no conflicts
+      }
+
       // Check active JWT session if present
       if (authToken) {
         try {
@@ -342,6 +353,7 @@ export default function App() {
           <HomeDashboard
             customers={customers}
             employees={employees}
+            conflicts={conflicts}
             activeUser={activeUser}
             onSelectCustomer={(id) => setSelectedCustomerId(id)}
             onOpenCustomerSearch={() => setIsCustomerSearchOpen(true)}
