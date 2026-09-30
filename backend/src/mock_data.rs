@@ -894,8 +894,11 @@ pub fn get_mock_employees() -> Vec<Employee> {
 pub fn get_mock_users() -> Vec<crate::models::UserAccount> {
     use crate::models::{UserAccount, UserRole};
 
-    let admin_hash = bcrypt::hash("Admin123!", 4).unwrap_or_default();
-    let consultant_hash = bcrypt::hash("Payroll123!", 4).unwrap_or_default();
+    let admin_pass = std::env::var("TECTONIC_ADMIN_PASSWORD").unwrap_or_else(|_| "Admin123!".to_string());
+    let consultant_pass = std::env::var("TECTONIC_CONSULTANT_PASSWORD").unwrap_or_else(|_| "Payroll123!".to_string());
+
+    let admin_hash = bcrypt::hash(&admin_pass, 4).unwrap_or_default();
+    let consultant_hash = bcrypt::hash(&consultant_pass, 4).unwrap_or_default();
 
     vec![
         UserAccount {

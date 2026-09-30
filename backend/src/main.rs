@@ -32,7 +32,11 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use trust_engine::TrustEngine;
 use uuid::Uuid;
 
-static JWT_SECRET: &[u8] = b"SDWorx_Tectonic_Hackathon_Secret_2026_Key!";
+pub fn get_jwt_secret() -> Vec<u8> {
+    std::env::var("JWT_SECRET")
+        .unwrap_or_else(|_| "SDWorx_Tectonic_Hackathon_Secret_2026_Key!".to_string())
+        .into_bytes()
+}
 
 #[derive(Clone)]
 pub struct AppState {
@@ -58,7 +62,8 @@ where
             if let Ok(auth_str) = auth_header.to_str() {
                 if auth_str.starts_with("Bearer ") {
                     let token = &auth_str[7..];
-                    let decoding_key = DecodingKey::from_secret(JWT_SECRET);
+                    let secret = get_jwt_secret();
+                    let decoding_key = DecodingKey::from_secret(&secret);
                     let mut validation = Validation::default();
                     validation.validate_exp = false; // Graceful in demo / local testing
 
@@ -198,10 +203,11 @@ async fn login_user(
         exp,
     };
 
+    let secret = get_jwt_secret();
     let token = match encode(
         &Header::default(),
         &claims,
-        &EncodingKey::from_secret(JWT_SECRET),
+        &EncodingKey::from_secret(&secret),
     ) {
         Ok(t) => t,
         Err(_) => return Err(StatusCode::INTERNAL_SERVER_ERROR),
