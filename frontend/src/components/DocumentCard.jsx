@@ -1,223 +1,121 @@
 import React, { useState } from 'react';
 import {
   FileText,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
-  Shield,
   Calendar,
   User,
   ChevronDown,
   ChevronUp,
-  Tag,
+  Check,
+  AlertTriangle,
   Lock,
   Eye,
   EyeOff,
-  Sparkles,
 } from 'lucide-react';
 
-export default function DocumentCard({
-  doc,
-  activeUser,
-  onFeedback,
-}) {
+export default function DocumentCard({ doc, activeUser, onFeedback }) {
   const [expanded, setExpanded] = useState(false);
   const [showUnmasked, setShowUnmasked] = useState(false);
 
   const trustScore = doc.trust?.overall_score || 50;
+  const hasPayrollClearance = activeUser.role === 'Senior Payroll Officer';
 
-  // Kleurcodering op basis van Trust Score
-  const getTrustBadgeStyle = (score) => {
-    if (score >= 90) return 'bg-emerald-600 text-white shadow-emerald-500/20';
-    if (score >= 75) return 'bg-sdworx-600 text-white shadow-sdworx-500/20';
-    if (score >= 55) return 'bg-amber-500 text-white shadow-amber-500/20';
-    return 'bg-rose-600 text-white shadow-rose-500/20';
-  };
-
-  const getSourceBadgeStyle = (type) => {
+  // Subtiele bron-badges conform corporate huisstijl
+  const getSourceBadge = (type) => {
     switch (type) {
       case 'SignedContract':
-        return 'bg-emerald-100 text-emerald-800 border-emerald-300';
+        return 'bg-slate-100 text-slate-800 border-slate-200';
       case 'OfficialTemplate':
-        return 'bg-blue-100 text-blue-800 border-blue-300';
+        return 'bg-blue-50 text-[#005FB8] border-blue-100';
       case 'CrmNote':
-        return 'bg-purple-100 text-purple-800 border-purple-300';
-      case 'TicketResolution':
-      case 'TicketComment':
-        return 'bg-slate-100 text-slate-800 border-slate-300';
-      case 'ChatMessage':
-        return 'bg-amber-100 text-amber-800 border-amber-300';
+        return 'bg-slate-50 text-slate-700 border-slate-200';
       default:
-        return 'bg-slate-100 text-slate-700 border-slate-200';
+        return 'bg-slate-50 text-slate-600 border-slate-200';
     }
   };
 
-  const hasPayrollClearance = activeUser.role === 'Senior Payroll Officer';
-
   return (
     <div
-      className={`bg-white rounded-2xl border transition-all duration-200 ${
-        doc.trust?.is_authoritative
-          ? 'border-emerald-300 shadow-sm ring-1 ring-emerald-400/30'
-          : doc.trust?.conflict_flag
-          ? 'border-rose-300 shadow-sm bg-rose-50/20'
-          : 'border-slate-200 shadow-2xs hover:shadow-md'
+      className={`bg-white rounded-lg border transition-colors ${
+        doc.trust?.conflict_flag
+          ? 'border-amber-300/80 bg-amber-50/10'
+          : 'border-slate-200 hover:border-slate-300'
       }`}
     >
-      <div className="p-5">
-        {/* Header row: Source, Date, Trust Badge */}
-        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <div className="p-4 sm:p-5">
+        {/* Top line: Source type, Date, Trust percentage */}
+        <div className="flex items-center justify-between gap-3 text-xs mb-1.5">
           <div className="flex items-center space-x-2">
             <span
-              className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${getSourceBadgeStyle(
+              className={`px-2 py-0.5 rounded text-[11px] font-medium border ${getSourceBadge(
                 doc.source_type
               )}`}
             >
               {doc.source_label}
             </span>
-            {doc.trust?.is_authoritative && (
-              <span className="inline-flex items-center space-x-1 text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
-                <Sparkles className="w-3 h-3 text-emerald-600" />
-                <span>Gouden Waarheid</span>
-              </span>
-            )}
-            {doc.trust?.conflict_flag && (
-              <span className="inline-flex items-center space-x-1 text-xs font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-300">
-                <AlertCircle className="w-3 h-3 text-rose-600" />
-                <span>Conflicterend</span>
-              </span>
-            )}
+            <span className="text-slate-400">•</span>
+            <span className="text-slate-500 text-[11px]">{doc.date}</span>
           </div>
 
-          {/* Trust Score Pill */}
           <div className="flex items-center space-x-2">
-            <div className="text-right">
-              <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-bold">
-                Trust Score
-              </span>
-              <div
-                className={`inline-flex items-center px-3 py-1 rounded-xl text-sm font-black shadow-sm ${getTrustBadgeStyle(
-                  trustScore
-                )}`}
-              >
-                {trustScore.toFixed(0)}%
-              </div>
-            </div>
+            <span className="text-[11px] text-slate-500 font-medium">Betrouwbaarheid:</span>
+            <span
+              className={`font-semibold text-xs px-2 py-0.5 rounded ${
+                trustScore >= 85
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                  : trustScore >= 60
+                  ? 'bg-slate-100 text-slate-700 border border-slate-200'
+                  : 'bg-amber-50 text-amber-700 border border-amber-200'
+              }`}
+            >
+              {trustScore.toFixed(0)}%
+            </span>
           </div>
         </div>
 
-        {/* Title & Author */}
-        <h4 className="text-base font-bold text-slate-900 mb-1 leading-snug">{doc.title}</h4>
-        <div className="flex flex-wrap items-center gap-y-1 gap-x-4 text-xs text-slate-500 mb-3">
-          <span className="flex items-center space-x-1">
-            <Calendar className="w-3.5 h-3.5 text-slate-400" />
-            <span>{doc.date}</span>
-          </span>
-          <span className="flex items-center space-x-1">
-            <User className="w-3.5 h-3.5 text-slate-400" />
-            <span className="font-medium text-slate-700">{doc.author}</span>
-            <span className="text-slate-400">({doc.author_role})</span>
-          </span>
+        {/* Title */}
+        <h4 className="text-sm font-semibold text-slate-900 mb-1 leading-snug">{doc.title}</h4>
+
+        {/* Summary text */}
+        <p className="text-xs text-slate-600 leading-relaxed mb-3">{doc.summary}</p>
+
+        {/* Key Values List (calm and clean) */}
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          {doc.key_facts?.map((fact, idx) => (
+            <span
+              key={idx}
+              className={`text-[11px] px-2 py-1 rounded border font-medium ${
+                fact.is_conflicting
+                  ? 'bg-amber-50 text-amber-900 border-amber-300'
+                  : 'bg-slate-50 text-slate-700 border-slate-200'
+              }`}
+            >
+              <span className="text-slate-500">{fact.label}:</span>{' '}
+              <strong className={fact.is_conflicting ? 'text-amber-800 underline' : 'text-slate-800'}>
+                {fact.value}
+              </strong>
+            </span>
+          ))}
         </div>
 
-        {/* Summary */}
-        <p className="text-sm text-slate-600 mb-4 leading-relaxed">{doc.summary}</p>
-
-        {/* Key Facts Pills */}
-        <div className="mb-4">
-          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-            Geëxtraheerde Bepalingen (Kernwaarden)
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {doc.key_facts?.map((fact, idx) => (
-              <div
-                key={idx}
-                className={`inline-flex items-center space-x-1.5 text-xs px-2.5 py-1 rounded-lg border font-medium ${
-                  fact.is_conflicting
-                    ? 'bg-rose-100 text-rose-900 border-rose-300 font-bold ring-2 ring-rose-400/50'
-                    : 'bg-slate-50 text-slate-800 border-slate-200'
-                }`}
-              >
-                <span className="text-slate-500">{fact.label}:</span>
-                <span className={fact.is_conflicting ? 'text-rose-700 underline' : 'font-bold'}>
-                  {fact.value}
-                </span>
-                {fact.is_conflicting && (
-                  <span className="text-[10px] bg-rose-600 text-white px-1.5 py-0.2 rounded font-black">
-                    OUTLIER
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Expandable Snippet / Raw Content */}
+        {/* Expandable Preview */}
         {expanded && (
-          <div className="my-4 pt-3 border-t border-slate-100 space-y-3">
-            {/* Trust Breakdown Details */}
-            <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200">
-              <div className="text-xs font-bold text-slate-700 mb-2 flex items-center justify-between">
-                <span>Algoritmische Gewichten Breakdown</span>
-                <span className="text-[11px] text-slate-500 font-normal">
-                  $T = 0.40 \cdot S + 0.25 \cdot R + 0.20 \cdot C + 0.15 \cdot F$
+          <div className="mt-3 pt-3 border-t border-slate-100 space-y-3">
+            <div className="bg-slate-50 rounded-md p-3 border border-slate-200/80 font-mono text-[11px] text-slate-700 relative">
+              <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-slate-200 text-[10px] text-slate-500 font-sans">
+                <span className="flex items-center space-x-1">
+                  <Lock className="w-3 h-3 text-slate-400" />
+                  <span>Dossierfragment (PII beschermd)</span>
                 </span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
-                <div className="bg-white p-2 rounded-lg border border-slate-200">
-                  <div className="text-[10px] text-slate-500 uppercase">Bron ($S$)</div>
-                  <div className="text-sm font-black text-slate-800">
-                    {doc.trust?.source_score?.toFixed(0)} / 100
-                  </div>
-                </div>
-                <div className="bg-white p-2 rounded-lg border border-slate-200">
-                  <div className="text-[10px] text-slate-500 uppercase">Recentheid ($R$)</div>
-                  <div className="text-sm font-black text-slate-800">
-                    {doc.trust?.recency_score?.toFixed(0)} / 100
-                  </div>
-                </div>
-                <div className="bg-white p-2 rounded-lg border border-slate-200">
-                  <div className="text-[10px] text-slate-500 uppercase">Consensus ($C$)</div>
-                  <div className="text-sm font-black text-slate-800">
-                    {doc.trust?.consensus_score?.toFixed(0)} / 100
-                  </div>
-                </div>
-                <div className="bg-white p-2 rounded-lg border border-slate-200">
-                  <div className="text-[10px] text-slate-500 uppercase">Feedback ($F$)</div>
-                  <div className="text-sm font-black text-slate-800">
-                    {doc.trust?.feedback_score?.toFixed(0)} / 100
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Document Extract with PII Masking */}
-            <div className="bg-slate-900 text-slate-200 rounded-xl p-4 font-mono text-xs relative">
-              <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800 text-[11px] text-slate-400">
-                <div className="flex items-center space-x-1.5">
-                  <Shield className="w-3.5 h-3.5 text-sdworx-400" />
-                  <span>Document Fragment (Live PII Masking Active)</span>
-                </div>
                 {hasPayrollClearance && (
                   <button
                     onClick={() => setShowUnmasked(!showUnmasked)}
-                    className="flex items-center space-x-1 text-sdworx-300 hover:text-sdworx-200 underline text-xs"
+                    className="text-[#005FB8] hover:underline"
                   >
-                    {showUnmasked ? (
-                      <>
-                        <EyeOff className="w-3 h-3" />
-                        <span>Verberg Gevoelige Data</span>
-                      </>
-                    ) : (
-                      <>
-                        <Eye className="w-3 h-3" />
-                        <span>Toon Origineel (Clearance OK)</span>
-                      </>
-                    )}
+                    {showUnmasked ? 'Verberg gegevens' : 'Toon ongecensureerd (Senior rechten)'}
                   </button>
                 )}
               </div>
-              <p className="leading-relaxed whitespace-pre-wrap">
+              <p className="whitespace-pre-wrap leading-relaxed">
                 {showUnmasked && hasPayrollClearance
                   ? doc.unmasked_raw_content || doc.raw_content
                   : doc.raw_content}
@@ -226,51 +124,35 @@ export default function DocumentCard({
           </div>
         )}
 
-        {/* Footer: Expand toggle & Feedback action buttons */}
-        <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="inline-flex items-center space-x-1 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
-          >
-            {expanded ? (
-              <>
-                <ChevronUp className="w-4 h-4" />
-                <span>Minder Details</span>
-              </>
-            ) : (
-              <>
-                <ChevronDown className="w-4 h-4" />
-                <span>Bekijk Wiskundige Score & Fragment</span>
-              </>
-            )}
-          </button>
+        {/* Bottom row: Author and Subtle Feedback Actions */}
+        <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+          <div className="flex items-center space-x-2">
+            <span>Auteur: {doc.author}</span>
+            <span>•</span>
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="text-[#005FB8] hover:underline font-medium inline-flex items-center space-x-0.5"
+            >
+              <span>{expanded ? 'Minder' : 'Lees fragment'}</span>
+              {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+            </button>
+          </div>
 
-          {/* Feedback buttons */}
-          <div className="flex items-center space-x-1.5">
-            <span className="text-[11px] font-medium text-slate-400 mr-1">Feedback:</span>
+          <div className="flex items-center space-x-2">
             <button
               onClick={() => onFeedback(doc.id, 'VERIFIED')}
-              className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-colors"
-              title="Bevestig dat dit document correct en actueel is"
+              className="text-[11px] text-slate-600 hover:text-emerald-700 hover:underline px-1.5 py-0.5"
+              title="Bevestig document als accuraat"
             >
-              <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Geldig ({doc.feedback?.verified_count || 0})</span>
+              Bevestig ({doc.feedback?.verified_count || 0})
             </button>
+            <span>•</span>
             <button
               onClick={() => onFeedback(doc.id, 'OUTDATED')}
-              className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-colors"
-              title="Markeer als achterhaald of vervangen"
+              className="text-[11px] text-slate-600 hover:text-rose-700 hover:underline px-1.5 py-0.5"
+              title="Markeer als achterhaald"
             >
-              <XCircle className="w-3.5 h-3.5 text-rose-600" />
-              <span>Verouderd ({doc.feedback?.outdated_count || 0})</span>
-            </button>
-            <button
-              onClick={() => onFeedback(doc.id, 'QUESTIONABLE')}
-              className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 transition-colors"
-              title="Meld twijfel of mogelijke tegenspraak"
-            >
-              <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
-              <span>Twijfel ({doc.feedback?.questionable_count || 0})</span>
+              Meld verouderd ({doc.feedback?.outdated_count || 0})
             </button>
           </div>
         </div>

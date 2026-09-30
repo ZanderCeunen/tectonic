@@ -1,16 +1,5 @@
 import React, { useState } from 'react';
-import {
-  X,
-  PhoneForwarded,
-  Sparkles,
-  CheckCircle2,
-  Clock,
-  Briefcase,
-  User,
-  Shield,
-  Send,
-  Zap,
-} from 'lucide-react';
+import { X, Check, PhoneForwarded } from 'lucide-react';
 
 export default function SmartRouterModal({
   isOpen,
@@ -25,7 +14,7 @@ export default function SmartRouterModal({
   const [selectedDomain, setSelectedDomain] = useState('Internationale Detachering & Expat');
   const [callerName, setCallerName] = useState(customer?.primary_contact || 'Marc Vanhove');
   const [inquiryNotes, setInquiryNotes] = useState(
-    'Klant vraagt opheldering over werkregime (38u vs 36u) en A1-attesten voor grensoverschrijdend telewerk naar Nederland.'
+    'Klant vraagt toelichting over het 38u werkregime en afspraken rond grensoverschrijdend telewerk.'
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [handoffSuccess, setHandoffSuccess] = useState(null);
@@ -38,15 +27,13 @@ export default function SmartRouterModal({
     'Cafetariaplan & Flex Income',
   ];
 
-  // Algoritmische berekening van matches voor de geselecteerde klant en domein
+  // Algoritmische berekening matches op basis van klanthistoriek + domeinervaring
   const rankedMatches = employees
     .map((emp) => {
       const customerScore = emp.customer_familiarity?.[customer?.id] || 15;
       const domainScore = emp.domain_expertise?.[selectedDomain] || 25;
-
       const rawMatch = 0.5 * customerScore + 0.5 * domainScore;
 
-      // Beschikbaarheidsmodifier
       const availabilityFactor =
         emp.availability === 'Available'
           ? 1.0
@@ -67,8 +54,6 @@ export default function SmartRouterModal({
     })
     .sort((a, b) => b.overallMatch - a.overallMatch);
 
-  const topMatch = rankedMatches[0];
-
   const handleHandoff = (expert) => {
     setIsSubmitting(true);
     setTimeout(() => {
@@ -81,213 +66,150 @@ export default function SmartRouterModal({
       });
       setIsSubmitting(false);
       setHandoffSuccess(expert);
-    }, 600);
+    }, 350);
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden relative animate-in fade-in zoom-in-95 duration-200">
-        {/* Modal Header */}
-        <div className="bg-gradient-to-r from-sdworx-900 via-sdworx-800 to-sdworx-700 text-white p-6 relative">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg max-w-xl w-full border border-slate-200 shadow-xl overflow-hidden">
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">
+              Klant doorsturen naar de juiste collega
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Klant: {customer?.name} ({customer?.joint_committee.split(' - ')[0]})
+            </p>
+          </div>
           <button
             onClick={onClose}
-            className="absolute top-5 right-5 text-slate-300 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
+            className="text-slate-400 hover:text-slate-700 p-1 rounded-md"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
-          <div className="flex items-center space-x-2 text-sdworx-200 text-xs font-bold uppercase tracking-wider mb-1">
-            <Zap className="w-4 h-4 text-amber-400" />
-            <span>Pijler 2: Dynamic Expertise Routing</span>
-          </div>
-          <h2 className="text-xl font-black tracking-tight">
-            Slimme Doorverwijzing voor {customer?.name}
-          </h2>
-          <p className="text-xs text-sdworx-200 mt-1">
-            Het systeem berekent 50% Klantkennis + 50% Domeinexpertise op basis van reële dossiers.
-          </p>
         </div>
 
-        {/* Modal Body */}
-        <div className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+        {/* Inhoud */}
+        <div className="p-5 space-y-4">
           {handoffSuccess ? (
-            <div className="py-8 text-center space-y-4">
-              <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner animate-bounce">
-                <CheckCircle2 className="w-10 h-10" />
+            <div className="py-6 text-center space-y-3">
+              <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto border border-emerald-200">
+                <Check className="w-5 h-5" />
               </div>
-              <h3 className="text-xl font-bold text-slate-900">
-                Warm Handoff Succesvol Uitgevoerd!
-              </h3>
-              <p className="text-sm text-slate-600 max-w-md mx-auto">
-                Klant <span className="font-semibold">{callerName}</span> is direct doorgeschakeld
-                naar <span className="font-semibold text-sdworx-700">{handoffSuccess.name}</span>.
+              <h4 className="text-sm font-semibold text-slate-900">
+                Oproep doorgeschakeld naar {handoffSuccess.name}
+              </h4>
+              <p className="text-xs text-slate-600 max-w-sm mx-auto leading-relaxed">
+                De klant is doorgestuurd. De documenten van {customer?.name} en jouw notitie zijn automatisch klaargezet voor je collega.
               </p>
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 max-w-md mx-auto text-left text-xs space-y-1.5 font-mono">
-                <div className="text-slate-400 font-bold uppercase text-[10px]">Overgedragen Context:</div>
-                <div className="text-slate-700">✓ Klantdossier: {customer?.name} ({customer?.joint_committee.split(' - ')[0]})</div>
-                <div className="text-slate-700">✓ Geëxtraheerde Gouden Waarheid: 38u/week (Contract 2024)</div>
-                <div className="text-slate-700">✓ Actieve Conflict Alert bijgevoegd (Outlier Ticket #421)</div>
-                <div className="text-emerald-600 font-semibold">✓ Cryptografische audit hash gelogd in SHA-256 keten</div>
+              <div className="pt-2">
+                <button
+                  onClick={() => {
+                    setHandoffSuccess(null);
+                    onClose();
+                  }}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-medium rounded-md"
+                >
+                  Sluiten
+                </button>
               </div>
-              <button
-                onClick={() => {
-                  setHandoffSuccess(null);
-                  onClose();
-                }}
-                className="mt-4 px-6 py-2.5 rounded-xl bg-sdworx-600 hover:bg-sdworx-700 text-white font-semibold text-sm shadow-md transition-colors"
-              >
-                Sluit Venster
-              </button>
             </div>
           ) : (
             <>
-              {/* Domain & Context Selector */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Onderwerp / Vraagstuk
-                  </label>
-                  <select
-                    value={selectedDomain}
-                    onChange={(e) => setSelectedDomain(e.target.value)}
-                    className="w-full text-sm py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:ring-2 focus:ring-sdworx-500 focus:outline-none"
-                  >
-                    {domains.map((dom) => (
-                      <option key={dom} value={dom}>
-                        {dom}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Beller / Contactpersoon
-                  </label>
-                  <input
-                    type="text"
-                    value={callerName}
-                    onChange={(e) => setCallerName(e.target.value)}
-                    className="w-full text-sm py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-800 focus:ring-2 focus:ring-sdworx-500 focus:outline-none"
-                  />
-                </div>
+              {/* Vraagstuk selecteren */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Waarover gaat de vraag van de klant?
+                </label>
+                <select
+                  value={selectedDomain}
+                  onChange={(e) => setSelectedDomain(e.target.value)}
+                  className="w-full text-xs py-2 px-3 bg-slate-50 border border-slate-200 rounded-md font-medium text-slate-800 focus:outline-none focus:border-[#005FB8]"
+                >
+                  {domains.map((dom) => (
+                    <option key={dom} value={dom}>
+                      {dom}
+                    </option>
+                  ))}
+                </select>
               </div>
 
+              {/* Notitie voor collega */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Gespreksnotitie & Context (Wordt meegezonden)
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Korte notitie / vraagstelling
                 </label>
-                <textarea
-                  rows={2}
+                <input
+                  type="text"
                   value={inquiryNotes}
                   onChange={(e) => setInquiryNotes(e.target.value)}
-                  className="w-full text-xs py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:ring-2 focus:ring-sdworx-500 focus:outline-none"
+                  className="w-full text-xs py-1.5 px-3 bg-slate-50 border border-slate-200 rounded-md text-slate-800 focus:outline-none focus:border-[#005FB8]"
                 />
               </div>
 
-              {/* Conflict Context Attachment Notice */}
-              {conflicts?.length > 0 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-center space-x-2 text-xs text-amber-800">
-                  <span className="font-bold">⚠️ Automatische Context:</span>
-                  <span>
-                    De actieve conflictwaarschuwing ({conflicts[0].topic}) wordt automatisch als briefing meegegeven aan de expert.
-                  </span>
-                </div>
-              )}
-
-              {/* Ranked Matches List */}
+              {/* Aanbevolen collega's */}
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                    Aanbevolen Experts (Gerangschikt op Match)
-                  </div>
-                  <span className="text-[11px] text-slate-500">
-                    Formule: 50% Klantaffiniteit + 50% Domein
-                  </span>
+                <div className="text-xs font-semibold text-slate-500 mb-2">
+                  Wie kent deze klant of dit onderwerp het best?
                 </div>
 
-                <div className="space-y-3">
+                <div className="divide-y divide-slate-100 border border-slate-200 rounded-md">
                   {rankedMatches.map((expert, idx) => {
                     const isTop = idx === 0;
                     return (
                       <div
                         key={expert.id}
-                        className={`p-4 rounded-2xl border transition-all ${
-                          isTop
-                            ? 'bg-gradient-to-r from-sdworx-50/80 to-indigo-50/50 border-sdworx-300 ring-2 ring-sdworx-500/20 shadow-sm'
-                            : 'bg-white border-slate-200 hover:border-slate-300'
+                        className={`p-3 flex items-center justify-between gap-3 ${
+                          isTop ? 'bg-blue-50/20' : 'bg-white'
                         }`}
                       >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center space-x-3 min-w-0">
-                            <img
-                              src={expert.avatar_url}
-                              alt={expert.name}
-                              className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-xs shrink-0"
-                            />
-                            <div className="min-w-0">
-                              <div className="flex items-center space-x-2">
-                                <h4 className="text-sm font-bold text-slate-900 truncate">
-                                  {expert.name}
-                                </h4>
-                                {isTop && (
-                                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-sdworx-600 text-white">
-                                    Beste Match
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-xs text-slate-500 truncate">{expert.title}</p>
-                              <div className="flex items-center space-x-2 text-[11px] text-slate-600 mt-1">
-                                <span className="font-semibold text-sdworx-700">
-                                  Klantscore: {expert.customerScore}%
-                                </span>
-                                <span>•</span>
-                                <span className="font-semibold text-indigo-700">
-                                  Domein: {expert.domainScore}%
-                                </span>
-                                <span>•</span>
-                                <span className="text-slate-500">
-                                  {expert.completed_cases} cases afgerond
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Match Percentage & Transfer Button */}
-                          <div className="text-right shrink-0 flex items-center space-x-3">
-                            <div className="text-right">
-                              <div className="text-lg font-black text-slate-900">
-                                {expert.overallMatch}%
-                              </div>
-                              <span
-                                className={`text-[10px] font-bold block ${
-                                  expert.availability === 'Available'
-                                    ? 'text-emerald-600'
-                                    : expert.availability === 'InCall'
-                                    ? 'text-amber-600'
-                                    : 'text-slate-400'
-                                }`}
-                              >
-                                {expert.availability === 'Available'
-                                  ? '● Beschikbaar'
-                                  : expert.availability === 'InCall'
-                                  ? '● In gesprek'
-                                  : '● Bezig'}
+                        <div className="flex items-center space-x-3 min-w-0">
+                          <img
+                            src={expert.avatar_url}
+                            alt={expert.name}
+                            className="w-9 h-9 rounded-full object-cover border border-slate-200 shrink-0"
+                          />
+                          <div className="min-w-0">
+                            <div className="flex items-center space-x-2">
+                              <span className="text-xs font-semibold text-slate-900 truncate">
+                                {expert.name}
                               </span>
+                              {isTop && (
+                                <span className="text-[10px] font-medium px-1.5 py-0.2 rounded bg-blue-100 text-[#005FB8]">
+                                  Beste match ({expert.overallMatch}%)
+                                </span>
+                              )}
                             </div>
-
-                            <button
-                              onClick={() => handleHandoff(expert)}
-                              disabled={isSubmitting}
-                              className={`px-3.5 py-2 text-xs font-bold rounded-xl flex items-center space-x-1.5 transition-all shadow-sm ${
-                                isTop
-                                  ? 'bg-sdworx-600 hover:bg-sdworx-700 text-white shadow-sdworx-600/30 hover:scale-105'
-                                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                              }`}
-                            >
-                              <PhoneForwarded className="w-3.5 h-3.5" />
-                              <span>1-Click Transfer</span>
-                            </button>
+                            <p className="text-[11px] text-slate-500 truncate">{expert.title}</p>
+                            <p className="text-[11px] text-slate-400 mt-0.5">
+                              Heeft gewerkt aan {expert.completed_cases} vergelijkbare dossiers
+                            </p>
                           </div>
+                        </div>
+
+                        <div className="flex items-center space-x-3 shrink-0">
+                          <span
+                            className={`text-[10px] ${
+                              expert.availability === 'Available'
+                                ? 'text-emerald-600'
+                                : 'text-slate-400'
+                            }`}
+                          >
+                            {expert.availability === 'Available' ? '● Vrij' : '● Bezet'}
+                          </span>
+
+                          <button
+                            onClick={() => handleHandoff(expert)}
+                            disabled={isSubmitting}
+                            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                              isTop
+                                ? 'bg-[#005FB8] hover:bg-[#004b93] text-white'
+                                : 'border border-slate-200 hover:bg-slate-100 text-slate-700'
+                            }`}
+                          >
+                            Doorschakelen
+                          </button>
                         </div>
                       </div>
                     );

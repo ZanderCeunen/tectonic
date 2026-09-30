@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import CustomerHub from './components/CustomerHub';
-import ExpertiseGraphView from './components/ExpertiseGraphView';
-import SecurityConsole from './components/SecurityConsole';
 import SmartRouterModal from './components/SmartRouterModal';
+import CustomerSearchModal from './components/CustomerSearchModal';
 import {
   MOCK_CUSTOMERS,
   MOCK_DOCUMENTS,
   MOCK_CONFLICTS,
   MOCK_EMPLOYEES,
-  MOCK_AUDIT_ENTRIES,
 } from './mockFrontendData';
 
 export default function App() {
@@ -18,19 +16,18 @@ export default function App() {
   const [documents, setDocuments] = useState(MOCK_DOCUMENTS);
   const [conflicts, setConflicts] = useState(MOCK_CONFLICTS);
   const [employees, setEmployees] = useState(MOCK_EMPLOYEES);
-  const [auditEntries, setAuditEntries] = useState(MOCK_AUDIT_ENTRIES);
 
-  const [activeTab, setActiveTab] = useState('hub'); // 'hub' | 'graph' | 'security'
   const [isRouterOpen, setIsRouterOpen] = useState(false);
+  const [isCustomerSearchOpen, setIsCustomerSearchOpen] = useState(false);
 
+  // Ingelogde medewerker bij SD Worx
   const [activeUser, setActiveUser] = useState({
     name: 'Tom De Smet',
-    role: 'Consultant',
-    clearance: 'Standard',
+    role: 'Payroll Consultant',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
   });
 
-  // Haal data op van de Rust backend indien beschikbaar, anders fallback naar mock data
+  // Haal data op van backend indien beschikbaar, anders naadloze live fallback
   useEffect(() => {
     async function fetchData() {
       try {
@@ -40,11 +37,7 @@ export default function App() {
           if (custData.length > 0) setCustomers(custData);
         }
 
-        const docRes = await fetch(
-          `/api/customers/${selectedCustomerId}/documents?redact_pii=${
-            activeUser.role !== 'Senior Payroll Officer'
-          }`
-        );
+        const docRes = await fetch(`/api/customers/${selectedCustomerId}/documents`);
         if (docRes.ok) {
           const docData = await docRes.json();
           if (docData.documents) setDocuments(docData.documents);
@@ -56,24 +49,16 @@ export default function App() {
           const empData = await empRes.json();
           if (empData.length > 0) setEmployees(empData);
         }
-
-        const auditRes = await fetch('/api/security/audit-chain');
-        if (auditRes.ok) {
-          const auditData = await auditRes.json();
-          if (auditData.entries) setAuditEntries(auditData.entries);
-        }
       } catch (err) {
-        // Rust backend draait offline of nog niet gestart; UI draait naadloos verder op live state
-        console.log('Backend offline of lokaal actief, live mock data wordt gebruikt.');
+        // Rust backend offline of lokaal actief; UI draait naadloos verder
       }
     }
 
     fetchData();
-  }, [selectedCustomerId, activeUser.role]);
+  }, [selectedCustomerId]);
 
   // Document feedback interactie
   const handleFeedback = async (docId, type) => {
-    // Optimistic UI update
     setDocuments((prevDocs) =>
       prevDocs.map((d) => {
         if (d.id === docId) {
@@ -85,9 +70,6 @@ export default function App() {
           } else if (type === 'OUTDATED') {
             fb.outdated_count = (fb.outdated_count || 0) + 1;
             scoreDelta = -15;
-          } else if (type === 'QUESTIONABLE') {
-            fb.questionable_count = (fb.questionable_count || 0) + 1;
-            scoreDelta = -6;
           }
 
           const newScore = Math.max(10, Math.min(100, (d.trust?.overall_score || 50) + scoreDelta));
@@ -98,7 +80,6 @@ export default function App() {
             trust: {
               ...d.trust,
               overall_score: newScore,
-              feedback_score: Math.max(10, Math.min(100, (d.trust?.feedback_score || 70) + scoreDelta)),
             },
           };
         }
@@ -106,21 +87,6 @@ export default function App() {
       })
     );
 
-    // Voeg audit log entry toe
-    const newEntry = {
-      index: auditEntries.length,
-      timestamp: new Date().toISOString(),
-      actor: activeUser.name,
-      actor_role: activeUser.role,
-      action: 'SUBMIT_DOCUMENT_FEEDBACK',
-      resource: docId,
-      details: `Feedback ${type} geregistreerd voor document ID ${docId}`,
-      prev_hash: auditEntries[auditEntries.length - 1]?.hash || '000000',
-      hash: Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2),
-    };
-    setAuditEntries((prev) => [...prev, newEntry]);
-
-    // Backend call (indien live)
     try {
       await fetch(`/api/documents/${docId}/feedback`, {
         method: 'POST',
@@ -136,9 +102,8 @@ export default function App() {
     }
   };
 
-  // 1-Click Handoff actie
+  // Klant doorsturen
   const handleExecuteHandoff = async (handoffData) => {
-    // Update medewerker state
     setEmployees((prev) =>
       prev.map((emp) => {
         if (emp.id === handoffData.employee_id) {
@@ -150,31 +115,12 @@ export default function App() {
               ...emp.customer_familiarity,
               [selectedCustomerId]: Math.min(100, currentAffinity + 4),
             },
-            recent_activity: `Doorgeschakeld met klantvraag: '${handoffData.inquiry_summary.slice(
-              0,
-              40
-            )}...'`,
           };
         }
         return emp;
       })
     );
 
-    // Voeg audit log entry toe
-    const newEntry = {
-      index: auditEntries.length,
-      timestamp: new Date().toISOString(),
-      actor: activeUser.name,
-      actor_role: activeUser.role,
-      action: 'EXECUTE_WARM_HANDOFF',
-      resource: selectedCustomerId,
-      details: `Klantoproep doorgeschakeld naar expert ${handoffData.expert_name}. Context en conflict-alert automatisch overgedragen.`,
-      prev_hash: auditEntries[auditEntries.length - 1]?.hash || '000000',
-      hash: Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2),
-    };
-    setAuditEntries((prev) => [...prev, newEntry]);
-
-    // Backend call (indien live)
     try {
       await fetch('/api/routing/handoff', {
         method: 'POST',
@@ -184,7 +130,7 @@ export default function App() {
           employee_id: handoffData.employee_id,
           caller_name: handoffData.caller_name,
           inquiry_summary: handoffData.inquiry_summary,
-          attached_doc_ids: ['DOC-001', 'DOC-004'],
+          attached_doc_ids: ['DOC-001'],
         }),
       });
     } catch (e) {
@@ -195,48 +141,29 @@ export default function App() {
   const selectedCustomer = customers.find((c) => c.id === selectedCustomerId);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
-      {/* Top Header */}
+    <div className="min-h-screen bg-slate-50/60 flex flex-col font-sans">
+      {/* SD Worx Header met Klantzoeker trigger */}
       <Header
         customers={customers}
         selectedCustomerId={selectedCustomerId}
-        onSelectCustomer={setSelectedCustomerId}
+        onOpenCustomerSearch={() => setIsCustomerSearchOpen(true)}
         activeUser={activeUser}
-        onChangeActiveUser={setActiveUser}
-        onOpenRouter={() => setIsRouterOpen(true)}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
       />
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'hub' && (
-          <CustomerHub
-            customer={selectedCustomer}
-            documents={documents}
-            conflicts={conflicts}
-            activeUser={activeUser}
-            onFeedback={handleFeedback}
-          />
-        )}
-
-        {activeTab === 'graph' && (
-          <ExpertiseGraphView
-            employees={employees}
-            customers={customers}
-            selectedCustomerId={selectedCustomerId}
-          />
-        )}
-
-        {activeTab === 'security' && (
-          <SecurityConsole
-            auditEntries={auditEntries}
-            onVerifyIntegrity={() => {}}
-          />
-        )}
+      {/* Hoofdsectie: Het Klantdossier */}
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6">
+        <CustomerHub
+          customer={selectedCustomer}
+          documents={documents}
+          conflicts={conflicts}
+          activeUser={activeUser}
+          onFeedback={handleFeedback}
+          onOpenRouter={() => setIsRouterOpen(true)}
+          onOpenCustomerSearch={() => setIsCustomerSearchOpen(true)}
+        />
       </main>
 
-      {/* Smart Router Modal */}
+      {/* Modal: Klant doorsturen naar expert */}
       <SmartRouterModal
         isOpen={isRouterOpen}
         onClose={() => setIsRouterOpen(false)}
@@ -246,13 +173,20 @@ export default function App() {
         onExecuteHandoff={handleExecuteHandoff}
       />
 
-      {/* Hackathon Footer */}
-      <footer className="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>TECTONIC — SD Worx Hackathon Innovation Platform</span>
-          <span className="font-semibold text-slate-700">
-            Powered by Rust (Axum Core) & Tailwind CSS
-          </span>
+      {/* Modal: Uitgebreide Klantzoeker & Filter */}
+      <CustomerSearchModal
+        isOpen={isCustomerSearchOpen}
+        onClose={() => setIsCustomerSearchOpen(false)}
+        customers={customers}
+        selectedCustomerId={selectedCustomerId}
+        onSelectCustomer={setSelectedCustomerId}
+      />
+
+      {/* Subtiele corporate footer */}
+      <footer className="border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-400">
+        <div className="max-w-6xl mx-auto px-4 flex items-center justify-between">
+          <span>SD Worx Kennisbeheer & Expertise Routing</span>
+          <span>Interne Werknemersomgeving</span>
         </div>
       </footer>
     </div>

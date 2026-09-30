@@ -72,13 +72,12 @@ async fn main() {
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
-    println!("🚀 TECTONIC Backend gestart op http://127.0.0.1:8080");
-    println!("🔒 Cryptografische Audit Ledger & PII Redactor actief");
+    println!("SD Worx Kennisportaal API actief op http://127.0.0.1:8080");
     axum::serve(listener, app).await.unwrap();
 }
 
 async fn health_check() -> impl IntoResponse {
-    (StatusCode::OK, "TECTONIC Backend Status: ACTIVE & HEALTHY")
+    (StatusCode::OK, "SD Worx Knowledge Hub API Status: ACTIEF")
 }
 
 async fn list_customers(State(state): State<AppState>) -> Json<Vec<Customer>> {

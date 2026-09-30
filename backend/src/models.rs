@@ -15,10 +15,13 @@ pub struct Customer {
     pub id: String,
     pub name: String,
     pub enterprise_number: String,
+    pub customer_code: Option<String>,
     pub industry: String,
     pub joint_committee: String, // bv. "PC 200 - Aanvullend Paritair Comité voor Bedienden"
     pub primary_contact: String,
     pub contact_email: String,
+    pub contact_phone: Option<String>,
+    pub sdworx_account_manager: Option<String>,
     pub employee_count: usize,
     pub location: String,
 }
