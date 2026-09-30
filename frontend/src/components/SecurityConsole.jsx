@@ -26,7 +26,7 @@ export default function SecurityConsole({ auditEntries, onVerifyIntegrity }) {
     return input
       .replace(/\b(\d{2})[\.\s]?(\d{2})[\.\s]?(\d{2})[-–\s]?(\d{3})[\.\s]?(\d{2})\b/g, '$1.$2.$3-***.**')
       .replace(/\b(BE\d{2})[\s]?(\d{4})[\s]?(\d{4})[\s]?(\d{4})\b/g, '$1 **** **** $4')
-      .replace(/(€\s?|\bEUR\s?)(\d{1,3}(?:\.\d{3})*|\d+)(?:,\d{2})?\s?(?:bruto|maandloon|uurloon|/maand|/uur)?/g, '€ [VERTROUWELIJK_SALARIS]');
+      .replace(new RegExp('(€\\s?|\\bEUR\\s?)(\\d{1,3}(?:\\.\\d{3})*|\\d+)(?:,\\d{2})?\\s?(?:bruto|maandloon|uurloon|/maand|/uur)?', 'g'), '€ [VERTROUWELIJK_SALARIS]');
   };
 
   const handleVerify = () => {
