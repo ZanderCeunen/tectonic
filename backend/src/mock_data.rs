@@ -93,6 +93,9 @@ pub fn get_mock_documents() -> Vec<DocumentItem> {
             author_role: "Klant HR Directie & SD Worx Legal".to_string(),
             summary: "Officieel medeondertekend addendum betreffende het voltijds arbeidsregime van 38 uur per week, telewerkmodaliteiten (max. 2 dagen) en representatievergoeding.".to_string(),
             raw_content: "Overeenkomst gesloten tussen Acme Logistics BV en werknemersvertegenwoordiging. Artikel 3: Het wekelijks werkregime voor alle bedienden onder PC 200 is vastgesteld op exact 38u/week verdeeld over 5 werkdagen. Telewerk is toegestaan voor maximaal 2 dagen per week mits goedkeuring leidinggevende. Referentie medewerker dossier RRN 85.04.12-123.45, bankrekening BE68 5390 0754 7034. Bruto basiswedde directieassistentie € 3.850,00 bruto per maand.".to_string(),
+            file_path: Some("/documents/CUST-001/addendum_2024.pdf".to_string()),
+            file_name: Some("addendum_2024.pdf".to_string()),
+            file_size: Some(1258432),
             key_facts: vec![
                 KeyFact {
                     field: "werkregime".to_string(),
@@ -142,6 +145,9 @@ pub fn get_mock_documents() -> Vec<DocumentItem> {
             author_role: "SD Worx Legal Knowledge Center".to_string(),
             summary: "Officiële sectorale richtlijn SD Worx voor bedienden onder PC 200. Bevestigt de wettelijke 38-urenweek en de indexeringsregels.".to_string(),
             raw_content: "SD Worx Kennisdossier PC 200. De standaard arbeidsduur bedraagt 38u/week, tenzij op ondernemingsvlak een kortere arbeidsduur werd ingevoerd met ADV-dagen. Maaltijdcheque werkgeversbijdrage maximaal € 6,91 (totaal € 8,00 per gewerkte dag).".to_string(),
+            file_path: Some("/templates/PC200_barema_2024.docx".to_string()),
+            file_name: Some("PC200_barema_2024.docx".to_string()),
+            file_size: Some(876543),
             key_facts: vec![
                 KeyFact {
                     field: "werkregime".to_string(),
@@ -185,6 +191,9 @@ pub fn get_mock_documents() -> Vec<DocumentItem> {
             author_role: "Senior Payroll Officer SD Worx".to_string(),
             summary: "Verslag van kwartaaloverleg met Marc Vanhove. Behandeling van 3 internationale detacheringen naar Nederland en bevestiging van de 38u-regeling.".to_string(),
             raw_content: "Overleg met Marc Vanhove inzake grensoverschrijdend telewerk. Grenswerkers vallen onder A1-verordening met max 49.9% telewerk in woonland. Normale werktijd blijft 38u/week conform Addendum 2024. Contactpersoon Marc goedgekeurd.".to_string(),
+            file_path: None,
+            file_name: None,
+            file_size: None,
             key_facts: vec![
                 KeyFact {
                     field: "werkregime".to_string(),
@@ -228,6 +237,9 @@ pub fn get_mock_documents() -> Vec<DocumentItem> {
             author_role: "Junior HR Consultant SD Worx".to_string(),
             summary: "Ticketantwoord waarin Kevin per abuis vermeldt dat Acme Logistics op een 36u-regime werkt n.a.v. een vraag over compensatierust.".to_string(),
             raw_content: "Beste Marc, voor de berekening van de feestdagvergoeding zijn we uitgegaan van de 36u/week regeling die van toepassing is op de logistieke site. Gelieve dit te bevestigen voor de loonstrook van september.".to_string(),
+            file_path: None,
+            file_name: None,
+            file_size: None,
             key_facts: vec![
                 KeyFact {
                     field: "werkregime".to_string(),
@@ -265,6 +277,9 @@ pub fn get_mock_documents() -> Vec<DocumentItem> {
             author_role: "Payroll Consultant SD Worx".to_string(),
             summary: "Korte chatnotitie met Marc over collectieve sluitingsdagen tussen Kerst en Nieuwjaar.".to_string(),
             raw_content: "Marc bevestigt via chat: bedrijf sluit op 24/12 en 31/12 in de namiddag. Brugdag op Hemelvaartsdag goedgekeurd door ondernemingsraad.".to_string(),
+            file_path: None,
+            file_name: None,
+            file_size: None,
             key_facts: vec![
                 KeyFact {
                     field: "brugdagen".to_string(),
