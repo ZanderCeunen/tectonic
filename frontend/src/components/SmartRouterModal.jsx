@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, Check, Phone, PhoneCall, UserCheck, AlertCircle } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { X, Check, Phone, PhoneCall, Search, Sparkles, Briefcase, FileCheck, CheckCircle2 } from 'lucide-react';
 
 export default function SmartRouterModal({
   isOpen,
@@ -12,53 +12,167 @@ export default function SmartRouterModal({
 }) {
   if (!isOpen) return null;
 
-  const [selectedDomain, setSelectedDomain] = useState('Internationale Detachering & Expat');
+  const [searchQuery, setSearchQuery] = useState('');
   const [isCalling, setIsCalling] = useState(false);
   const [callSuccess, setCallSuccess] = useState(null);
 
-  const domains = [
-    'Internationale Detachering & Expat',
+  const quickPills = [
+    'Grensarbeid & Expat A1',
+    'Bouw & Weerverlet PC 124',
+    'Horeca & Flexi-jobs PC 302',
+    'Ploegenpremie & Chemie PC 207',
     'CAO 200 & Bediendenstatuut',
-    'Werkregime & Arbeidstijd',
-    'Tijdsregistratie & Overuren',
-    'Cafetariaplan & Flex Income',
-    'Bouwbedrijf PC 124',
-    'Chemie & Petrochemie PC 207',
-    'Horeca PC 302 & Flexi-jobs',
-    'Voedingsnijverheid PC 118',
+    'Cafetariaplan & Bedrijfswagens',
+    'Zorg & IFIC Barema PC 330',
   ];
 
   // Filter actieve medewerker eruit (jezelf niet kunnen bellen)
-  const availableEmployees = employees.filter(
-    (emp) => emp.name !== activeUser.name && emp.id !== activeUser.id
-  );
+  const availableEmployees = useMemo(() => {
+    return employees.filter(
+      (emp) => emp.name !== activeUser.name && emp.id !== activeUser.id
+    );
+  }, [employees, activeUser]);
 
-  // Algoritmische berekening matches op basis van klanthistoriek + domeinervaring
-  const rankedMatches = availableEmployees
-    .map((emp) => {
-      const customerScore = emp.customer_familiarity?.[customer?.id] || 15;
-      const domainScore = emp.domain_expertise?.[selectedDomain] || 25;
-      const rawMatch = 0.5 * customerScore + 0.5 * domainScore;
+  // Slim zoek- & matchalgoritme op de client-zijde (in lijn met de Rust backend)
+  const rankedMatches = useMemo(() => {
+    const rawTokens = searchQuery
+      .toLowerCase()
+      .split(/[^a-zA-Z0-9-]/)
+      .filter((t) => t.length >= 2);
 
-      const availabilityFactor =
-        emp.availability === 'Available'
-          ? 1.0
-          : emp.availability === 'InCall'
-          ? 0.9
-          : emp.availability === 'Busy'
-          ? 0.85
-          : 0.6;
+    const targetCustId = customer?.id || '';
 
-      const overallMatch = Math.round(rawMatch * availabilityFactor);
+    return availableEmployees
+      .map((emp) => {
+        let bestDomainScore = 0;
+        let matchedDomainName = '';
+        let keywordHits = 0;
 
-      return {
-        ...emp,
-        customerScore,
-        domainScore,
-        overallMatch,
-      };
-    })
-    .sort((a, b) => b.overallMatch - a.overallMatch);
+        // 1. Check domeinexpertise
+        const domainEntries = Object.entries(emp.domain_expertise || {});
+        for (const [domain, score] of domainEntries) {
+          const domLower = domain.toLowerCase();
+          for (const token of rawTokens) {
+            if (domLower.includes(token)) {
+              keywordHits += 1;
+              if (score > bestDomainScore) {
+                bestDomainScore = score;
+                matchedDomainName = domain;
+              }
+            }
+          }
+        }
+
+        // 2. Check recente dossieractiviteit & functietitel
+        const profileText = `${emp.name} ${emp.title} ${emp.recent_activity || ''}`.toLowerCase();
+        for (const token of rawTokens) {
+          if (profileText.includes(token)) {
+            keywordHits += 1;
+          }
+        }
+
+        // 3. Domeinspecifieke trefwoordherkenning
+        const hasToken = (keywords) => rawTokens.some((t) => keywords.some((k) => t.includes(k) || k.includes(t)));
+
+        if (hasToken(['expat', 'detachering', 'buitenland', 'grensarbeid', 'a1', 'internationaal'])) {
+          const s = emp.domain_expertise?.['Internationale Detachering & Expat'] || 0;
+          if (s > bestDomainScore) {
+            bestDomainScore = s;
+            matchedDomainName = 'Internationale Detachering & Expat';
+          }
+        }
+
+        if (hasToken(['bouw', 'weerverlet', 'constructiv', 'pc 124', '124', 'arbeiders', 'rustdag', 'mobiliteit'])) {
+          const s = emp.domain_expertise?.['Bouwbedrijf PC 124'] || 0;
+          if (s > bestDomainScore) {
+            bestDomainScore = s;
+            matchedDomainName = 'Bouwbedrijf PC 124';
+          }
+        }
+
+        if (hasToken(['horeca', 'flexi', 'flexijob', 'flexi-job', 'pc 302', '302', 'dimona', 'student'])) {
+          const s = emp.domain_expertise?.['Horeca PC 302 & Flexi-jobs'] || 0;
+          if (s > bestDomainScore) {
+            bestDomainScore = s;
+            matchedDomainName = 'Horeca PC 302 & Flexi-jobs';
+          }
+        }
+
+        if (hasToken(['chemie', 'volcontinu', 'ploeg', 'ploegen', 'nachtpremie', 'standby', 'pc 207', '207'])) {
+          const s = emp.domain_expertise?.['Chemie & Petrochemie PC 207'] || 0;
+          if (s > bestDomainScore) {
+            bestDomainScore = s;
+            matchedDomainName = 'Chemie & Petrochemie PC 207';
+          }
+        }
+
+        if (hasToken(['cao 200', 'pc 200', '200', 'bediende', 'bedienden', 'arbeidsduur', '38u', '36u', 'telewerk', 'thuiswerk'])) {
+          const s = emp.domain_expertise?.['CAO 200 & Bediendenstatuut'] || 0;
+          if (s > bestDomainScore) {
+            bestDomainScore = s;
+            matchedDomainName = 'CAO 200 & Bediendenstatuut';
+          }
+        }
+
+        if (hasToken(['cafetaria', 'cafetariaplan', 'flex', 'wagen', 'bedrijfswagen', 'fisc', 'tax'])) {
+          const s = emp.domain_expertise?.['Cafetariaplan & Flex Income'] || 0;
+          if (s > bestDomainScore) {
+            bestDomainScore = s;
+            matchedDomainName = 'Cafetariaplan & Flex Income';
+          }
+        }
+
+        if (hasToken(['zorg', 'ziekenhuis', 'ific', 'pc 330', '330'])) {
+          const s = emp.domain_expertise?.['Zorgsector PC 330 & IFIC'] || 0;
+          if (s > bestDomainScore) {
+            bestDomainScore = s;
+            matchedDomainName = 'Zorgsector PC 330 & IFIC';
+          }
+        }
+
+        // Bepaal finale domeinscore
+        const finalDomainScore =
+          bestDomainScore > 0
+            ? Math.min(100, bestDomainScore + keywordHits * 3)
+            : rawTokens.length === 0
+            ? Math.max(...Object.values(emp.domain_expertise || { default: 50 }))
+            : Math.min(70, 25 + keywordHits * 8);
+
+        // 4. Klantervaring met huidig dossier
+        const customerScore = targetCustId ? emp.customer_familiarity?.[targetCustId] || 15 : 40;
+
+        // 5. Factor succesvol afgehandelde dossiers (tot 18 bonuspunten)
+        const casesBoost = Math.min(18, (emp.completed_cases || 0) * 0.35);
+
+        // 6. Gewogen formule
+        const weightedScore = targetCustId
+          ? 0.45 * finalDomainScore + 0.40 * customerScore + casesBoost
+          : 0.70 * finalDomainScore + 0.15 * customerScore + casesBoost;
+
+        const availabilityFactor =
+          emp.availability === 'Available'
+            ? 1.0
+            : emp.availability === 'InCall'
+            ? 0.92
+            : emp.availability === 'Busy'
+            ? 0.85
+            : 0.6;
+
+        const overallMatch = Math.round(Math.min(99, Math.max(10, weightedScore * availabilityFactor)));
+
+        const domainDisplay = matchedDomainName || emp.title;
+
+        return {
+          ...emp,
+          overallMatch,
+          customerScore: Math.round(customerScore),
+          domainScore: Math.round(finalDomainScore),
+          domainDisplay,
+          explanation: `${emp.name} heeft ${emp.completed_cases} dossiers succesvol afgerond en beheert expertise in '${domainDisplay}'.`,
+        };
+      })
+      .sort((a, b) => b.overallMatch - a.overallMatch);
+  }, [availableEmployees, searchQuery, customer]);
 
   const handleCall = (expert) => {
     setIsCalling(true);
@@ -66,42 +180,42 @@ export default function SmartRouterModal({
       onExecuteHandoff({
         customer_id: customer?.id,
         employee_id: expert.id,
-        caller_name: customer?.primary_contact || 'Klant',
-        inquiry_summary: `Telefonisch overleg over ${selectedDomain}`,
+        caller_name: customer?.primary_contact || 'Klant HR Verantwoordelijke',
+        inquiry_summary: searchQuery || `Telefonisch overleg dossier ${customer?.name || 'Algemeen'}`,
         expert_name: expert.name,
       });
       setIsCalling(false);
       setCallSuccess(expert);
-    }, 400);
+    }, 350);
   };
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div className="bg-white rounded-xl max-w-xl w-full border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
-        <div className="bg-sdworx-navy text-white px-5 py-3.5 flex items-center justify-between">
+        <div className="bg-[#005FB8] text-white px-5 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
-            <div className="p-1.5 bg-sdworx-orange rounded text-white">
+            <div className="p-1.5 bg-white/15 rounded-lg text-white">
               <PhoneCall className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-white">
-                Collega Bellen voor Dossier
+              <h3 className="text-sm font-bold text-white flex items-center space-x-1.5">
+                <span>Expert Zoeken & Collega Bellen</span>
               </h3>
-              <p className="text-[11px] text-slate-300">
-                {customer?.name} ({customer?.joint_committee?.split(' - ')[0] || 'Algemeen'})
+              <p className="text-[11px] text-blue-100">
+                {customer ? `${customer.name} (${customer.joint_committee?.split(' - ')[0] || 'Dossier'})` : 'Alle SD Worx Experten'}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-300 hover:text-white p-1 rounded hover:bg-white/10"
+            className="text-blue-100 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Inhoud */}
+        {/* Modal Inhoud */}
         <div className="p-5 space-y-4">
           {callSuccess ? (
             <div className="py-6 text-center space-y-3">
@@ -112,8 +226,8 @@ export default function SmartRouterModal({
                 Verbonden met {callSuccess.name}
               </h4>
               <p className="text-xs text-slate-600 max-w-sm mx-auto leading-relaxed">
-                De verbinding is actief op toestel <strong className="text-sdworx-navy font-mono">int. {callSuccess.extension || '4102'}</strong>.
-                Het dossier van <strong>{customer?.name}</strong> is automatisch voor je collega geopend.
+                De oproep is doorgeschakeld naar <strong className="text-[#005FB8] font-mono">int. {callSuccess.extension || '4102'}</strong>.
+                {customer && <span> Het dossier van <strong>{customer.name}</strong> en de context zijn direct voor je collega klaargezet.</span>}
               </p>
               <div className="pt-2">
                 <button
@@ -121,7 +235,7 @@ export default function SmartRouterModal({
                     setCallSuccess(null);
                     onClose();
                   }}
-                  className="px-4 py-1.5 bg-sdworx-navy hover:bg-sdworx-navy-dark text-white text-xs font-semibold rounded transition-colors"
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg transition-colors"
                 >
                   Gesprek Beëindigen / Sluiten
                 </button>
@@ -129,85 +243,130 @@ export default function SmartRouterModal({
             </div>
           ) : (
             <>
-              {/* Vraagstuk selecteren */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Waarover gaat de vraag van de beller?
+              {/* Vrije Zoekbalk / Kernwoorden Invoer */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-800">
+                  Typ een vraag, probleem of kernwoorden:
                 </label>
-                <select
-                  value={selectedDomain}
-                  onChange={(e) => setSelectedDomain(e.target.value)}
-                  className="w-full text-xs py-2 px-2.5 bg-slate-50 border border-slate-300 rounded font-medium text-slate-900 focus:outline-none focus:border-sdworx-blue"
-                >
-                  {domains.map((dom) => (
-                    <option key={dom} value={dom}>
-                      {dom}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Aanbevolen collega's om direct te bellen */}
-              <div>
-                <div className="flex items-center justify-between text-xs font-semibold text-slate-600 mb-2">
-                  <span>Beschikbare collega's gerangschikt op klantervaring</span>
-                  <span className="text-[11px] text-slate-400">Direct intern bellen</span>
+                <div className="relative">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Bv: 'Vraag over grensarbeid en A1 expat', 'Weerverlet bouw', 'Flexi-job PC 302'..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#005FB8] focus:bg-white transition-all shadow-2xs font-medium"
+                    autoFocus
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs px-1.5 py-0.5 rounded"
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
 
-                <div className="divide-y divide-slate-100 border border-slate-200 rounded max-h-64 overflow-y-auto">
+                {/* Snelle trefwoord suggesties */}
+                <div className="flex items-center space-x-1.5 overflow-x-auto py-1 text-[11px]">
+                  <span className="text-slate-400 text-[10px] uppercase font-bold shrink-0">Suggesties:</span>
+                  {quickPills.map((pill) => (
+                    <button
+                      key={pill}
+                      type="button"
+                      onClick={() => setSearchQuery(pill)}
+                      className={`px-2 py-0.5 rounded-md transition-colors shrink-0 text-[11px] font-medium ${
+                        searchQuery === pill
+                          ? 'bg-[#005FB8] text-white'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {pill}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Resultaten: Gematchte Experten & Collega's */}
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center justify-between text-xs font-semibold text-slate-600 px-0.5">
+                  <span className="flex items-center space-x-1">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Aanbevolen collega's ({rankedMatches.length})</span>
+                  </span>
+                  <span className="text-[11px] text-slate-400">Gerangschikt op dossierervaring</span>
+                </div>
+
+                <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl max-h-72 overflow-y-auto shadow-2xs bg-white">
                   {rankedMatches.map((expert, idx) => {
                     const isTop = idx === 0;
                     return (
                       <div
                         key={expert.id}
-                        className={`p-3 flex items-center justify-between gap-3 ${
-                          isTop ? 'bg-sdworx-blue-light/40' : 'bg-white hover:bg-slate-50'
+                        className={`p-3.5 flex items-start justify-between gap-3 transition-colors ${
+                          isTop ? 'bg-blue-50/50 hover:bg-blue-50/80' : 'hover:bg-slate-50'
                         }`}
                       >
-                        <div className="flex items-center space-x-3 min-w-0">
+                        <div className="flex items-start space-x-3 min-w-0">
                           <img
                             src={expert.avatar_url}
                             alt={expert.name}
-                            className="w-9 h-9 rounded-full object-cover border border-slate-200 shrink-0"
+                            className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0 mt-0.5"
                           />
-                          <div className="min-w-0">
-                            <div className="flex items-center space-x-2">
+                          <div className="min-w-0 space-y-0.5">
+                            <div className="flex items-center space-x-2 flex-wrap">
                               <span className="text-xs font-bold text-slate-900 truncate">
                                 {expert.name}
                               </span>
-                              {isTop && (
-                                <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-sdworx-orange text-white">
-                                  Beste Match ({expert.overallMatch}%)
-                                </span>
-                              )}
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                                  isTop
+                                    ? 'bg-emerald-600 text-white'
+                                    : 'bg-slate-100 text-slate-700'
+                                }`}
+                              >
+                                {expert.overallMatch}% Match
+                              </span>
+                              <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-blue-100 text-[#005FB8]">
+                                {expert.completed_cases} afgeronde dossiers
+                              </span>
                             </div>
-                            <p className="text-[11px] text-slate-600 truncate">
-                              {expert.title} • <span className="font-mono text-sdworx-navy font-bold">int. {expert.extension}</span>
+
+                            <p className="text-[11px] text-slate-600">
+                              {expert.title} • <span className="font-mono text-slate-800 font-bold">int. {expert.extension || '4100'}</span>
                             </p>
-                            <p className="text-[11px] text-slate-400 mt-0.5">
-                              {expert.customerScore}% dossierkennis • {expert.completed_cases} cases afgerond
+
+                            {/* Uitleg over de match */}
+                            <p className="text-[11px] text-slate-500 leading-tight pt-0.5">
+                              {expert.recent_activity ? (
+                                <span>Recent: {expert.recent_activity}</span>
+                              ) : (
+                                <span>{expert.explanation}</span>
+                              )}
                             </p>
                           </div>
                         </div>
 
-                        <div className="flex items-center space-x-2.5 shrink-0">
+                        {/* Direct Bellen Knop */}
+                        <div className="flex flex-col items-end space-y-1.5 shrink-0 ml-2">
                           <span
-                            className={`text-[11px] font-medium ${
+                            className={`text-[10px] font-bold ${
                               expert.availability === 'Available'
                                 ? 'text-emerald-700'
                                 : 'text-slate-400'
                             }`}
                           >
-                            {expert.availability === 'Available' ? '● Vrij' : '● Bezet'}
+                            {expert.availability === 'Available' ? '● Beschikbaar' : '● In Gesprek'}
                           </span>
 
                           <button
                             onClick={() => handleCall(expert)}
                             disabled={isCalling}
-                            className={`px-3 py-1.5 text-xs font-bold rounded flex items-center space-x-1.5 transition-colors shadow-2xs ${
+                            className={`px-3 py-1.5 text-xs font-bold rounded-lg flex items-center space-x-1.5 transition-all shadow-2xs ${
                               isTop
-                                ? 'bg-sdworx-blue hover:bg-sdworx-navy text-white'
-                                : 'bg-slate-800 hover:bg-slate-900 text-white'
+                                ? 'bg-[#005FB8] hover:bg-[#004b93] text-white'
+                                : 'bg-slate-900 hover:bg-slate-800 text-white'
                             }`}
                           >
                             <Phone className="w-3.5 h-3.5" />

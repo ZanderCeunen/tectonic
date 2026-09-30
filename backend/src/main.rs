@@ -568,14 +568,17 @@ async fn recommend_experts(
     let expertise_graph = ExpertiseGraph::new(employees);
     let recommendations = expertise_graph.recommend_experts(&req);
 
+    let target_cust = req.customer_id.as_deref().unwrap_or("Algemeen");
+    let query_summary = req.query.as_deref().unwrap_or_else(|| req.domain.as_deref().unwrap_or("Zoekopdracht"));
+
     let entry = state.audit_chain.append(
         "ROUTING_ENGINE",
         "AlgorithmicRouter",
         "CALCULATE_ROUTING_MATCH",
-        &req.customer_id,
+        target_cust,
         &format!(
-            "Beste matches berekend voor domein '{}'. Top match: {}",
-            req.domain,
+            "Beste matches berekend voor '{}'. Top match: {}",
+            query_summary,
             recommendations
                 .first()
                 .map(|r| r.employee.name.as_str())

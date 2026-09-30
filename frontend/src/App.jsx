@@ -372,7 +372,7 @@ export default function App() {
           <span className="font-medium text-slate-600">
             SD Worx Kennisnet & Dossierbeheer
           </span>
-          <span>Interne Werknemersomgeving • SQLite Database & JWT Active</span>
+          <span>Interne Werknemersomgeving</span>
         </div>
       </footer>
     </div>

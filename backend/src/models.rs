@@ -215,11 +215,16 @@ pub struct Employee {
     pub recent_activity: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct RoutingRequest {
-    pub customer_id: String,
-    pub domain: String,
-    pub inquiry_summary: String,
+    #[serde(default)]
+    pub customer_id: Option<String>,
+    #[serde(default)]
+    pub domain: Option<String>,
+    #[serde(default)]
+    pub inquiry_summary: Option<String>,
+    #[serde(default)]
+    pub query: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

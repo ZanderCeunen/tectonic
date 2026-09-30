@@ -81,28 +81,24 @@ export default function Header({
             </button>
           </div>
 
-          {/* Actieve medewerker & Inloggen / Uitloggen */}
+          {/* Actieve medewerker & Uitloggen */}
           <div className="flex items-center space-x-3 shrink-0">
-            <button
-              onClick={onOpenLogin}
-              className="text-right hidden sm:block group hover:opacity-80 text-left"
-              title="Klik om te wisselen van account"
-            >
-              <div className="text-xs font-bold text-slate-900 flex items-center justify-end space-x-1">
-                <span>{activeUser.name}</span>
-                <Shield className="w-3 h-3 text-emerald-600" />
+            <div className="text-right hidden sm:block">
+              <div className="text-xs font-bold text-slate-900">
+                {activeUser.name}
               </div>
               <div className="text-[11px] text-slate-500">
-                {activeUser.role} • <span className="text-[#005FB8] font-semibold">Wissel</span>
+                {activeUser.role}
               </div>
-            </button>
+            </div>
 
             <button
               onClick={onLogout}
-              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg border border-slate-200 transition-colors"
+              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg border border-slate-200 transition-colors flex items-center space-x-1"
               title="Uitloggen"
             >
               <LogOut className="w-4 h-4" />
+              <span className="text-xs font-medium text-slate-600 hover:text-rose-600 hidden md:inline">Uitloggen</span>
             </button>
           </div>
         </div>
