@@ -1,5 +1,5 @@
 use crate::models::{
-    ConflictAlert, ConflictingDocRef, DocumentItem, KeyFact, TrustBreakdown,
+    ConflictAlert, ConflictingDocRef, DocumentItem, TrustBreakdown,
 };
 use chrono::{NaiveDate, Utc};
 use std::collections::HashMap;
