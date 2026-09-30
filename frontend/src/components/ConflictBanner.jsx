@@ -1,79 +1,46 @@
 import React, { useState } from 'react';
-import { AlertCircle, ChevronDown, ChevronUp, FileText, Check } from 'lucide-react';
+import { AlertCircle, ChevronDown, ChevronUp, CheckCircle2 } from 'lucide-react';
 
 export default function ConflictBanner({ conflicts }) {
-  const [expanded, setExpanded] = useState(false);
+  const [open, setOpen] = useState(false);
 
   if (!conflicts || conflicts.length === 0) return null;
 
   const conflict = conflicts[0];
 
   return (
-    <div className="bg-white border border-amber-200/80 rounded-lg p-4 mb-5 shadow-xs">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start space-x-3">
-          <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
-          <div>
-            <div className="flex items-center space-x-2">
-              <h3 className="text-sm font-semibold text-slate-900">
-                Aandachtspunt: Afwijkende bepaling in documenten ({conflict.topic})
-              </h3>
-            </div>
-            <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
-              Er is een verschil aangetroffen in de werkuren tussen verschillende bronnen.
-              De getekende arbeidsovereenkomst (<strong>38u/week</strong>) is leidend ten opzichte van
-              het recentere helpdesk-ticket (<strong>36u/week</strong>).
-            </p>
-          </div>
+    <div className="bg-amber-50/70 border border-amber-200/80 rounded-md px-3.5 py-2 text-xs text-amber-900 mb-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center space-x-2 min-w-0">
+          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+          <span className="font-semibold text-amber-950 truncate">
+            Aandachtspunt:
+          </span>
+          <span className="text-amber-900 truncate">
+            Afwijkende werkuren aangetroffen tussen Addendum 2024 (38u) en Ticket #421 (36u).
+          </span>
         </div>
 
         <button
-          onClick={() => setExpanded(!expanded)}
-          className="text-xs text-slate-500 hover:text-slate-800 font-medium inline-flex items-center space-x-1 shrink-0 mt-0.5"
+          onClick={() => setOpen(!open)}
+          className="text-[11px] font-semibold text-sdworx-navy hover:underline shrink-0 flex items-center space-x-0.5 ml-2"
         >
-          <span>{expanded ? 'Verberg details' : 'Vergelijk bronnen'}</span>
-          {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          <span>{open ? 'Sluit' : 'Bekijk'}</span>
+          {open ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
         </button>
       </div>
 
-      {expanded && (
-        <div className="mt-3 pt-3 border-t border-slate-100">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-            {conflict.conflicting_docs.map((item, idx) => {
-              const isPreferred = item.trust_score >= 85;
-              return (
-                <div
-                  key={idx}
-                  className={`p-3 rounded-md border ${
-                    isPreferred
-                      ? 'border-emerald-200 bg-emerald-50/50'
-                      : 'border-slate-200 bg-slate-50/60'
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-[11px] text-slate-500 mb-1">
-                    <span>{item.source_label}</span>
-                    <span className="font-semibold text-slate-700">{item.trust_score.toFixed(0)}% score</span>
-                  </div>
-                  <p className="font-medium text-slate-900 truncate mb-1">{item.doc_title}</p>
-                  <div className="flex items-center justify-between mt-2 pt-1 border-t border-slate-200/60">
-                    <span className="text-[11px] text-slate-500">Geregistreerd:</span>
-                    <span
-                      className={`font-semibold ${
-                        isPreferred ? 'text-emerald-700' : 'text-slate-500 line-through'
-                      }`}
-                    >
-                      {item.stated_value}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="mt-3 text-[11px] text-slate-500 flex items-center space-x-1.5">
-            <Check className="w-3.5 h-3.5 text-emerald-600" />
-            <span>
-              Aanbeveling: Raadpleeg <em>Sarah Vermeulen</em> bij verdere twijfel over dit dossier.
+      {open && (
+        <div className="mt-2.5 pt-2 border-t border-amber-200/60 text-[11px] space-y-2">
+          <p className="text-slate-700">
+            <strong>Juridische richtlijn:</strong> Het getekende addendum (38u/week, 95% betrouwbaarheid) heeft wettelijke voorrang op de informele ticketnotitie. Loonverwerking uitvoeren op basis van de 38-urenweek.
+          </p>
+          <div className="flex items-center space-x-3 text-slate-600">
+            <span className="bg-white border border-emerald-300 text-emerald-800 px-2 py-0.5 rounded font-mono font-medium">
+              Addendum: 38u/week (Leidend)
+            </span>
+            <span className="bg-white border border-slate-200 text-slate-500 line-through px-2 py-0.5 rounded font-mono">
+              Ticket #421: 36u/week (Nietig)
             </span>
           </div>
         </div>
