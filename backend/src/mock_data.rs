@@ -168,6 +168,9 @@ pub fn get_mock_documents() -> Vec<DocumentItem> {
             summary: "Officieel medeondertekend addendum betreffende het voltijds arbeidsregime van 38 uur per week, telewerkmodaliteiten (max. 2 dagen) en representatievergoeding.".to_string(),
             raw_content: "Overeenkomst gesloten tussen Acme Logistics BV en werknemersvertegenwoordiging. Artikel 3: Het wekelijks werkregime voor alle bedienden onder PC 200 is vastgesteld op exact 38u/week verdeeld over 5 werkdagen. Telewerk is toegestaan voor maximaal 2 dagen per week mits goedkeuring leidinggevende. Referentie medewerker dossier RRN 85.04.12-***.**, bankrekening BE68 **** **** 7034. Bruto basiswedde directieassistentie € [VERTROUWELIJK_SALARIS].".to_string(),
             unmasked_raw_content: Some("Overeenkomst gesloten tussen Acme Logistics BV en werknemersvertegenwoordiging. Artikel 3: Het wekelijks werkregime voor alle bedienden onder PC 200 is vastgesteld op exact 38u/week verdeeld over 5 werkdagen. Telewerk is toegestaan voor maximaal 2 dagen per week mits goedkeuring leidinggevende. Referentie medewerker dossier RRN 85.04.12-123.45, bankrekening BE68 5390 0754 7034. Bruto basiswedde directieassistentie € 3.850,00 bruto per maand.".to_string()),
+            file_path: None,
+            file_name: None,
+            file_size: None,
             key_facts: vec![
                 KeyFact {
                     field: "werkregime".to_string(),
@@ -216,6 +219,9 @@ pub fn get_mock_documents() -> Vec<DocumentItem> {
             summary: "Officiële sectorale richtlijn SD Worx voor bedienden onder PC 200. Bevestigt de wettelijke 38-urenweek en indexeringsregels.".to_string(),
             raw_content: "SD Worx Kennisdossier PC 200. De standaard arbeidsduur bedraagt 38u/week, tenzij op ondernemingsvlak een kortere arbeidsduur werd ingevoerd met ADV-dagen. Maaltijdcheque werkgeversbijdrage maximaal € 6,91 (totaal € 8,00 per gewerkte dag).".to_string(),
             unmasked_raw_content: Some("SD Worx Kennisdossier PC 200. De standaard arbeidsduur bedraagt 38u/week, tenzij op ondernemingsvlak een kortere arbeidsduur werd ingevoerd met ADV-dagen. Maaltijdcheque werkgeversbijdrage maximaal € 6,91 (totaal € 8,00 per gewerkte dag).".to_string()),
+            file_path: None,
+            file_name: None,
+            file_size: None,
             key_facts: vec![
                 KeyFact {
                     field: "werkregime".to_string(),
@@ -258,6 +264,9 @@ pub fn get_mock_documents() -> Vec<DocumentItem> {
             summary: "Verslag van kwartaaloverleg met Marc Vanhove. Behandeling van 3 internationale detacheringen naar Nederland en bevestiging van de 38u-regeling.".to_string(),
             raw_content: "Overleg met Marc Vanhove inzake grensoverschrijdend telewerk. Grenswerkers vallen onder A1-verordening met max 49.9% telewerk in woonland. Normale werktijd blijft 38u/week conform Addendum 2024. Contactpersoon Marc goedgekeurd.".to_string(),
             unmasked_raw_content: Some("Overleg met Marc Vanhove inzake grensoverschrijdend telewerk. Grenswerkers vallen onder A1-verordening met max 49.9% telewerk in woonland. Normale werktijd blijft 38u/week conform Addendum 2024. Contactpersoon Marc goedgekeurd.".to_string()),
+            file_path: None,
+            file_name: None,
+            file_size: None,
             key_facts: vec![
                 KeyFact {
                     field: "werkregime".to_string(),
@@ -300,6 +309,9 @@ pub fn get_mock_documents() -> Vec<DocumentItem> {
             summary: "Ticketantwoord waarin Kevin per abuis vermeldt dat Acme Logistics op een 36u-regime werkt n.a.v. een vraag over compensatierust voor feestdagen.".to_string(),
             raw_content: "Beste Marc, voor de berekening van de feestdagvergoeding zijn we uitgegaan van de 36u/week regeling die van toepassing is op de logistieke site. Gelieve dit te bevestigen voor de loonstrook van september.".to_string(),
             unmasked_raw_content: Some("Beste Marc, voor de berekening van de feestdagvergoeding zijn we uitgegaan van de 36u/week regeling die van toepassing is op de logistieke site. Gelieve dit te bevestigen voor de loonstrook van september.".to_string()),
+            file_path: None,
+            file_name: None,
+            file_size: None,
             key_facts: vec![
                 KeyFact {
                     field: "werkregime".to_string(),
@@ -336,6 +348,9 @@ pub fn get_mock_documents() -> Vec<DocumentItem> {
             summary: "Korte chatnotitie met Marc over collectieve sluitingsdagen tussen Kerst en Nieuwjaar.".to_string(),
             raw_content: "Marc bevestigt via chat: bedrijf sluit op 24/12 en 31/12 in de namiddag. Brugdag op Hemelvaartsdag goedgekeurd door ondernemingsraad.".to_string(),
             unmasked_raw_content: Some("Marc bevestigt via chat: bedrijf sluit op 24/12 en 31/12 in de namiddag. Brugdag op Hemelvaartsdag goedgekeurd door ondernemingsraad.".to_string()),
+            file_path: None,
+            file_name: None,
+            file_size: None,
             key_facts: vec![
                 KeyFact {
                     field: "brugdagen".to_string(),
@@ -374,6 +389,9 @@ pub fn get_mock_documents() -> Vec<DocumentItem> {
             summary: "Neergelegde collectieve arbeidsovereenkomst voor 5-ploegenstelsel in chemische productie. Ploegenpremie vastgesteld op 27.5% voor volcontinu.".to_string(),
             raw_content: "Bedrijfs-CAO BioHealth Solutions NV. Werkduur gemiddeld 33.6u/week in volcontinu cyclus met 12 compensatiedagen per kalenderjaar. Ploegentoeslag ochtend/middag 12.5%, nacht 27.5%. Paritair Comité 207.".to_string(),
             unmasked_raw_content: Some("Bedrijfs-CAO BioHealth Solutions NV. Werkduur gemiddeld 33.6u/week in volcontinu cyclus met 12 compensatiedagen per kalenderjaar. Ploegentoeslag ochtend/middag 12.5%, nacht 27.5%. Paritair Comité 207.".to_string()),
+            file_path: None,
+            file_name: None,
+            file_size: None,
             key_facts: vec![
                 KeyFact {
                     field: "ploegenregime".to_string(),
@@ -422,6 +440,9 @@ pub fn get_mock_documents() -> Vec<DocumentItem> {
             summary: "Fiscale en sociale behandeling van standby-vergoedingen voor laboranten buiten de reguliere diensturen.".to_string(),
             raw_content: "Vergoeding voor beschikbaarheid thuis: € 2.45 bruto per uur standby. Bij fysieke oproep minimaal 3 uur uitbetaald aan 150% met verplichte rusttijd van 11 opeenvolgende uren conform arbeidswet.".to_string(),
             unmasked_raw_content: Some("Vergoeding voor beschikbaarheid thuis: € 2.45 bruto per uur standby. Bij fysieke oproep minimaal 3 uur uitbetaald aan 150% met verplichte rusttijd van 11 opeenvolgende uren conform arbeidswet.".to_string()),
+            file_path: None,
+            file_name: None,
+            file_size: None,
             key_facts: vec![
                 KeyFact {
                     field: "standby_vergoeding".to_string(),
@@ -466,6 +487,9 @@ pub fn get_mock_documents() -> Vec<DocumentItem> {
             summary: "Vastlegging van de 40u-week met 12 toekenningsdagen (ADV) in de bouwsector, getrouwheidszegels en weerverletprocedure via Constructiv.".to_string(),
             raw_content: "PC 124 Bouwreglement. Wekelijks arbeidsregime 40u/week met 12 rustdagen ter compensatie (38u op jaarbasis). Weerverlet wegens vorst/regen wordt aangegeven via elektronische C3.2A en Constructiv toeslag.".to_string(),
             unmasked_raw_content: Some("PC 124 Bouwreglement. Wekelijks arbeidsregime 40u/week met 12 rustdagen ter compensatie (38u op jaarbasis). Weerverlet wegens vorst/regen wordt aangegeven via elektronische C3.2A en Constructiv toeslag.".to_string()),
+            file_path: None,
+            file_name: None,
+            file_size: None,
             key_facts: vec![
                 KeyFact {
                     field: "werkregime".to_string(),
@@ -510,6 +534,9 @@ pub fn get_mock_documents() -> Vec<DocumentItem> {
             summary: "Standaard raamcontract voor flexi-jobbers in de horeca inclusief minimum flexiloon, vakantiegeld (7.67%) en Dimona-Fli registraties.".to_string(),
             raw_content: "Flexi-arbeidsovereenkomst PC 302 Horeca. Uurloon conform sectoraal minimum inclusief 7.67% flexi-vakantiegeld, vrijgesteld van RSZ en bedrijfsvoorheffing mits 4/5e tewerkstelling bij hoofdwerkgever in T-3.".to_string(),
             unmasked_raw_content: Some("Flexi-arbeidsovereenkomst PC 302 Horeca. Uurloon conform sectoraal minimum inclusief 7.67% flexi-vakantiegeld, vrijgesteld van RSZ en bedrijfsvoorheffing mits 4/5e tewerkstelling bij hoofdwerkgever in T-3.".to_string()),
+            file_path: None,
+            file_name: None,
+            file_size: None,
             key_facts: vec![
                 KeyFact {
                     field: "flexi_regeling".to_string(),
@@ -697,7 +724,7 @@ pub fn get_mock_users() -> Vec<crate::models::UserAccount> {
             username: "admin".to_string(),
             name: "System Administrator".to_string(),
             email: "admin@sdworx.com".to_string(),
-            password_hash: admin_hash.clone(),
+            password_hash: admin_hash,
             role: UserRole::Admin,
             clearance_level: "Admin".to_string(),
             employee_id: None,
@@ -721,6 +748,26 @@ pub fn get_mock_users() -> Vec<crate::models::UserAccount> {
             role: UserRole::SeniorPayrollOfficer,
             clearance_level: "Senior".to_string(),
             employee_id: Some("EMP-001".to_string()),
+        },
+        UserAccount {
+            id: "USR-004".to_string(),
+            username: "emma.wouters".to_string(),
+            name: "Emma Wouters".to_string(),
+            email: "emma.wouters@sdworx.com".to_string(),
+            password_hash: consultant_hash.clone(),
+            role: UserRole::LegalAdvisor,
+            clearance_level: "Senior".to_string(),
+            employee_id: Some("EMP-002".to_string()),
+        },
+        UserAccount {
+            id: "USR-005".to_string(),
+            username: "kevin.peeters".to_string(),
+            name: "Kevin Peeters".to_string(),
+            email: "kevin.peeters@sdworx.com".to_string(),
+            password_hash: consultant_hash,
+            role: UserRole::Consultant,
+            clearance_level: "Standard".to_string(),
+            employee_id: Some("EMP-004".to_string()),
         },
     ]
 }

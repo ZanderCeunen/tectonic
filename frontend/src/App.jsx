@@ -5,6 +5,7 @@ import CustomerHub from './components/CustomerHub';
 import SmartRouterModal from './components/SmartRouterModal';
 import CustomerSearchModal from './components/CustomerSearchModal';
 import LoginModal from './components/LoginModal';
+import LoginScreen from './components/LoginScreen';
 import CustomerManagerModal from './components/CustomerManagerModal';
 import EmployeeManagerModal from './components/EmployeeManagerModal';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
@@ -19,6 +20,7 @@ export default function App() {
   const [backendError, setBackendError] = useState(null);
 
   const [authToken, setAuthToken] = useState(localStorage.getItem('tectonic_jwt') || '');
+  const [activeUser, setActiveUser] = useState(null);
 
   // Modals state
   const [isRouterOpen, setIsRouterOpen] = useState(false);
@@ -30,32 +32,18 @@ export default function App() {
   const [customerToEdit, setCustomerToEdit] = useState(null);
   const [employeeToEdit, setEmployeeToEdit] = useState(null);
 
-  // Ingelogde medewerker bij SD Worx
-  const [activeUser, setActiveUser] = useState({
-    id: 'USR-002',
-    name: 'Tom De Smet',
-    role: 'Consultant',
-    clearance_level: 'Standard',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-  });
-
   // 1. Laad initiële data van de Rust Backend
   const loadInitialData = async () => {
     setIsLoading(true);
     setBackendError(null);
     try {
-      // Haal klanten op
+      // Haal klanten op van SQLite database
       const custRes = await fetch('/api/customers');
       if (!custRes.ok) throw new Error(`Backend fout bij ophalen klanten: ${custRes.status}`);
       const custData = await custRes.json();
       setCustomers(custData);
 
-      // Selecteer standaard eerste klant indien nog geen gekozen
-      if (custData.length > 0 && !selectedCustomerId) {
-        setSelectedCustomerId(custData[0].id);
-      }
-
-      // Haal medewerkers op
+      // Haal medewerkers op van SQLite database
       const empRes = await fetch('/api/employees');
       if (!empRes.ok) throw new Error(`Backend fout bij ophalen medewerkers: ${empRes.status}`);
       const empData = await empRes.json();
@@ -72,13 +60,28 @@ export default function App() {
             setActiveUser({
               id: meUser.id,
               name: meUser.name,
-              role: meUser.role,
-              clearance_level: meUser.clearance_level,
+              role: typeof meUser.role === 'string' ? meUser.role : 'Consultant',
+              clearance_level: meUser.clearance_level || 'Standard',
+              avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+            });
+          } else {
+            // Default demo user if token is mock
+            setActiveUser({
+              id: 'USR-002',
+              name: 'Tom De Smet',
+              role: 'Consultant',
+              clearance_level: 'Standard',
               avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
             });
           }
         } catch (e) {
-          // ignore
+          setActiveUser({
+            id: 'USR-002',
+            name: 'Tom De Smet',
+            role: 'Consultant',
+            clearance_level: 'Standard',
+            avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+          });
         }
       }
 
@@ -94,7 +97,7 @@ export default function App() {
     loadInitialData();
   }, []);
 
-  // 2. Laad documenten en conflicten voor het geselecteerde klantdossier
+  // 2. Laad documenten en conflicten voor het geselecteerde klantdossier van SQLite
   const loadCustomerDocuments = async (customerId) => {
     if (!customerId) {
       setDocuments([]);
@@ -133,7 +136,7 @@ export default function App() {
         body: JSON.stringify({
           document_id: docId,
           feedback_type: type,
-          employee_id: activeUser.name,
+          employee_id: activeUser ? activeUser.name : 'Tom De Smet',
         }),
       });
 
@@ -147,7 +150,7 @@ export default function App() {
     }
   };
 
-  // 4. Klantoproep doorverbinden / Bellen via Backend
+  // 4. Klantoproep doorverbinden via Backend
   const handleExecuteHandoff = async (handoffData) => {
     try {
       const res = await fetch('/api/routing/handoff', {
@@ -177,7 +180,7 @@ export default function App() {
     }
   };
 
-  // 5. Inloggen Callback
+  // 5. Inloggen & Uitloggen Callbacks
   const handleLoginSuccess = (user, token) => {
     setAuthToken(token);
     setActiveUser({
@@ -187,6 +190,12 @@ export default function App() {
       clearance_level: user.clearance_level || 'Standard',
       avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
     });
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('tectonic_jwt');
+    setAuthToken('');
+    setActiveUser(null);
   };
 
   // 6. Klant Opslaan Callback
@@ -222,23 +231,23 @@ export default function App() {
   if (backendError) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg max-w-md w-full p-6 border border-slate-300 shadow-lg text-center space-y-4">
+        <div className="bg-white rounded-xl max-w-md w-full p-6 border border-slate-300 shadow-lg text-center space-y-4">
           <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mx-auto">
             <AlertTriangle className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-slate-900">Verbinding met Backend Vereist</h2>
+            <h2 className="text-base font-bold text-slate-900">Verbinding met Backend API Vereist</h2>
             <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-              De frontend is 100% gekoppeld aan de Rust Backend API. Zorg dat de Rust backend draait op <code className="font-mono bg-slate-100 px-1 py-0.5 rounded">http://127.0.0.1:8080</code>.
+              De TECTONIC Dashboard frontend haalt alle echte gegevens op uit SQLite via de Rust Backend. Zorg dat de backend draait op <code className="font-mono bg-slate-100 px-1 py-0.5 rounded">http://127.0.0.1:8080</code>.
             </p>
           </div>
-          <div className="bg-slate-50 p-2.5 rounded border border-slate-200 text-[11px] font-mono text-slate-700 text-left">
+          <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-[11px] font-mono text-slate-700 text-left">
             cd backend<br />
             cargo run
           </div>
           <button
             onClick={loadInitialData}
-            className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded flex items-center justify-center space-x-1.5 transition-colors"
+            className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl flex items-center justify-center space-x-1.5 transition-colors"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             <span>Opnieuw Proberen</span>
@@ -246,6 +255,11 @@ export default function App() {
         </div>
       </div>
     );
+  }
+
+  // FLOOW: Als de gebruiker NIET ingelogd is (geen authToken of activeUser), toon de LoginScreen
+  if (!authToken || !activeUser) {
+    return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
   }
 
   return (
@@ -266,6 +280,7 @@ export default function App() {
           setIsEmployeeManagerOpen(true);
         }}
         onOpenLogin={() => setIsLoginOpen(true)}
+        onLogout={handleLogout}
       />
 
       {/* Hoofdsectie: Klantdossier of Overzichtsdashboard */}
@@ -273,7 +288,7 @@ export default function App() {
         {isLoading ? (
           <div className="py-20 text-center text-slate-500 text-xs flex items-center justify-center space-x-2">
             <RefreshCw className="w-4 h-4 animate-spin text-[#005FB8]" />
-            <span>Klantendossiers en authenticatie laden van SD Worx backend...</span>
+            <span>Klantendossiers en SQLite database gegevens laden...</span>
           </div>
         ) : selectedCustomer ? (
           <CustomerHub
@@ -289,8 +304,19 @@ export default function App() {
         ) : (
           <HomeDashboard
             customers={customers}
+            employees={employees}
+            activeUser={activeUser}
             onSelectCustomer={(id) => setSelectedCustomerId(id)}
             onOpenCustomerSearch={() => setIsCustomerSearchOpen(true)}
+            onOpenAddCustomer={() => {
+              setCustomerToEdit(null);
+              setIsCustomerManagerOpen(true);
+            }}
+            onOpenAddEmployee={() => {
+              setEmployeeToEdit(null);
+              setIsEmployeeManagerOpen(true);
+            }}
+            onOpenRouter={() => setIsRouterOpen(true)}
           />
         )}
       </main>
@@ -315,7 +341,7 @@ export default function App() {
         onSelectCustomer={(id) => setSelectedCustomerId(id)}
       />
 
-      {/* Modal: Login & JWT Auth */}
+      {/* Modal: Login & JWT Auth Switcher */}
       <LoginModal
         isOpen={isLoginOpen}
         onClose={() => setIsLoginOpen(false)}
@@ -346,7 +372,7 @@ export default function App() {
           <span className="font-medium text-slate-600">
             SD Worx Kennisnet & Dossierbeheer
           </span>
-          <span>Interne Werknemersomgeving • JWT Auth & SQLite Persistentie Active</span>
+          <span>Interne Werknemersomgeving • SQLite Database & JWT Active</span>
         </div>
       </footer>
     </div>

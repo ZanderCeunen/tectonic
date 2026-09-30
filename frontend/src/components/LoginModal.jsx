@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { X, Lock, User, Key, CheckCircle2, Shield } from 'lucide-react';
 
 export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('Admin123!');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -30,28 +30,10 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
         setErrorMsg('Ongeldige gebruikersnaam of wachtwoord.');
       }
     } catch (err) {
-      // Offline fallback voor demo
-      if (username === 'admin') {
-        const mockUser = {
-          id: 'USR-001',
-          name: 'System Administrator',
-          role: 'Admin',
-          clearance_level: 'Admin',
-          avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-        };
-        onLoginSuccess(mockUser, 'demo_token_admin');
-        onClose();
-      } else {
-        setErrorMsg('Kan geen verbinding maken met authenticatieserver.');
-      }
+      setErrorMsg('Kan geen verbinding maken met authenticatieserver.');
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const setPresetUser = (user, pass) => {
-    setUsername(user);
-    setPassword(pass);
   };
 
   return (
@@ -95,6 +77,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full text-xs pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:border-[#005FB8]"
+                placeholder="••••••••"
               />
             </div>
           </div>
@@ -104,35 +87,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
               {errorMsg}
             </div>
           )}
-
-          <div className="space-y-1 pt-1">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-              Snel Inloggen (Systeem Accounts):
-            </span>
-            <div className="grid grid-cols-3 gap-1.5 pt-1">
-              <button
-                type="button"
-                onClick={() => setPresetUser('admin', 'Admin123!')}
-                className="px-2 py-1 text-[11px] bg-slate-100 hover:bg-slate-200 rounded text-slate-800 font-medium truncate"
-              >
-                👑 Admin
-              </button>
-              <button
-                type="button"
-                onClick={() => setPresetUser('tom.desmet', 'Payroll123!')}
-                className="px-2 py-1 text-[11px] bg-slate-100 hover:bg-slate-200 rounded text-slate-800 font-medium truncate"
-              >
-                👤 Tom (Consultant)
-              </button>
-              <button
-                type="button"
-                onClick={() => setPresetUser('sarah.vermeulen', 'Payroll123!')}
-                className="px-2 py-1 text-[11px] bg-slate-100 hover:bg-slate-200 rounded text-slate-800 font-medium truncate"
-              >
-                ⭐ Sarah (Senior)
-              </button>
-            </div>
-          </div>
 
           <div className="pt-3 border-t border-slate-100 flex items-center justify-end space-x-2">
             <button

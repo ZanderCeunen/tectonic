@@ -119,18 +119,46 @@ impl Database {
         emps: Vec<Employee>,
         users: Vec<UserAccount>,
     ) -> Result<()> {
-        for u in users {
-            self.insert_user(&u)?;
+        let user_count: i64 = self
+            .conn
+            .query_row("SELECT COUNT(*) FROM users", [], |row: &Row| row.get(0))
+            .unwrap_or(0);
+        if user_count == 0 {
+            for u in users {
+                self.insert_user(&u)?;
+            }
         }
-        for c in customers {
-            self.insert_customer(&c)?;
+
+        let cust_count: i64 = self
+            .conn
+            .query_row("SELECT COUNT(*) FROM customers", [], |row: &Row| row.get(0))
+            .unwrap_or(0);
+        if cust_count == 0 {
+            for c in customers {
+                self.insert_customer(&c)?;
+            }
         }
-        for d in docs {
-            self.insert_document(&d)?;
+
+        let doc_count: i64 = self
+            .conn
+            .query_row("SELECT COUNT(*) FROM documents", [], |row: &Row| row.get(0))
+            .unwrap_or(0);
+        if doc_count == 0 {
+            for d in docs {
+                self.insert_document(&d)?;
+            }
         }
-        for e in emps {
-            self.insert_employee(&e)?;
+
+        let emp_count: i64 = self
+            .conn
+            .query_row("SELECT COUNT(*) FROM employees", [], |row: &Row| row.get(0))
+            .unwrap_or(0);
+        if emp_count == 0 {
+            for e in emps {
+                self.insert_employee(&e)?;
+            }
         }
+
         Ok(())
     }
 
@@ -155,7 +183,7 @@ impl Database {
 
     pub fn get_user_by_username(&self, username: &str) -> Result<Option<UserAccount>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, username, name, email, password_hash, role, clearance_level, employee_id FROM users WHERE username = ?1",
+            "SELECT id, username, name, email, password_hash, role, clearance_level, employee_id FROM users WHERE LOWER(username) = LOWER(?1)",
         )?;
         let mut rows = stmt.query_map(params![username], |row: &Row| {
             let role_str: String = row.get(5)?;

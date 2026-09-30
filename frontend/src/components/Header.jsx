@@ -1,5 +1,5 @@
 import React from 'react';
-import { Building2, Search, ChevronDown, User, Phone, Home, FolderOpen, Plus, Shield, UserPlus } from 'lucide-react';
+import { Building2, Search, ChevronDown, User, Phone, Home, FolderOpen, Plus, Shield, UserPlus, LogOut } from 'lucide-react';
 
 export default function Header({
   customers,
@@ -10,6 +10,7 @@ export default function Header({
   onOpenAddCustomer,
   onOpenAddEmployee,
   onOpenLogin,
+  onLogout,
 }) {
   const selectedCustomer = customers.find((c) => c.id === selectedCustomerId);
 
@@ -80,27 +81,28 @@ export default function Header({
             </button>
           </div>
 
-          {/* Actieve medewerker & Inloggen */}
+          {/* Actieve medewerker & Inloggen / Uitloggen */}
           <div className="flex items-center space-x-3 shrink-0">
             <button
               onClick={onOpenLogin}
               className="text-right hidden sm:block group hover:opacity-80 text-left"
-              title="Klik om in te loggen met JWT authenticatie"
+              title="Klik om te wisselen van account"
             >
               <div className="text-xs font-bold text-slate-900 flex items-center justify-end space-x-1">
                 <span>{activeUser.name}</span>
                 <Shield className="w-3 h-3 text-emerald-600" />
               </div>
               <div className="text-[11px] text-slate-500">
-                {activeUser.role} • <span className="text-[#005FB8] font-semibold">Inloggen</span>
+                {activeUser.role} • <span className="text-[#005FB8] font-semibold">Wissel</span>
               </div>
             </button>
 
             <button
-              onClick={onOpenLogin}
-              className="w-8 h-8 rounded-full overflow-hidden border border-slate-200 bg-slate-100 shadow-2xs hover:ring-2 hover:ring-[#005FB8] transition-all"
+              onClick={onLogout}
+              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg border border-slate-200 transition-colors"
+              title="Uitloggen"
             >
-              <img src={activeUser.avatar} alt={activeUser.name} className="w-full h-full object-cover" />
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
         </div>

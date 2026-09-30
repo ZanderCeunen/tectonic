@@ -8,6 +8,7 @@ pub enum UserRole {
     SeniorPayrollOfficer,
     Consultant,
     Auditor,
+    LegalAdvisor,
 }
 
 impl UserRole {
@@ -17,6 +18,7 @@ impl UserRole {
             UserRole::SeniorPayrollOfficer => "Senior Payroll Officer",
             UserRole::Consultant => "Consultant",
             UserRole::Auditor => "Auditor",
+            UserRole::LegalAdvisor => "Legal Advisor",
         }
     }
 
@@ -25,6 +27,7 @@ impl UserRole {
             "Admin" => UserRole::Admin,
             "Senior Payroll Officer" | "SeniorPayrollOfficer" => UserRole::SeniorPayrollOfficer,
             "Auditor" => UserRole::Auditor,
+            "Legal Advisor" | "LegalAdvisor" => UserRole::LegalAdvisor,
             _ => UserRole::Consultant,
         }
     }

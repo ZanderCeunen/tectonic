@@ -14,6 +14,7 @@ use axum::{
     Json, Router,
 };
 use base64::Engine;
+use chrono::Utc;
 use db::Database;
 use expertise_graph::ExpertiseGraph;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
@@ -21,7 +22,7 @@ use mock_data::{get_mock_customers, get_mock_documents, get_mock_employees, get_
 use models::{
     AuditEntry, Claims, Customer, DocumentFeedback, DocumentItem, DocumentSourceType,
     FeedbackSubmission, HandoffRequest, KeyFact, LoginRequest, LoginResponse,
-    RoutingRecommendation, RoutingRequest, TrustBreakdown, UserAccount, UserRole,
+    RoutingRecommendation, RoutingRequest, TrustBreakdown, UserAccount,
 };
 use security::{AuditChain, PiiRedactor};
 use serde::{Deserialize, Serialize};
@@ -92,21 +93,19 @@ async fn main() {
     let db_path = "tectonic.db";
     let db = Database::new(db_path).expect("Mislukt om SQLite database te openen");
 
-    // Seed database if empty
-    if db.is_empty().unwrap_or(true) {
-        println!("🌱 SQLite database is leeg. Seeden met SD Worx dataset & beheerders...");
-        let initial_customers = get_mock_customers();
-        let initial_docs = get_mock_documents();
-        let initial_employees = get_mock_employees();
-        let initial_users = get_mock_users();
-        db.seed(
-            initial_customers,
-            initial_docs,
-            initial_employees,
-            initial_users,
-        )
-        .expect("Mislukt om database te seeden");
-    }
+    // Ensure all tables (users, customers, documents, employees) are seeded if empty
+    println!("🌱 SQLite database opstarten & controleren op voorbeelddata...");
+    let initial_customers = get_mock_customers();
+    let initial_docs = get_mock_documents();
+    let initial_employees = get_mock_employees();
+    let initial_users = get_mock_users();
+    db.seed(
+        initial_customers,
+        initial_docs,
+        initial_employees,
+        initial_users,
+    )
+    .expect("Mislukt om database te seeden");
 
     let existing_audits = db.get_audit_entries().unwrap_or_default();
     let audit_chain = AuditChain::from_existing(existing_audits);
@@ -163,14 +162,21 @@ async fn login_user(
     State(state): State<AppState>,
     Json(credentials): Json<LoginRequest>,
 ) -> Result<Json<LoginResponse>, StatusCode> {
+    let clean_username = credentials.username.trim();
+    let clean_password = credentials.password.trim();
+
     let db = state.db.lock().unwrap();
-    let user = match db.get_user_by_username(&credentials.username) {
+    let user = match db.get_user_by_username(clean_username) {
         Ok(Some(u)) => u,
-        _ => return Err(StatusCode::UNAUTHORIZED),
+        _ => {
+            eprintln!("🔒 Login mislukt: Gebruiker '{}' niet gevonden in SQLite.", clean_username);
+            return Err(StatusCode::UNAUTHORIZED);
+        }
     };
 
-    let valid = bcrypt::verify(&credentials.password, &user.password_hash).unwrap_or(false);
+    let valid = bcrypt::verify(clean_password, &user.password_hash).unwrap_or(false);
     if !valid {
+        eprintln!("🔒 Login mislukt: Ongeldig wachtwoord voor gebruiker '{}'.", clean_username);
         return Err(StatusCode::UNAUTHORIZED);
     }
 
