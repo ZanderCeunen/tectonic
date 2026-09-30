@@ -15,7 +15,7 @@ A high-performance enterprise workspace for SD Worx payroll consultants and lega
 
 ## ⚙️ Technical Architecture & Inner Workings
 
-TECTONIC is engineered with a high-performance Rust microbackend and a modern React single-page application.
+The project is engineered with a high-performance Rust microbackend and a modern React single-page application.
 
 ### 🧠 Trust Engine & Contradiction Detection (`backend/src/trust_engine.rs`)
 - **Hierarchy-Based Trust Scoring**: Evaluates source reliability across customer documents (Legal Contracts: 95%, Official Templates: 85%, CRM Notes: 70%, Support Tickets: 50%).
