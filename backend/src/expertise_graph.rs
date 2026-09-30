@@ -32,9 +32,9 @@ impl ExpertiseGraph {
         map.get(id).cloned()
     }
 
-    /// Intelligent Google-search-like question & keyword matching algorithm.
-    /// Matches the right expert to a free-form question or keywords based on
-    /// successfully resolved cases, domain expertise, customer familiarity, and availability.
+    /// Intelligent expert routing and matching algorithm.
+    /// Matches the right expert to an inquiry or topic based on
+    /// domain expertise, successfully resolved cases, customer familiarity, and availability.
     pub fn recommend_experts(&self, req: &RoutingRequest) -> Vec<RoutingRecommendation> {
         let map = self.employees.lock().unwrap();
         let mut recommendations = Vec::new();
@@ -94,7 +94,10 @@ impl ExpertiseGraph {
 
             for token in &raw_tokens {
                 if emp_text_profile.contains(token) {
-                    keyword_hits += 1;
+                    keyword_hits += 2;
+                    if best_domain_score == 0.0 {
+                        best_domain_score = 80.0;
+                    }
                 }
             }
 
@@ -193,12 +196,13 @@ impl ExpertiseGraph {
                 }
             }
 
+            // Calculate final domain score
             let final_domain_score = if best_domain_score > 0.0 {
-                (best_domain_score + (keyword_hits as f64 * 3.0)).min(100.0)
+                (best_domain_score + (keyword_hits as f64 * 2.0)).min(100.0)
             } else if raw_tokens.is_empty() {
                 emp.domain_expertise.values().cloned().fold(0.0, f64::max)
             } else {
-                (25.0 + (keyword_hits as f64 * 8.0)).min(70.0)
+                (25.0 + (keyword_hits as f64 * 8.0)).min(65.0)
             };
 
             // 4. Customer familiarity
@@ -210,19 +214,21 @@ impl ExpertiseGraph {
                 sum / count
             };
 
-            // 5. Completed cases weight boost (up to 18 points)
-            let cases_boost = (emp.completed_cases as f64 * 0.35).min(18.0);
+            // 5. Completed cases weight boost
+            let cases_boost = (emp.completed_cases as f64 * 0.25).min(15.0);
 
-            // 6. Weighted total
-            let weighted_score = if !target_customer_id.is_empty() {
-                (0.45 * final_domain_score) + (0.40 * customer_score) + cases_boost
+            // 6. Weighted total (domain expertise dominates when query is present)
+            let weighted_score = if !raw_tokens.is_empty() {
+                (0.85 * final_domain_score) + (0.05 * customer_score) + (cases_boost * 0.5)
+            } else if !target_customer_id.is_empty() {
+                (0.40 * final_domain_score) + (0.45 * customer_score) + cases_boost
             } else {
-                (0.70 * final_domain_score) + (0.15 * customer_score) + cases_boost
+                (0.65 * final_domain_score) + (0.20 * customer_score) + cases_boost
             };
 
             let availability_factor = match emp.availability {
                 AvailabilityStatus::Available => 1.0,
-                AvailabilityStatus::InCall => 0.92,
+                AvailabilityStatus::InCall => 0.95,
                 AvailabilityStatus::Busy => 0.85,
                 AvailabilityStatus::Away => 0.60,
             };

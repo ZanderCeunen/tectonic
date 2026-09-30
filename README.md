@@ -11,12 +11,12 @@ Internal workspace for SD Worx payroll consultants and legal officers to central
    * Each document is assigned a mathematical **Trust Score** (signed contracts and official SD Worx templates take precedence over informal tickets and chat messages).
    * **Automatic Conflict Detection & Resolution**: If a ticket states a 36h/week schedule while a signed contract stipulates 38h/week, the system flags the contradiction immediately and allows the consultant to resolve it with an official resolution record.
 
-2. **Smart Expert Routing (Google Search-like inquiry matching)**:
-   * When a client calls or a complex question arises (e.g., *"Who has experience with A1 expat postings and cross-border telework under PC 200 for logistics companies?"*), type the full question or keywords into the Smart Router.
+2. **Smart Expert Routing & Colleague Transfer**:
+   * When a client calls or a complex question arises (e.g., *"Who has experience with A1 expat postings and cross-border telework under PC 200 for logistics companies?"*), type the inquiry or domain keywords into the Smart Router.
    * The intelligent matching algorithm ranks colleagues based on:
+     * Domain expertise and Joint Committee (Paritair Comité) experience.
      * Number of successfully completed cases.
      * Historical familiarity with the specific customer.
-     * Domain expertise and Joint Committee (Paritair Comité) experience.
      * Live availability (Available, In Call, Busy).
    * One-click internal warm transfer with pre-loaded case context.
 

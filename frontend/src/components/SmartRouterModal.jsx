@@ -22,28 +22,44 @@ export default function SmartRouterModal({
     );
   }, [employees, activeUser]);
 
-  // Intelligent Google-search-like scoring on client side
+  // Search scoring & ranking
   const rankedMatches = useMemo(() => {
-    const stopWords = new Set(['the', 'a', 'an', 'in', 'on', 'at', 'for', 'with', 'about', 'who', 'can', 'help', 'me', 'how', 'what', 'is', 'of', 'and', 'or', 'to', 'wie', 'kan', 'helpen', 'met', 'over', 'voor']);
-    const rawTokens = searchQuery
-      .toLowerCase()
+    const q = searchQuery.trim().toLowerCase();
+    const tokens = q
       .split(/[^a-zA-Z0-9-]/)
-      .filter((t) => t.length >= 2 && !stopWords.has(t));
+      .filter((t) => t.length >= 2);
 
     const targetCustId = customer?.id || '';
 
     return availableEmployees
       .map((emp) => {
+        const custScore = targetCustId ? emp.customer_familiarity?.[targetCustId] || 10 : 30;
+        const casesCount = emp.completed_cases || 0;
+
+        // When query is empty: sort by customer familiarity and completed cases
+        if (!q || tokens.length === 0) {
+          const baseScore = targetCustId ? custScore * 0.7 + Math.min(25, casesCount * 0.5) : 70 + Math.min(25, casesCount * 0.5);
+          const availFactor = emp.availability === 'Available' ? 1.0 : emp.availability === 'InCall' ? 0.92 : 0.85;
+          const matchPercent = Math.round(Math.min(99, Math.max(10, baseScore * availFactor)));
+
+          return {
+            ...emp,
+            overallMatch: matchPercent,
+            domainDisplay: emp.title,
+            explanation: `${emp.name} has completed ${casesCount} cases and is familiar with ${customer?.name || 'this domain'}.`,
+          };
+        }
+
+        // When query has terms: calculate direct match score
         let bestDomainScore = 0;
         let matchedDomainName = '';
         let keywordHits = 0;
 
-        // 1. Check domain expertise maps
-        const domainEntries = Object.entries(emp.domain_expertise || {});
-        for (const [domain, score] of domainEntries) {
-          const domLower = domain.toLowerCase();
-          for (const token of rawTokens) {
-            if (domLower.includes(token)) {
+        // A. Match domain expertise keys
+        for (const [domain, score] of Object.entries(emp.domain_expertise || {})) {
+          const dLower = domain.toLowerCase();
+          for (const token of tokens) {
+            if (dLower.includes(token)) {
               keywordHits += 1;
               if (score > bestDomainScore) {
                 bestDomainScore = score;
@@ -53,106 +69,65 @@ export default function SmartRouterModal({
           }
         }
 
-        // 2. Check recent activity and title
-        const profileText = `${emp.name} ${emp.title} ${emp.recent_activity || ''}`.toLowerCase();
-        for (const token of rawTokens) {
-          if (profileText.includes(token)) {
-            keywordHits += 1;
+        // B. Match name, title, department, recent activity
+        const fullBio = `${emp.name} ${emp.title} ${emp.department || ''} ${emp.recent_activity || ''}`.toLowerCase();
+        for (const token of tokens) {
+          if (fullBio.includes(token)) {
+            keywordHits += 2;
+            if (bestDomainScore === 0) bestDomainScore = 80;
           }
         }
 
-        // 3. Domain synonyms & keywords
-        const hasToken = (keywords) => rawTokens.some((t) => keywords.some((k) => t.includes(k) || k.includes(t)));
+        // C. Synonyms mapping
+        const has = (...terms) => tokens.some((t) => terms.some((term) => t.includes(term) || term.includes(t)));
 
-        if (hasToken(['expat', 'posting', 'detachering', 'abroad', 'cross-border', 'grensarbeid', 'a1', 'international'])) {
+        if (has('expat', 'posting', 'detachering', 'abroad', 'international', 'a1', 'cross-border', 'grensarbeid')) {
           const s = emp.domain_expertise?.['International Mobility & Expat'] || emp.domain_expertise?.['Internationale Detachering & Expat'] || 0;
-          if (s > bestDomainScore) {
-            bestDomainScore = s;
-            matchedDomainName = 'International Mobility & Expat';
-          }
+          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'International Mobility & Expat'; }
         }
-
-        if (hasToken(['construction', 'bouw', 'bad-weather', 'weerverlet', 'constructiv', 'pc 124', '124', 'mobility', 'rustdag'])) {
+        if (has('bouw', 'construction', '124', 'weerverlet', 'bad-weather', 'mobility', 'mobiliteit')) {
           const s = emp.domain_expertise?.['Construction PC 124'] || emp.domain_expertise?.['Bouwbedrijf PC 124'] || 0;
-          if (s > bestDomainScore) {
-            bestDomainScore = s;
-            matchedDomainName = 'Construction PC 124';
-          }
+          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Construction PC 124'; }
         }
-
-        if (hasToken(['hospitality', 'horeca', 'flexi', 'flexijob', 'flexi-job', 'pc 302', '302', 'dimona', 'student'])) {
+        if (has('horeca', 'hospitality', '302', 'flexi', 'flexijob', 'flexi-job', 'dimona', 'student')) {
           const s = emp.domain_expertise?.['Hospitality PC 302 & Flexi-jobs'] || emp.domain_expertise?.['Horeca PC 302 & Flexi-jobs'] || 0;
-          if (s > bestDomainScore) {
-            bestDomainScore = s;
-            matchedDomainName = 'Hospitality PC 302 & Flexi-jobs';
-          }
+          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Hospitality PC 302 & Flexi-jobs'; }
         }
-
-        if (hasToken(['chemical', 'chemistry', 'chemie', 'continuous', 'volcontinu', 'shift', 'ploeg', 'ploegen', 'night', 'pc 207', '207'])) {
+        if (has('chemie', 'chemical', '207', 'shift', 'ploeg', 'nacht', 'volcontinu', 'continuous')) {
           const s = emp.domain_expertise?.['Chemical Industry PC 207'] || emp.domain_expertise?.['Chemie & Petrochemie PC 207'] || 0;
-          if (s > bestDomainScore) {
-            bestDomainScore = s;
-            matchedDomainName = 'Chemical Industry PC 207';
-          }
+          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Chemical Industry PC 207'; }
         }
-
-        if (hasToken(['cba 200', 'cao 200', 'pc 200', '200', 'white-collar', 'bediende', 'working-hours', '38h', '38u', '36u', 'telework'])) {
+        if (has('200', 'bediende', 'white-collar', 'arbeidsduur', 'working-hours', '38h', '38u', 'telework', 'thuiswerk')) {
           const s = emp.domain_expertise?.['CBA 200 & White-Collar Status'] || emp.domain_expertise?.['CAO 200 & Bediendenstatuut'] || 0;
-          if (s > bestDomainScore) {
-            bestDomainScore = s;
-            matchedDomainName = 'CBA 200 & White-Collar Status';
-          }
+          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'CBA 200 & White-Collar Status'; }
         }
-
-        if (hasToken(['cafeteria', 'cafetariaplan', 'flex', 'benefit', 'company-car', 'wagen', 'tax', 'bonus'])) {
+        if (has('cafetaria', 'cafeteria', 'benefit', 'bonus', 'wagen', 'company-car', 'tax', 'fisc')) {
           const s = emp.domain_expertise?.['Flexible Benefits & Cafeteria Plan'] || emp.domain_expertise?.['Cafetariaplan & Flex Income'] || 0;
-          if (s > bestDomainScore) {
-            bestDomainScore = s;
-            matchedDomainName = 'Flexible Benefits & Cafeteria Plan';
-          }
+          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Flexible Benefits & Cafeteria Plan'; }
         }
-
-        if (hasToken(['healthcare', 'zorg', 'hospital', 'ific', 'pc 330', '330'])) {
+        if (has('zorg', 'healthcare', '330', 'ific', 'ziekenhuis', 'hospital', 'rusthuis')) {
           const s = emp.domain_expertise?.['Healthcare PC 330 & IFIC'] || emp.domain_expertise?.['Zorgsector PC 330 & IFIC'] || 0;
-          if (s > bestDomainScore) {
-            bestDomainScore = s;
-            matchedDomainName = 'Healthcare PC 330 & IFIC';
-          }
+          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Healthcare PC 330 & IFIC'; }
+        }
+        if (has('food', 'voeding', '118')) {
+          const s = emp.domain_expertise?.['Food Industry PC 118'] || emp.domain_expertise?.['Voedingsnijverheid PC 118'] || 0;
+          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Food Industry PC 118'; }
+        }
+        if (has('metal', 'metaal', '111')) {
+          const s = emp.domain_expertise?.['Metal Industry PC 111'] || emp.domain_expertise?.['Metaalsector PC 111'] || 0;
+          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Metal Industry PC 111'; }
         }
 
-        const finalDomainScore =
-          bestDomainScore > 0
-            ? Math.min(100, bestDomainScore + keywordHits * 3)
-            : rawTokens.length === 0
-            ? Math.max(...Object.values(emp.domain_expertise || { default: 50 }))
-            : Math.min(70, 25 + keywordHits * 8);
-
-        const customerScore = targetCustId ? emp.customer_familiarity?.[targetCustId] || 15 : 40;
-        const casesBoost = Math.min(18, (emp.completed_cases || 0) * 0.35);
-
-        const weightedScore = targetCustId
-          ? 0.45 * finalDomainScore + 0.40 * customerScore + casesBoost
-          : 0.70 * finalDomainScore + 0.15 * customerScore + casesBoost;
-
-        const availabilityFactor =
-          emp.availability === 'Available'
-            ? 1.0
-            : emp.availability === 'InCall'
-            ? 0.92
-            : emp.availability === 'Busy'
-            ? 0.85
-            : 0.6;
-
-        const overallMatch = Math.round(Math.min(99, Math.max(10, weightedScore * availabilityFactor)));
+        let calculatedScore = bestDomainScore > 0 ? bestDomainScore : keywordHits > 0 ? 60 + keywordHits * 10 : 25;
+        const availFactor = emp.availability === 'Available' ? 1.0 : emp.availability === 'InCall' ? 0.95 : 0.85;
+        const matchPercent = Math.round(Math.min(99, Math.max(10, calculatedScore * availFactor)));
         const domainDisplay = matchedDomainName || emp.title;
 
         return {
           ...emp,
-          overallMatch,
-          customerScore: Math.round(customerScore),
-          domainScore: Math.round(finalDomainScore),
+          overallMatch: matchPercent,
           domainDisplay,
-          explanation: `${emp.name} has resolved ${emp.completed_cases} cases successfully and manages expertise in '${domainDisplay}'.`,
+          explanation: `${emp.name} specializes in '${domainDisplay}' with ${casesCount} cases completed.`,
         };
       })
       .sort((a, b) => b.overallMatch - a.overallMatch);
@@ -165,7 +140,7 @@ export default function SmartRouterModal({
         customer_id: customer?.id || 'CUST-001',
         employee_id: expert.id,
         caller_name: customer?.primary_contact || 'Client Representative',
-        inquiry_summary: searchQuery || `Warm handoff inquiry for ${customer?.name || 'General Inquiry'}`,
+        inquiry_summary: searchQuery || `Internal inquiry transfer for ${customer?.name || 'General Case'}`,
         expert_name: expert.name,
       });
       setIsCalling(false);
@@ -184,10 +159,10 @@ export default function SmartRouterModal({
             </div>
             <div>
               <h3 className="text-sm font-bold text-white flex items-center space-x-1.5">
-                <span>Smart Expert Router & Internal Call</span>
+                <span>Expert Router & Internal Call</span>
               </h3>
               <p className="text-[11px] text-blue-100">
-                {customer ? `${customer.name} (${customer.joint_committee?.split(' - ')[0] || 'Customer Case'})` : 'All SD Worx Colleagues'}
+                {customer ? `${customer.name} (${customer.joint_committee?.split(' - ')[0] || 'Customer Case'})` : 'SD Worx Internal Colleagues'}
               </p>
             </div>
           </div>
@@ -227,16 +202,16 @@ export default function SmartRouterModal({
             </div>
           ) : (
             <>
-              {/* Google Search-like Question & Keyword Input */}
+              {/* Question & Keyword Search Input */}
               <div className="space-y-1.5">
                 <label className="block text-xs font-bold text-slate-800">
-                  Search colleague by question or keywords:
+                  Search colleague by expertise or question:
                 </label>
                 <div className="relative">
                   <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     type="text"
-                    placeholder="e.g. 'Who has experience with A1 expat telework?', 'Construction PC 124 bad weather'..."
+                    placeholder="Type a topic or question (e.g. Expat, Construction PC 124, Flexi-jobs, IFIC, Overtime...)"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-9 pr-3 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#005FB8] focus:bg-white transition-all shadow-2xs font-medium"
