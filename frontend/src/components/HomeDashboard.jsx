@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Building2,
   Search,
@@ -7,9 +7,7 @@ import {
   Users,
   Briefcase,
   ArrowRight,
-  FolderOpen,
-  CheckCircle2,
-  Clock,
+  RotateCcw,
 } from 'lucide-react';
 
 export default function HomeDashboard({
@@ -18,77 +16,107 @@ export default function HomeDashboard({
   onOpenCustomerSearch,
 }) {
   const [filterQuery, setFilterQuery] = useState('');
-  const [selectedPC, setSelectedPC] = useState('ALL');
+  const [pcQuery, setPcQuery] = useState('');
+  const [managerQuery, setManagerQuery] = useState('');
 
-  const filtered = customers.filter((c) => {
-    const q = filterQuery.toLowerCase();
-    const matchesQuery =
-      !q ||
-      c.name.toLowerCase().includes(q) ||
-      c.enterprise_number.toLowerCase().includes(q) ||
-      c.primary_contact.toLowerCase().includes(q) ||
-      c.contact_phone.toLowerCase().includes(q) ||
-      c.location.toLowerCase().includes(q) ||
-      c.sdworx_account_manager.toLowerCase().includes(q);
+  const filtered = useMemo(() => {
+    const q = filterQuery.trim().toLowerCase();
+    const pc = pcQuery.trim().toLowerCase();
+    const mgr = managerQuery.trim().toLowerCase();
 
-    const matchesPC = selectedPC === 'ALL' || c.joint_committee.startsWith(selectedPC);
-    return matchesQuery && matchesPC;
-  });
+    return customers.filter((c) => {
+      const matchesQuery =
+        !q ||
+        c.name.toLowerCase().includes(q) ||
+        c.enterprise_number.toLowerCase().includes(q) ||
+        c.primary_contact.toLowerCase().includes(q) ||
+        (c.contact_phone && c.contact_phone.toLowerCase().includes(q)) ||
+        c.location.toLowerCase().includes(q);
 
-  const allPCs = ['ALL', 'PC 200', 'PC 124', 'PC 207', 'PC 302', 'PC 118', 'PC 111', 'PC 330'];
+      const matchesPC =
+        !pc ||
+        c.joint_committee.toLowerCase().includes(pc) ||
+        (c.joint_committee_code && c.joint_committee_code.toLowerCase().includes(pc));
+
+      const matchesManager =
+        !mgr ||
+        (c.sdworx_account_manager &&
+          c.sdworx_account_manager.toLowerCase().includes(mgr));
+
+      return matchesQuery && matchesPC && matchesManager;
+    });
+  }, [customers, filterQuery, pcQuery, managerQuery]);
+
+  const hasFilters = filterQuery || pcQuery || managerQuery;
 
   return (
-    <div className="space-y-5 animate-in fade-in duration-150">
+    <div className="space-y-4 animate-in fade-in duration-150">
       {/* Search Header Banner */}
-      <div className="bg-white rounded-lg p-5 border border-slate-200 shadow-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+      <div className="bg-white rounded-lg p-4 border border-slate-200 shadow-2xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
           <div>
-            <h1 className="text-base font-bold text-sdworx-navy tracking-tight">
-              SD Worx Kennisnet — Actieve Klantdossiers
+            <h1 className="text-sm font-bold text-sdworx-navy tracking-tight">
+              SD Worx Kennisnet — Klantdossiers
             </h1>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Selecteer een onderneming om brondocumenten, barema-afspraken en expertise-routing te raadplegen.
+            <p className="text-[11px] text-slate-500">
+              Typ in de zoekvelden om direct een klantdossier, sociaal-juridische afspraken of collega te raadplegen.
             </p>
           </div>
 
           <button
             onClick={onOpenCustomerSearch}
-            className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-sdworx-navy hover:bg-sdworx-navy-dark text-white text-xs font-semibold rounded transition-colors self-start sm:self-auto"
+            className="inline-flex items-center space-x-1.5 px-3 py-1.5 bg-sdworx-navy hover:bg-sdworx-navy-dark text-white text-xs font-semibold rounded transition-colors self-start sm:self-auto shadow-2xs"
           >
             <Search className="w-3.5 h-3.5" />
-            <span>Geavanceerd Zoeken</span>
+            <span>Uitgebreide Zoeker</span>
           </button>
         </div>
 
-        {/* Snelle Zoekbalk & Filter Tabs */}
-        <div className="space-y-3">
-          <div className="relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+        {/* Handmatige invoervakjes: 1 grote zoekbalk + 2 kleine vakjes voor PC en Beheerder */}
+        <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 pt-1">
+          <div className="sm:col-span-6 relative">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
-              placeholder="Zoek op klantnaam, KBO-nummer, telefoon (+32...), contactpersoon of beheerder..."
+              placeholder="Zoek klantnaam, KBO, telefoon, contactpersoon..."
               value={filterQuery}
               onChange={(e) => setFilterQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 text-xs bg-slate-50 border border-slate-200 rounded-md text-slate-800 focus:outline-none focus:border-sdworx-blue focus:bg-white"
+              className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-sdworx-blue focus:bg-white"
             />
           </div>
 
-          {/* PC Filter Bar */}
-          <div className="flex items-center space-x-1 overflow-x-auto text-xs pt-1">
-            <span className="text-slate-400 text-[11px] font-medium mr-1 shrink-0">Filter op PC:</span>
-            {allPCs.map((pc) => (
+          <div className="sm:col-span-3">
+            <input
+              type="text"
+              placeholder="PC (bv. 200, 124, 207...)"
+              value={pcQuery}
+              onChange={(e) => setPcQuery(e.target.value)}
+              className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-sdworx-blue focus:bg-white"
+            />
+          </div>
+
+          <div className="sm:col-span-3 flex items-center space-x-1.5">
+            <input
+              type="text"
+              placeholder="Beheerder (bv. Sarah...)"
+              value={managerQuery}
+              onChange={(e) => setManagerQuery(e.target.value)}
+              className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-sdworx-blue focus:bg-white"
+            />
+            {hasFilters && (
               <button
-                key={pc}
-                onClick={() => setSelectedPC(pc)}
-                className={`px-2.5 py-1 rounded transition-colors shrink-0 text-xs font-medium ${
-                  selectedPC === pc
-                    ? 'bg-sdworx-navy text-white'
-                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                }`}
+                type="button"
+                onClick={() => {
+                  setFilterQuery('');
+                  setPcQuery('');
+                  setManagerQuery('');
+                }}
+                className="p-1.5 text-slate-400 hover:text-slate-700 rounded border border-slate-200 bg-slate-50"
+                title="Wis filters"
               >
-                {pc === 'ALL' ? 'Alle Sectoren' : pc}
+                <RotateCcw className="w-3.5 h-3.5" />
               </button>
-            ))}
+            )}
           </div>
         </div>
       </div>
@@ -96,7 +124,7 @@ export default function HomeDashboard({
       {/* Overzicht van Klanten (Dense Enterprise Cards) */}
       <div>
         <div className="flex items-center justify-between text-xs text-slate-500 mb-2 px-1">
-          <span>{filtered.length} dossiers beschikbaar</span>
+          <span>{filtered.length} dossiers gevonden</span>
           <span className="text-[11px]">Klik op een dossier om te openen</span>
         </div>
 
@@ -105,10 +133,10 @@ export default function HomeDashboard({
             <div
               key={c.id}
               onClick={() => onSelectCustomer(c.id)}
-              className="bg-white rounded-lg p-4 border border-slate-200 hover:border-sdworx-blue hover:shadow-xs transition-all cursor-pointer group flex flex-col justify-between"
+              className="bg-white rounded-lg p-3.5 border border-slate-200 hover:border-sdworx-blue hover:shadow-xs transition-all cursor-pointer group flex flex-col justify-between"
             >
               <div>
-                <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="flex items-start justify-between gap-2 mb-1.5">
                   <div className="min-w-0">
                     <h3 className="text-xs font-bold text-slate-900 group-hover:text-sdworx-blue transition-colors truncate">
                       {c.name}
@@ -122,7 +150,7 @@ export default function HomeDashboard({
                   </span>
                 </div>
 
-                <div className="space-y-1 text-[11px] text-slate-600 my-2.5 pt-2 border-t border-slate-100">
+                <div className="space-y-1 text-[11px] text-slate-600 my-2 pt-1.5 border-t border-slate-100">
                   <div className="flex items-center space-x-1.5">
                     <User className="w-3 h-3 text-slate-400" />
                     <span className="truncate">{c.primary_contact}</span>
@@ -140,7 +168,7 @@ export default function HomeDashboard({
                 </div>
               </div>
 
-              <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
                 <span className="text-sdworx-blue font-medium truncate">
                   Beheerder: {c.sdworx_account_manager}
                 </span>
@@ -151,6 +179,12 @@ export default function HomeDashboard({
               </div>
             </div>
           ))}
+
+          {filtered.length === 0 && (
+            <div className="col-span-full text-center py-10 bg-white rounded-lg border border-slate-200 text-slate-500 text-xs">
+              Geen dossiers gevonden die overeenkomen met de ingevoerde criteria.
+            </div>
+          )}
         </div>
       </div>
     </div>

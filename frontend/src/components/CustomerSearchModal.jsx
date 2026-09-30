@@ -9,7 +9,7 @@ import {
   MapPin,
   Briefcase,
   Check,
-  Filter,
+  RotateCcw,
 } from 'lucide-react';
 
 export default function CustomerSearchModal({
@@ -22,28 +22,19 @@ export default function CustomerSearchModal({
   if (!isOpen) return null;
 
   const [query, setQuery] = useState('');
-  const [selectedCommittee, setSelectedCommittee] = useState('ALL');
-  const [selectedManager, setSelectedManager] = useState('ALL');
+  const [pcInput, setPcInput] = useState('');
+  const [managerInput, setManagerInput] = useState('');
+  const [locationInput, setLocationInput] = useState('');
 
-  // Paritaire comités voor filter
-  const committees = useMemo(() => {
-    const list = Array.from(new Set(customers.map((c) => c.joint_committee.split(' - ')[0])));
-    return ['ALL', ...list];
-  }, [customers]);
-
-  // Dossierbeheerders voor filter
-  const managers = useMemo(() => {
-    const list = Array.from(
-      new Set(customers.map((c) => c.sdworx_account_manager).filter(Boolean))
-    );
-    return ['ALL', ...list];
-  }, [customers]);
-
-  // Slimme meervoudige filtering
+  // Slimme meervoudige handmatige filtering
   const filteredCustomers = useMemo(() => {
     const cleanQuery = query.trim().toLowerCase();
+    const cleanPc = pcInput.trim().toLowerCase();
+    const cleanMgr = managerInput.trim().toLowerCase();
+    const cleanLoc = locationInput.trim().toLowerCase();
 
     return customers.filter((cust) => {
+      // 1. Algemene zoekterm
       const matchesText =
         !cleanQuery ||
         cust.name.toLowerCase().includes(cleanQuery) ||
@@ -51,38 +42,53 @@ export default function CustomerSearchModal({
         (cust.customer_code && cust.customer_code.toLowerCase().includes(cleanQuery)) ||
         (cust.contact_phone && cust.contact_phone.toLowerCase().includes(cleanQuery)) ||
         cust.primary_contact.toLowerCase().includes(cleanQuery) ||
-        cust.contact_email.toLowerCase().includes(cleanQuery) ||
-        (cust.sdworx_account_manager &&
-          cust.sdworx_account_manager.toLowerCase().includes(cleanQuery)) ||
-        cust.location.toLowerCase().includes(cleanQuery);
+        cust.contact_email.toLowerCase().includes(cleanQuery);
 
-      const matchesCommittee =
-        selectedCommittee === 'ALL' ||
-        cust.joint_committee.startsWith(selectedCommittee);
+      // 2. Handmatig getypt Paritair Comité (bv. "200", "PC 124", "118")
+      const matchesPC =
+        !cleanPc ||
+        cust.joint_committee.toLowerCase().includes(cleanPc) ||
+        (cust.joint_committee_code && cust.joint_committee_code.toLowerCase().includes(cleanPc));
 
+      // 3. Handmatig getypte dossierbeheerder (bv. "Sarah", "Tom", "Wouters")
       const matchesManager =
-        selectedManager === 'ALL' ||
-        cust.sdworx_account_manager === selectedManager;
+        !cleanMgr ||
+        (cust.sdworx_account_manager &&
+          cust.sdworx_account_manager.toLowerCase().includes(cleanMgr));
 
-      return matchesText && matchesCommittee && matchesManager;
+      // 4. Handmatig getypte locatie/regio
+      const matchesLocation =
+        !cleanLoc ||
+        cust.location.toLowerCase().includes(cleanLoc);
+
+      return matchesText && matchesPC && matchesManager && matchesLocation;
     });
-  }, [customers, query, selectedCommittee, selectedManager]);
+  }, [customers, query, pcInput, managerInput, locationInput]);
 
   const handleSelect = (customer) => {
     onSelectCustomer(customer.id);
     onClose();
   };
 
+  const handleResetFilters = () => {
+    setQuery('');
+    setPcInput('');
+    setManagerInput('');
+    setLocationInput('');
+  };
+
+  const hasActiveFilters = query || pcInput || managerInput || locationInput;
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg max-w-2xl w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in fade-in zoom-in-95 duration-150">
-        {/* Header met zoekveld */}
-        <div className="p-4 border-b border-slate-200 bg-slate-50/50">
+      <div className="bg-white rounded-lg max-w-3xl w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in fade-in zoom-in-95 duration-150">
+        {/* Header met zoekvakken */}
+        <div className="p-4 border-b border-slate-200 bg-slate-50/60">
           <div className="flex items-center justify-between mb-2.5">
             <div>
               <h3 className="text-sm font-bold text-sdworx-navy">Dossier- & Klantzoeker</h3>
               <p className="text-[11px] text-slate-500">
-                Zoek op bedrijfsnaam, telefoon (+32...), KBO-nummer, contactpersoon of beheerder
+                Zoek op trefwoord of typ direct in de specifieke velden (PC, beheerder, regio)
               </p>
             </div>
             <button
@@ -93,16 +99,16 @@ export default function CustomerSearchModal({
             </button>
           </div>
 
-          {/* Zoekbalk */}
-          <div className="relative">
+          {/* Veld 1: Hoofdzoekbalk */}
+          <div className="relative mb-2.5">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               autoFocus
-              placeholder="Typ naam, telefoonnummer (+32...), KBO (0459...), Marc Vanhove..."
+              placeholder="Klantnaam, KBO-nummer (0459...), telefoon (+32...), contactpersoon..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="w-full pl-9 pr-8 py-2 text-xs bg-white border border-slate-300 rounded text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-sdworx-blue"
+              className="w-full pl-9 pr-8 py-1.5 text-xs bg-white border border-slate-300 rounded text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-sdworx-blue"
             />
             {query && (
               <button
@@ -114,44 +120,62 @@ export default function CustomerSearchModal({
             )}
           </div>
 
-          {/* Snelle filters */}
-          <div className="flex flex-wrap items-center gap-2 mt-2.5 pt-2 border-t border-slate-200/60 text-[11px]">
-            <span className="text-slate-500 font-medium flex items-center">
-              <Filter className="w-3 h-3 mr-1" /> PC:
-            </span>
-            <div className="flex items-center space-x-1 overflow-x-auto">
-              {committees.map((com) => (
-                <button
-                  key={com}
-                  onClick={() => setSelectedCommittee(com)}
-                  className={`px-2 py-0.5 rounded transition-colors text-xs ${
-                    selectedCommittee === com
-                      ? 'bg-sdworx-navy text-white font-medium'
-                      : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  {com === 'ALL' ? 'Alle' : com}
-                </button>
-              ))}
+          {/* Veld 2: Handmatige kleine invoervakjes voor PC, Beheerder en Regio (Geen knoppenrij) */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 pt-1">
+            <div>
+              <label className="block text-[10px] font-semibold uppercase text-slate-500 mb-0.5">
+                Paritair Comité (PC)
+              </label>
+              <input
+                type="text"
+                placeholder="bv. 200, 124, 207..."
+                value={pcInput}
+                onChange={(e) => setPcInput(e.target.value)}
+                className="w-full px-2 py-1 text-xs bg-white border border-slate-300 rounded text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-sdworx-blue"
+              />
             </div>
 
-            <span className="text-slate-300 mx-1">|</span>
+            <div>
+              <label className="block text-[10px] font-semibold uppercase text-slate-500 mb-0.5">
+                Dossierbeheerder
+              </label>
+              <input
+                type="text"
+                placeholder="bv. Sarah, Tom, Emma..."
+                value={managerInput}
+                onChange={(e) => setManagerInput(e.target.value)}
+                className="w-full px-2 py-1 text-xs bg-white border border-slate-300 rounded text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-sdworx-blue"
+              />
+            </div>
 
-            <span className="text-slate-500 font-medium">Beheerder:</span>
-            <div className="flex items-center space-x-1 overflow-x-auto">
-              {managers.map((mgr) => (
+            <div>
+              <label className="block text-[10px] font-semibold uppercase text-slate-500 mb-0.5">
+                Locatie / Regio
+              </label>
+              <input
+                type="text"
+                placeholder="bv. Antwerpen, Gent..."
+                value={locationInput}
+                onChange={(e) => setLocationInput(e.target.value)}
+                className="w-full px-2 py-1 text-xs bg-white border border-slate-300 rounded text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-sdworx-blue"
+              />
+            </div>
+
+            <div className="flex items-end">
+              {hasActiveFilters ? (
                 <button
-                  key={mgr}
-                  onClick={() => setSelectedManager(mgr)}
-                  className={`px-2 py-0.5 rounded transition-colors text-xs ${
-                    selectedManager === mgr
-                      ? 'bg-sdworx-blue text-white font-medium'
-                      : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
-                  }`}
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="w-full py-1 text-xs text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-100 rounded flex items-center justify-center space-x-1"
                 >
-                  {mgr === 'ALL' ? 'Alle' : mgr.split(' ')[0]}
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Wis filters</span>
                 </button>
-              ))}
+              ) : (
+                <div className="text-[10px] text-slate-400 py-1.5 px-1">
+                  Typ trefwoorden om direct te filteren
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -160,7 +184,7 @@ export default function CustomerSearchModal({
         <div className="flex-1 overflow-y-auto divide-y divide-slate-100 p-2">
           {filteredCustomers.length === 0 ? (
             <div className="text-center py-10 text-slate-500 text-xs">
-              Geen klanten gevonden met deze zoekterm of filters.
+              Geen dossiers gevonden die voldoen aan deze filters.
             </div>
           ) : (
             filteredCustomers.map((cust) => {
@@ -212,7 +236,7 @@ export default function CustomerSearchModal({
 
                     {/* Details */}
                     <div className="flex flex-wrap items-center gap-x-2 text-[11px] text-slate-400 mt-1">
-                      <span className="text-slate-600">{cust.joint_committee}</span>
+                      <span className="text-slate-700 font-medium">{cust.joint_committee}</span>
                       <span>•</span>
                       <span>{cust.employee_count} wkn</span>
                       <span>•</span>
@@ -248,7 +272,7 @@ export default function CustomerSearchModal({
 
         {/* Footer info */}
         <div className="px-4 py-2 bg-slate-50 border-t border-slate-200 text-[11px] text-slate-500 flex items-center justify-between">
-          <span>{filteredCustomers.length} van {customers.length} dossiers</span>
+          <span>{filteredCustomers.length} van {customers.length} dossiers getoond</span>
           <span>Klik om direct het dossier te laden</span>
         </div>
       </div>
