@@ -1,4 +1,4 @@
-# SD Worx — TECTONIC Knowledge & Dossier Portal
+# SD Worx — TECTONIC Knowledge & Dossier Portal (prove of concept)
 
 A high-performance enterprise workspace for SD Worx payroll consultants and legal officers to manage customer dossiers, resolve legal contradictions, and execute intelligent expert routing.
 
