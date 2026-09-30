@@ -111,12 +111,12 @@ impl DocumentSourceType {
 
     pub fn label(&self) -> &'static str {
         match self {
-            DocumentSourceType::SignedContract => "Getekend Contract / Addendum",
-            DocumentSourceType::OfficialTemplate => "Officiële SD Worx Template",
-            DocumentSourceType::CrmNote => "CRM Notitie",
-            DocumentSourceType::TicketResolution => "ServiceDesk Opgelost Ticket",
-            DocumentSourceType::TicketComment => "Ticket Commentaar / E-mail",
-            DocumentSourceType::ChatMessage => "Teams Chat / Notitie",
+            DocumentSourceType::SignedContract => "Signed Contract / Addendum",
+            DocumentSourceType::OfficialTemplate => "Official SD Worx Template",
+            DocumentSourceType::CrmNote => "CRM Note",
+            DocumentSourceType::TicketResolution => "ServiceDesk Resolved Ticket",
+            DocumentSourceType::TicketComment => "Ticket Comment / Email",
+            DocumentSourceType::ChatMessage => "Teams Chat / Note",
         }
     }
 }
@@ -264,4 +264,13 @@ pub struct FeedbackSubmission {
     pub document_id: String,
     pub feedback_type: String,
     pub employee_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResolveConflictInput {
+    pub customer_id: String,
+    pub field: String,
+    pub chosen_value: String,
+    pub resolution_note: String,
+    pub resolved_by: String,
 }

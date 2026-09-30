@@ -74,6 +74,13 @@ impl Database {
                 FOREIGN KEY (customer_id) REFERENCES customers(id)
             );
 
+            CREATE TABLE IF NOT EXISTS document_user_votes (
+                document_id TEXT NOT NULL,
+                employee_id TEXT NOT NULL,
+                vote_type TEXT NOT NULL,
+                PRIMARY KEY (document_id, employee_id)
+            );
+
             CREATE TABLE IF NOT EXISTS employees (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -451,8 +458,49 @@ impl Database {
         &self,
         doc_id: &str,
         feedback_type: &str,
+        employee_id: &str,
     ) -> Result<Option<DocumentItem>> {
-        match feedback_type {
+        let f_type = feedback_type.to_uppercase();
+        
+        let mut check_stmt = self.conn.prepare(
+            "SELECT vote_type FROM document_user_votes WHERE document_id = ?1 AND employee_id = ?2",
+        )?;
+        let existing_vote: Option<String> = check_stmt
+            .query_row(params![doc_id, employee_id], |row| row.get(0))
+            .ok();
+
+        if let Some(prev_vote) = existing_vote {
+            if prev_vote == f_type {
+                // User already submitted this vote, return current doc
+                return self.get_document_by_id(doc_id);
+            } else {
+                // Revert previous vote count
+                match prev_vote.as_str() {
+                    "VERIFIED" => {
+                        self.conn.execute(
+                            "UPDATE documents SET verified_count = MAX(0, verified_count - 1) WHERE id = ?1",
+                            params![doc_id],
+                        )?;
+                    }
+                    "OUTDATED" => {
+                        self.conn.execute(
+                            "UPDATE documents SET outdated_count = MAX(0, outdated_count - 1) WHERE id = ?1",
+                            params![doc_id],
+                        )?;
+                    }
+                    "QUESTIONABLE" => {
+                        self.conn.execute(
+                            "UPDATE documents SET questionable_count = MAX(0, questionable_count - 1) WHERE id = ?1",
+                            params![doc_id],
+                        )?;
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        // Apply new vote count
+        match f_type.as_str() {
             "VERIFIED" => {
                 self.conn.execute(
                     "UPDATE documents SET verified_count = verified_count + 1 WHERE id = ?1",
@@ -474,7 +522,87 @@ impl Database {
             _ => {}
         }
 
+        self.conn.execute(
+            "INSERT OR REPLACE INTO document_user_votes (document_id, employee_id, vote_type) VALUES (?1, ?2, ?3)",
+            params![doc_id, employee_id, f_type],
+        )?;
+
         self.get_document_by_id(doc_id)
+    }
+
+    pub fn resolve_conflict(
+        &self,
+        customer_id: &str,
+        field: &str,
+        chosen_value: &str,
+        resolution_note: &str,
+        resolved_by: &str,
+    ) -> Result<DocumentItem> {
+        let docs = self.get_documents()?;
+        for mut doc in docs {
+            if doc.customer_id == customer_id {
+                let mut modified = false;
+                for fact in &mut doc.key_facts {
+                    if fact.field == field {
+                        fact.value = chosen_value.to_string();
+                        fact.is_conflicting = false;
+                        modified = true;
+                    }
+                }
+                if modified {
+                    self.insert_document(&doc)?;
+                }
+            }
+        }
+
+        let now_str = chrono::Utc::now().format("%Y-%m-%d").to_string();
+        let doc_id = format!("RES-{}", uuid::Uuid::new_v4().simple().to_string()[..6].to_uppercase());
+        let res_doc = DocumentItem {
+            id: doc_id,
+            customer_id: customer_id.to_string(),
+            title: format!("Conflict Resolution Note: {}", field),
+            source_type: DocumentSourceType::OfficialTemplate,
+            source_label: "Official SD Worx Template".to_string(),
+            date: now_str,
+            author: resolved_by.to_string(),
+            author_role: "Payroll Consultant".to_string(),
+            summary: format!(
+                "Official conflict resolution recorded. Parameter '{}' standardized to '{}'. Note: {}",
+                field, chosen_value, resolution_note
+            ),
+            raw_content: format!(
+                "Formal dispute resolution registered by {}. Standardized value: '{}'. Details: {}",
+                resolved_by, chosen_value, resolution_note
+            ),
+            unmasked_raw_content: None,
+            file_path: None,
+            file_name: None,
+            file_size: None,
+            key_facts: vec![KeyFact {
+                field: field.to_string(),
+                label: field.to_string(),
+                value: chosen_value.to_string(),
+                is_conflicting: false,
+            }],
+            tags: vec!["Conflict Resolution".to_string(), "Standardized".to_string()],
+            trust: TrustBreakdown {
+                overall_score: 96.0,
+                source_score: 95.0,
+                recency_score: 100.0,
+                consensus_score: 100.0,
+                feedback_score: 100.0,
+                is_authoritative: true,
+                conflict_flag: false,
+            },
+            feedback: DocumentFeedback {
+                verified_count: 5,
+                outdated_count: 0,
+                questionable_count: 0,
+            },
+        };
+
+        self.insert_document(&res_doc)?;
+        Ok(res_doc)
     }
 
     // --- EMPLOYEE MANAGEMENT ---

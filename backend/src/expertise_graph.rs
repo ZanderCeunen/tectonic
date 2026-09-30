@@ -32,13 +32,14 @@ impl ExpertiseGraph {
         map.get(id).cloned()
     }
 
-    /// Slim zoek- en matchalgoritme: koppelt de juiste expert aan een vraag of kernwoorden
-    /// op basis van succesvol afgehandelde dossiers, domeinexpertise, klanthistoriek en beschikbaarheid.
+    /// Intelligent Google-search-like question & keyword matching algorithm.
+    /// Matches the right expert to a free-form question or keywords based on
+    /// successfully resolved cases, domain expertise, customer familiarity, and availability.
     pub fn recommend_experts(&self, req: &RoutingRequest) -> Vec<RoutingRecommendation> {
         let map = self.employees.lock().unwrap();
         let mut recommendations = Vec::new();
 
-        // Combineer query, domein en inquiry_summary tot één zoekcontext
+        // Combine question, domain, and summary into unified search context
         let search_text = format!(
             "{} {} {}",
             req.query.as_deref().unwrap_or(""),
@@ -47,32 +48,30 @@ impl ExpertiseGraph {
         )
         .to_lowercase();
 
+        // Tokenize and filter out short filler words (stop words)
+        let stop_words = ["the", "a", "an", "in", "on", "at", "for", "with", "about", "who", "can", "help", "me", "how", "what", "is", "of", "and", "or", "to", "van", "de", "het", "een", "voor", "met", "over", "wie", "kan", "helpen"];
         let raw_tokens: Vec<&str> = search_text
             .split(|c: char| !c.is_alphanumeric() && c != '-')
-            .filter(|t| t.len() >= 2)
+            .filter(|t| t.len() >= 2 && !stop_words.contains(t))
             .collect();
 
-        // Klant ID filter indien meegegeven
         let target_customer_id = req.customer_id.as_deref().unwrap_or("");
 
         for emp in map.values() {
-            // 1. Bereken Domein & Trefwoord Match (0.0 tot 100.0)
             let mut best_domain_score = 0.0;
             let mut matched_domain_name = String::new();
             let mut keyword_hits = 0;
 
-            // Directe domeinspecialisatie matching
+            // 1. Direct domain expertise checking
             for (domain, &score) in &emp.domain_expertise {
                 let dom_lower = domain.to_lowercase();
                 let mut matches_domain = false;
 
-                // Check op exacte of gedeeltelijke match
                 if !search_text.is_empty() && (dom_lower.contains(&search_text) || search_text.contains(&dom_lower)) {
                     matches_domain = true;
                     keyword_hits += 2;
                 }
 
-                // Check op tokens
                 for token in &raw_tokens {
                     if dom_lower.contains(token) {
                         matches_domain = true;
@@ -86,7 +85,7 @@ impl ExpertiseGraph {
                 }
             }
 
-            // Synoniemen & Specialisatie trefwoorden
+            // 2. Profile, title, and recent activity inspection
             let emp_text_profile = format!(
                 "{} {} {}",
                 emp.name, emp.title, emp.recent_activity
@@ -99,123 +98,128 @@ impl ExpertiseGraph {
                 }
             }
 
-            // Domeinspecifieke trefwoordherkenning
+            // 3. Domain-specific keyword & joint committee recognition
             let contains_any = |keywords: &[&str]| -> bool {
                 raw_tokens.iter().any(|t| keywords.iter().any(|k| t.contains(k) || k.contains(t)))
             };
 
-            if contains_any(&["expat", "detachering", "buitenland", "grensarbeid", "a1", "internationaal"]) {
-                if let Some(&score) = emp.domain_expertise.get("Internationale Detachering & Expat") {
+            if contains_any(&["expat", "posting", "detachering", "abroad", "cross-border", "grensarbeid", "a1", "international", "salary-split"]) {
+                if let Some(&score) = emp.domain_expertise.get("International Mobility & Expat")
+                    .or_else(|| emp.domain_expertise.get("Internationale Detachering & Expat")) {
                     if score > best_domain_score {
                         best_domain_score = score;
-                        matched_domain_name = "Internationale Detachering & Expat".to_string();
+                        matched_domain_name = "International Mobility & Expat".to_string();
                     }
                 }
             }
 
-            if contains_any(&["bouw", "weerverlet", "constructiv", "pc 124", "124", "arbeiders", "rustdag", "mobiliteit"]) {
-                if let Some(&score) = emp.domain_expertise.get("Bouwbedrijf PC 124") {
+            if contains_any(&["construction", "bouw", "bad-weather", "weerverlet", "constructiv", "pc 124", "124", "workers", "arbeiders", "mobility", "mobiliteit"]) {
+                if let Some(&score) = emp.domain_expertise.get("Construction PC 124")
+                    .or_else(|| emp.domain_expertise.get("Bouwbedrijf PC 124")) {
                     if score > best_domain_score {
                         best_domain_score = score;
-                        matched_domain_name = "Bouwbedrijf PC 124".to_string();
+                        matched_domain_name = "Construction PC 124".to_string();
                     }
                 }
             }
 
-            if contains_any(&["horeca", "flexi", "flexijob", "flexi-job", "pc 302", "302", "dimona", "student", "fli"]) {
-                if let Some(&score) = emp.domain_expertise.get("Horeca PC 302 & Flexi-jobs") {
+            if contains_any(&["hospitality", "horeca", "flexi", "flexijob", "flexi-job", "pc 302", "302", "dimona", "student", "fli"]) {
+                if let Some(&score) = emp.domain_expertise.get("Hospitality PC 302 & Flexi-jobs")
+                    .or_else(|| emp.domain_expertise.get("Horeca PC 302 & Flexi-jobs")) {
                     if score > best_domain_score {
                         best_domain_score = score;
-                        matched_domain_name = "Horeca PC 302 & Flexi-jobs".to_string();
+                        matched_domain_name = "Hospitality PC 302 & Flexi-jobs".to_string();
                     }
                 }
             }
 
-            if contains_any(&["chemie", "volcontinu", "ploeg", "ploegen", "nachtpremie", "standby", "wachtdienst", "pc 207", "207"]) {
-                if let Some(&score) = emp.domain_expertise.get("Chemie & Petrochemie PC 207") {
+            if contains_any(&["chemistry", "chemie", "continuous", "volcontinu", "shift", "ploeg", "ploegen", "night-premium", "nachtpremie", "standby", "wachtdienst", "pc 207", "207"]) {
+                if let Some(&score) = emp.domain_expertise.get("Chemical Industry PC 207")
+                    .or_else(|| emp.domain_expertise.get("Chemie & Petrochemie PC 207")) {
                     if score > best_domain_score {
                         best_domain_score = score;
-                        matched_domain_name = "Chemie & Petrochemie PC 207".to_string();
+                        matched_domain_name = "Chemical Industry PC 207".to_string();
                     }
                 }
             }
 
-            if contains_any(&["cao 200", "pc 200", "200", "bediende", "bedienden", "arbeidsduur", "38u", "36u", "thuiswerk", "telewerk"]) {
-                if let Some(&score) = emp.domain_expertise.get("CAO 200 & Bediendenstatuut") {
+            if contains_any(&["cba 200", "cao 200", "pc 200", "200", "white-collar", "bediende", "bedienden", "working-hours", "arbeidsduur", "38h", "38u", "36u", "telework", "thuiswerk", "meal-voucher", "maaltijdcheque"]) {
+                if let Some(&score) = emp.domain_expertise.get("CBA 200 & White-Collar Status")
+                    .or_else(|| emp.domain_expertise.get("CAO 200 & Bediendenstatuut")) {
                     if score > best_domain_score {
                         best_domain_score = score;
-                        matched_domain_name = "CAO 200 & Bediendenstatuut".to_string();
+                        matched_domain_name = "CBA 200 & White-Collar Status".to_string();
                     }
                 }
             }
 
-            if contains_any(&["cafetaria", "cafetariaplan", "flex", "wagen", "bedrijfswagen", "fisc", "tax", "bonus"]) {
-                if let Some(&score) = emp.domain_expertise.get("Cafetariaplan & Flex Income") {
+            if contains_any(&["cafeteria", "cafetariaplan", "flex-income", "flex", "company-car", "wagen", "bedrijfswagen", "tax", "fisc", "fiscaliteit", "bonus"]) {
+                if let Some(&score) = emp.domain_expertise.get("Flexible Benefits & Cafeteria Plan")
+                    .or_else(|| emp.domain_expertise.get("Cafetariaplan & Flex Income")) {
                     if score > best_domain_score {
                         best_domain_score = score;
-                        matched_domain_name = "Cafetariaplan & Flex Income".to_string();
+                        matched_domain_name = "Flexible Benefits & Cafeteria Plan".to_string();
                     }
                 }
             }
 
-            if contains_any(&["zorg", "ziekenhuis", "ific", "pc 330", "330", "vzw", "rusthuis"]) {
-                if let Some(&score) = emp.domain_expertise.get("Zorgsector PC 330 & IFIC") {
+            if contains_any(&["healthcare", "zorg", "hospital", "ziekenhuis", "ific", "pc 330", "330", "care-home", "rusthuis", "npo", "vzw"]) {
+                if let Some(&score) = emp.domain_expertise.get("Healthcare PC 330 & IFIC")
+                    .or_else(|| emp.domain_expertise.get("Zorgsector PC 330 & IFIC")) {
                     if score > best_domain_score {
                         best_domain_score = score;
-                        matched_domain_name = "Zorgsector PC 330 & IFIC".to_string();
+                        matched_domain_name = "Healthcare PC 330 & IFIC".to_string();
                     }
                 }
             }
 
-            if contains_any(&["voeding", "pc 118", "118", "voedingsnijverheid"]) {
-                if let Some(&score) = emp.domain_expertise.get("Voedingsnijverheid PC 118") {
+            if contains_any(&["food", "voeding", "pc 118", "118", "food-processing", "voedingsnijverheid"]) {
+                if let Some(&score) = emp.domain_expertise.get("Food Industry PC 118")
+                    .or_else(|| emp.domain_expertise.get("Voedingsnijverheid PC 118")) {
                     if score > best_domain_score {
                         best_domain_score = score;
-                        matched_domain_name = "Voedingsnijverheid PC 118".to_string();
+                        matched_domain_name = "Food Industry PC 118".to_string();
                     }
                 }
             }
 
-            if contains_any(&["metaal", "pc 111", "111", "constructie"]) {
-                if let Some(&score) = emp.domain_expertise.get("Metaalsector PC 111") {
+            if contains_any(&["metals", "metaal", "pc 111", "111", "manufacturing", "constructie"]) {
+                if let Some(&score) = emp.domain_expertise.get("Metal Industry PC 111")
+                    .or_else(|| emp.domain_expertise.get("Metaalsector PC 111")) {
                     if score > best_domain_score {
                         best_domain_score = score;
-                        matched_domain_name = "Metaalsector PC 111".to_string();
+                        matched_domain_name = "Metal Industry PC 111".to_string();
                     }
                 }
             }
 
-            // Indien geen specifieke match, neem het gemiddelde van de domeinen of fallback
             let final_domain_score = if best_domain_score > 0.0 {
                 (best_domain_score + (keyword_hits as f64 * 3.0)).min(100.0)
             } else if raw_tokens.is_empty() {
-                // Als geen zoekopdracht is ingevuld, neem de top expertise van de expert
                 emp.domain_expertise.values().cloned().fold(0.0, f64::max)
             } else {
                 (25.0 + (keyword_hits as f64 * 8.0)).min(70.0)
             };
 
-            // 2. Klantervaring & Historiek
+            // 4. Customer familiarity
             let customer_score = if !target_customer_id.is_empty() {
                 *emp.customer_familiarity.get(target_customer_id).unwrap_or(&15.0)
             } else {
-                // Algemene gemiddelde klantervaring
                 let sum: f64 = emp.customer_familiarity.values().sum();
                 let count = emp.customer_familiarity.len().max(1) as f64;
                 sum / count
             };
 
-            // 3. Succesvol afgehandelde dossiers factor (completed_cases gewicht tot 18%)
+            // 5. Completed cases weight boost (up to 18 points)
             let cases_boost = (emp.completed_cases as f64 * 0.35).min(18.0);
 
-            // 4. Gewogen totaalscore
+            // 6. Weighted total
             let weighted_score = if !target_customer_id.is_empty() {
                 (0.45 * final_domain_score) + (0.40 * customer_score) + cases_boost
             } else {
                 (0.70 * final_domain_score) + (0.15 * customer_score) + cases_boost
             };
 
-            // 5. Beschikbaarheidscorrectie
             let availability_factor = match emp.availability {
                 AvailabilityStatus::Available => 1.0,
                 AvailabilityStatus::InCall => 0.92,
@@ -226,7 +230,6 @@ impl ExpertiseGraph {
             let overall_match = (weighted_score * availability_factor).clamp(10.0, 99.0);
             let overall_match = (overall_match * 10.0).round() / 10.0;
 
-            // 6. Genereer een heldere, menselijke toelichting
             let domain_display = if !matched_domain_name.is_empty() {
                 matched_domain_name
             } else {
@@ -234,7 +237,7 @@ impl ExpertiseGraph {
             };
 
             let match_explanation = format!(
-                "{} heeft {} dossiers succesvol afgehandeld en is gespecialiseerd in '{}' (score: {:.0}%). Klanthistoriek: {:.0}%.",
+                "{} has successfully resolved {} cases and specializes in '{}' (expertise score: {:.0}%). Case history familiarity: {:.0}%.",
                 emp.name,
                 emp.completed_cases,
                 domain_display,
@@ -252,11 +255,10 @@ impl ExpertiseGraph {
             });
         }
 
-        // Sorteer op match score descending
         recommendations.sort_by(|a, b| {
             b.overall_match
                 .partial_cmp(&a.overall_match)
-                .unwrap()
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         if let Some(top) = recommendations.first_mut() {
@@ -266,22 +268,20 @@ impl ExpertiseGraph {
         recommendations
     }
 
-    /// Verwerkt een succesvolle doorschakeling en verhoogt de expertise en affiniteit
+    /// Records warm handoff and increments completed cases
     pub fn record_handoff(&self, handoff: &HandoffRequest) -> Option<Employee> {
         let mut map = self.employees.lock().unwrap();
         if let Some(emp) = map.get_mut(&handoff.employee_id) {
             emp.completed_cases += 1;
 
-            // Verhoog de klantaffiniteit
             let current_cust_score = emp
                 .customer_familiarity
                 .entry(handoff.customer_id.clone())
                 .or_insert(20.0);
             *current_cust_score = (*current_cust_score + 3.5).min(100.0);
 
-            // Update recente activiteit
             emp.recent_activity = format!(
-                "Doorgeschakeld met klantvraag: '{}' (Beller: {})",
+                "Assisted inquiry: '{}' (Caller: {})",
                 handoff.inquiry_summary, handoff.caller_name
             );
 

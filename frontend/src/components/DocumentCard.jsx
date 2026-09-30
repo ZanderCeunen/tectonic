@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FileText,
   Calendar,
@@ -10,23 +10,39 @@ import {
   Lock,
   Eye,
   EyeOff,
-  ExternalLink,
+  CheckCircle2,
 } from 'lucide-react';
 
 export default function DocumentCard({ doc, activeUser, onFeedback }) {
   const [expanded, setExpanded] = useState(false);
   const [showUnmasked, setShowUnmasked] = useState(false);
+  const [userVote, setUserVote] = useState(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem(`doc_vote_${doc.id}_${activeUser?.name || 'default'}`);
+    if (saved) {
+      setUserVote(saved);
+    }
+  }, [doc.id, activeUser]);
 
   const trustScore = doc.trust?.overall_score || 50;
-  const hasPayrollClearance = activeUser.role === 'Senior Payroll Officer';
+  const hasPayrollClearance = activeUser?.role === 'Senior Payroll Officer' || activeUser?.role === 'Admin';
 
-  // Bron-badges conform corporate huisstijl
+  const handleVote = (type) => {
+    if (userVote === type) return; // Prevent duplicate spam
+    setUserVote(type);
+    localStorage.setItem(`doc_vote_${doc.id}_${activeUser?.name || 'default'}`, type);
+    if (onFeedback) {
+      onFeedback(doc.id, type);
+    }
+  };
+
   const getSourceBadge = (type) => {
     switch (type) {
       case 'SignedContract':
         return 'bg-slate-100 text-slate-800 border-slate-300 font-bold';
       case 'OfficialTemplate':
-        return 'bg-blue-50 text-sdworx-navy border-blue-200 font-bold';
+        return 'bg-blue-50 text-[#005FB8] border-blue-200 font-bold';
       case 'CrmNote':
         return 'bg-slate-50 text-slate-700 border-slate-200 font-medium';
       default:
@@ -36,16 +52,16 @@ export default function DocumentCard({ doc, activeUser, onFeedback }) {
 
   return (
     <div
-      className={`bg-white rounded-lg border transition-colors ${
+      className={`bg-white rounded-xl border transition-all ${
         doc.trust?.conflict_flag
           ? 'border-amber-300 bg-amber-50/15'
-          : 'border-slate-200 hover:border-slate-300'
+          : 'border-slate-200 hover:border-slate-300 hover:shadow-xs'
       }`}
     >
       <div className="p-4 sm:p-5">
-        {/* Bovenste rij: Type, Datum, Betrouwbaarheid */}
+        {/* Top bar: Source label, Date, Author, Trust Score */}
         <div className="flex items-center justify-between gap-3 text-xs mb-2">
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 flex-wrap gap-y-1">
             <span
               className={`px-2 py-0.5 rounded text-[11px] border ${getSourceBadge(
                 doc.source_type
@@ -56,11 +72,11 @@ export default function DocumentCard({ doc, activeUser, onFeedback }) {
             <span className="text-slate-300">•</span>
             <span className="text-slate-500 text-[11px] font-medium">{doc.date}</span>
             <span className="text-slate-300">•</span>
-            <span className="text-slate-500 text-[11px]">Auteur: {doc.author}</span>
+            <span className="text-slate-500 text-[11px]">Author: {doc.author}</span>
           </div>
 
-          <div className="flex items-center space-x-1.5">
-            <span className="text-[11px] text-slate-500 font-medium">Betrouwbaarheid:</span>
+          <div className="flex items-center space-x-1.5 shrink-0">
+            <span className="text-[11px] text-slate-500 font-medium">Trust Score:</span>
             <span
               className={`font-bold text-xs px-2 py-0.5 rounded border ${
                 trustScore >= 85
@@ -75,20 +91,20 @@ export default function DocumentCard({ doc, activeUser, onFeedback }) {
           </div>
         </div>
 
-        {/* Documenttitel */}
+        {/* Document Title */}
         <h4 className="text-sm font-bold text-slate-900 mb-1.5 leading-snug">{doc.title}</h4>
 
-        {/* Samenvatting */}
+        {/* Summary */}
         <p className="text-xs text-slate-600 leading-relaxed mb-3">{doc.summary}</p>
 
-        {/* Geëxtraheerde parameters */}
+        {/* Key Extracted Facts */}
         <div className="flex flex-wrap items-center gap-2 mb-3.5">
           {doc.key_facts?.map((fact, idx) => (
             <span
               key={idx}
               className={`text-[11px] px-2 py-1 rounded border font-medium ${
                 fact.is_conflicting
-                  ? 'bg-amber-100/70 text-amber-950 border-amber-400 font-semibold'
+                  ? 'bg-amber-100/80 text-amber-950 border-amber-400 font-semibold'
                   : 'bg-slate-50 text-slate-800 border-slate-200'
               }`}
             >
@@ -100,21 +116,21 @@ export default function DocumentCard({ doc, activeUser, onFeedback }) {
           ))}
         </div>
 
-        {/* Uitklapbaar Documentviewer venster */}
+        {/* Collapsible Source Document Viewer */}
         {expanded && (
           <div className="my-3 pt-3 border-t border-slate-200 space-y-2.5 animate-in fade-in duration-100">
-            <div className="bg-slate-50 rounded border border-slate-200 p-3.5 font-mono text-xs text-slate-800 relative">
+            <div className="bg-slate-50 rounded-lg border border-slate-200 p-3.5 font-mono text-xs text-slate-800 relative">
               <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-200 text-[11px] text-slate-500 font-sans">
                 <span className="flex items-center space-x-1.5 font-medium text-slate-700">
-                  <FileText className="w-3.5 h-3.5 text-sdworx-navy" />
-                  <span>Documentfragment & Brontekst (GDPR PII-beschermd)</span>
+                  <FileText className="w-3.5 h-3.5 text-[#005FB8]" />
+                  <span>Document Excerpt & Source Text (GDPR Redacted)</span>
                 </span>
                 {hasPayrollClearance && (
                   <button
                     onClick={() => setShowUnmasked(!showUnmasked)}
-                    className="text-sdworx-blue hover:underline text-[11px] font-medium"
+                    className="text-[#005FB8] hover:underline text-[11px] font-medium"
                   >
-                    {showUnmasked ? 'Verberg persoonsgegevens' : 'Toon ongecensureerd (Senior rechten)'}
+                    {showUnmasked ? 'Mask confidential figures' : 'Show unmasked (Senior Payroll Access)'}
                   </button>
                 )}
               </div>
@@ -127,44 +143,60 @@ export default function DocumentCard({ doc, activeUser, onFeedback }) {
           </div>
         )}
 
-        {/* Actiebalk onderaan met duidelijke knoppen */}
+        {/* Action Footer */}
         <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2.5">
-          {/* Knop 1: Document Inzien / Openen */}
+          {/* Button: View Document Excerpt */}
           <button
             onClick={() => setExpanded(!expanded)}
-            className={`px-3 py-1.5 text-xs font-semibold rounded border transition-colors flex items-center space-x-1.5 ${
+            className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors flex items-center space-x-1.5 ${
               expanded
                 ? 'bg-slate-800 text-white border-slate-800'
                 : 'bg-white hover:bg-slate-100 text-slate-800 border-slate-300'
             }`}
           >
-            <FileText className="w-3.5 h-3.5 text-sdworx-blue" />
-            <span>{expanded ? 'Sluit document fragment' : 'Document fragment inzien'}</span>
+            <FileText className="w-3.5 h-3.5 text-[#005FB8]" />
+            <span>{expanded ? 'Hide document text' : 'View document excerpt'}</span>
             {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
 
-          {/* Knoppen voor Validatie: Bevestigen & Verouderd melden */}
+          {/* Validation Buttons: Verify or Flag Outdated with Spam Prevention */}
           <div className="flex items-center space-x-2">
             <button
-              onClick={() => onFeedback(doc.id, 'VERIFIED')}
-              className="px-2.5 py-1 text-xs font-medium rounded border border-emerald-300 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-900 transition-colors flex items-center space-x-1"
-              title="Bevestig dat de bepalingen in dit document actueel en accuraat zijn"
+              onClick={() => handleVote('VERIFIED')}
+              className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors flex items-center space-x-1 ${
+                userVote === 'VERIFIED'
+                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                  : 'border-emerald-300 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-900'
+              }`}
+              title="Confirm that the provisions in this document are currently active and authoritative"
             >
-              <Check className="w-3.5 h-3.5 text-emerald-700" />
-              <span>Bevestig als actueel</span>
-              <span className="ml-1 px-1.5 py-0.2 bg-emerald-200/80 rounded-full text-[10px] font-bold text-emerald-900">
+              <Check className="w-3.5 h-3.5" />
+              <span>{userVote === 'VERIFIED' ? 'Verified by you' : 'Confirm as Active'}</span>
+              <span
+                className={`ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                  userVote === 'VERIFIED' ? 'bg-white/20 text-white' : 'bg-emerald-200/80 text-emerald-900'
+                }`}
+              >
                 {doc.feedback?.verified_count || 0}
               </span>
             </button>
 
             <button
-              onClick={() => onFeedback(doc.id, 'OUTDATED')}
-              className="px-2.5 py-1 text-xs font-medium rounded border border-slate-300 bg-slate-50 hover:bg-rose-50 hover:border-rose-300 hover:text-rose-900 text-slate-700 transition-colors flex items-center space-x-1"
-              title="Meld dat dit document verouderd of vervangen is door een recentere overeenkomst"
+              onClick={() => handleVote('OUTDATED')}
+              className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors flex items-center space-x-1 ${
+                userVote === 'OUTDATED'
+                  ? 'bg-rose-600 text-white border-rose-600 shadow-2xs'
+                  : 'border-slate-300 bg-slate-50 hover:bg-rose-50 hover:border-rose-300 hover:text-rose-900 text-slate-700'
+              }`}
+              title="Flag that this document has been superseded by a more recent agreement"
             >
-              <Flag className="w-3 h-3 text-slate-500" />
-              <span>Meld verouderd</span>
-              <span className="ml-1 px-1.5 py-0.2 bg-slate-200 rounded-full text-[10px] font-bold text-slate-700">
+              <Flag className="w-3 h-3" />
+              <span>{userVote === 'OUTDATED' ? 'Marked outdated by you' : 'Mark Outdated'}</span>
+              <span
+                className={`ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                  userVote === 'OUTDATED' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                }`}
+              >
                 {doc.feedback?.outdated_count || 0}
               </span>
             </button>

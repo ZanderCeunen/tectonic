@@ -1,5 +1,5 @@
 import React from 'react';
-import { Building2, Search, ChevronDown, User, Phone, Home, FolderOpen, Plus, Shield, UserPlus, LogOut } from 'lucide-react';
+import { Building2, Search, ChevronDown, FolderOpen, Plus, LogOut } from 'lucide-react';
 
 export default function Header({
   customers,
@@ -8,8 +8,6 @@ export default function Header({
   onGoHome,
   activeUser,
   onOpenAddCustomer,
-  onOpenAddEmployee,
-  onOpenLogin,
   onLogout,
 }) {
   const selectedCustomer = customers.find((c) => c.id === selectedCustomerId);
@@ -23,7 +21,7 @@ export default function Header({
             <button
               onClick={onGoHome}
               className="flex items-center space-x-2 focus:outline-none hover:opacity-90 transition-opacity"
-              title="Terug naar overzicht / startscherm"
+              title="Return to Home Dashboard"
             >
               <img
                 src="/logo.png"
@@ -42,63 +40,54 @@ export default function Header({
               onClick={onGoHome}
               className="text-xs font-bold text-slate-800 hover:text-[#005FB8] hidden sm:flex items-center space-x-1"
             >
-              <span>Kennisnet & Dossierbeheer</span>
+              <span>Knowledge Portal & Case Assistant</span>
             </button>
           </div>
 
-          {/* Dossierkeuze & Beheer Acties */}
+          {/* Customer Case Selector & Actions */}
           <div className="flex items-center space-x-2">
             <button
               onClick={onOpenCustomerSearch}
-              className="inline-flex items-center space-x-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200/80 border border-slate-300 rounded text-xs font-semibold text-slate-800 transition-colors shadow-2xs group"
-              title="Open de dossierzoeker popup"
+              className="inline-flex items-center space-x-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200/80 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 transition-colors shadow-2xs group"
+              title="Open Case Search modal"
             >
               <FolderOpen className="w-3.5 h-3.5 text-[#005FB8]" />
-              <span className="text-slate-500 font-normal">Dossier:</span>
+              <span className="text-slate-500 font-normal">Case:</span>
               <span className="text-slate-900 font-bold truncate max-w-[140px] sm:max-w-xs">
-                {selectedCustomer ? selectedCustomer.name : 'Geen dossier gekozen'}
+                {selectedCustomer ? selectedCustomer.name : 'No Case Selected'}
               </span>
               <ChevronDown className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-800" />
             </button>
 
-            {/* Beheer Knoppen */}
+            {/* Quick Action: New Customer File */}
             <button
               onClick={onOpenAddCustomer}
-              className="inline-flex items-center space-x-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-medium border border-slate-200 transition-colors"
-              title="Nieuwe Klant Toevoegen"
+              className="inline-flex items-center space-x-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium border border-slate-200 transition-colors"
+              title="Register New Customer File"
             >
               <Plus className="w-3.5 h-3.5 text-emerald-600" />
-              <span className="hidden lg:inline">+ Klant</span>
-            </button>
-
-            <button
-              onClick={onOpenAddEmployee}
-              className="inline-flex items-center space-x-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-medium border border-slate-200 transition-colors"
-              title="Nieuwe SD Worx Expert Toevoegen"
-            >
-              <UserPlus className="w-3.5 h-3.5 text-[#005FB8]" />
-              <span className="hidden lg:inline">+ Expert</span>
+              <span className="hidden lg:inline">+ Customer</span>
             </button>
           </div>
 
-          {/* Actieve medewerker & Uitloggen */}
+          {/* Active Employee Profile & Logout */}
           <div className="flex items-center space-x-3 shrink-0">
             <div className="text-right hidden sm:block">
               <div className="text-xs font-bold text-slate-900">
-                {activeUser.name}
+                {activeUser?.name || 'Consultant'}
               </div>
               <div className="text-[11px] text-slate-500">
-                {activeUser.role}
+                {activeUser?.role || 'SD Worx Payroll'}
               </div>
             </div>
 
             <button
               onClick={onLogout}
               className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg border border-slate-200 transition-colors flex items-center space-x-1"
-              title="Uitloggen"
+              title="Sign Out"
             >
               <LogOut className="w-4 h-4" />
-              <span className="text-xs font-medium text-slate-600 hover:text-rose-600 hidden md:inline">Uitloggen</span>
+              <span className="text-xs font-medium text-slate-600 hover:text-rose-600 hidden md:inline">Sign Out</span>
             </button>
           </div>
         </div>

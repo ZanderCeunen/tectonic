@@ -117,7 +117,7 @@ export default function EmployeeManagerModal({ isOpen, onClose, employeeToEdit, 
           <div className="flex items-center space-x-2">
             <UserPlus className="w-5 h-5 text-[#005FB8]" />
             <h3 className="text-sm font-bold tracking-tight">
-              {isEdit ? `Expert Bewerken: ${formData.name}` : 'Nieuwe SD Worx Expert Toevoegen'}
+              {isEdit ? `Edit Expert: ${formData.name}` : 'Add New SD Worx Expert'}
             </h3>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-white p-1 rounded-md">
@@ -129,33 +129,33 @@ export default function EmployeeManagerModal({ isOpen, onClose, employeeToEdit, 
         <form onSubmit={handleSubmit} className="p-5 space-y-3.5 text-xs">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Volledige Naam *</label>
+              <label className="block font-semibold text-slate-700 mb-1">Full Name *</label>
               <input
                 type="text"
                 required
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="w-full py-1.5 px-3 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:border-[#005FB8]"
-                placeholder="bv. Sarah Vermeulen"
+                placeholder="e.g. Sarah Vermeulen"
               />
             </div>
 
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Functietitel *</label>
+              <label className="block font-semibold text-slate-700 mb-1">Job Title *</label>
               <input
                 type="text"
                 required
                 value={formData.title}
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 className="w-full py-1.5 px-3 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:border-[#005FB8]"
-                placeholder="bv. Senior Payroll Officer"
+                placeholder="e.g. Senior Payroll Officer"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Afdeling / Team</label>
+              <label className="block font-semibold text-slate-700 mb-1">Department / Team</label>
               <input
                 type="text"
                 value={formData.department}
@@ -165,23 +165,23 @@ export default function EmployeeManagerModal({ isOpen, onClose, employeeToEdit, 
             </div>
 
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Beschikbaarheid Status</label>
+              <label className="block font-semibold text-slate-700 mb-1">Availability Status</label>
               <select
                 value={formData.availability}
                 onChange={(e) => setFormData({ ...formData, availability: e.target.value })}
                 className="w-full py-1.5 px-3 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:border-[#005FB8]"
               >
-                <option value="Available">🟢 Vrij (Available)</option>
-                <option value="InCall">🟡 In Gesprek (InCall)</option>
-                <option value="Busy">🟠 Bezet (Busy)</option>
-                <option value="Away">⚪ Afwezig (Away)</option>
+                <option value="Available">🟢 Available</option>
+                <option value="InCall">🟡 In Call</option>
+                <option value="Busy">🟠 Busy</option>
+                <option value="Away">⚪ Away</option>
               </select>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Extensie (Internal Phone)</label>
+              <label className="block font-semibold text-slate-700 mb-1">Extension (Internal Phone)</label>
               <input
                 type="text"
                 value={formData.extension}
@@ -192,7 +192,7 @@ export default function EmployeeManagerModal({ isOpen, onClose, employeeToEdit, 
             </div>
 
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Direct Telefoonnummer</label>
+              <label className="block font-semibold text-slate-700 mb-1">Direct Phone Number</label>
               <input
                 type="text"
                 value={formData.direct_phone}
@@ -205,7 +205,7 @@ export default function EmployeeManagerModal({ isOpen, onClose, employeeToEdit, 
 
           <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
             <span className="font-semibold text-slate-800 text-[11px] block uppercase tracking-wider">
-              Domeinexpertise Scores (0 - 100%):
+              Domain Expertise Scores (0 - 100%):
             </span>
             <div className="grid grid-cols-3 gap-2">
               <div>
@@ -221,7 +221,7 @@ export default function EmployeeManagerModal({ isOpen, onClose, employeeToEdit, 
               </div>
 
               <div>
-                <label className="block text-[10px] text-slate-600 mb-0.5">CAO 200 ({formData.domain_cao200}%)</label>
+                <label className="block text-[10px] text-slate-600 mb-0.5">JC 200 ({formData.domain_cao200}%)</label>
                 <input
                   type="range"
                   min="0"
@@ -233,7 +233,7 @@ export default function EmployeeManagerModal({ isOpen, onClose, employeeToEdit, 
               </div>
 
               <div>
-                <label className="block text-[10px] text-slate-600 mb-0.5">Arbeidstijd ({formData.domain_time}%)</label>
+                <label className="block text-[10px] text-slate-600 mb-0.5">Working Time ({formData.domain_time}%)</label>
                 <input
                   type="range"
                   min="0"
@@ -252,7 +252,7 @@ export default function EmployeeManagerModal({ isOpen, onClose, employeeToEdit, 
               onClick={onClose}
               className="px-3 py-1.5 text-slate-600 hover:bg-slate-100 rounded-md font-medium"
             >
-              Annuleren
+              Cancel
             </button>
             <button
               type="submit"
@@ -260,7 +260,7 @@ export default function EmployeeManagerModal({ isOpen, onClose, employeeToEdit, 
               className="px-4 py-1.5 bg-[#005FB8] hover:bg-[#004b93] text-white font-semibold rounded-md shadow-xs transition-colors inline-flex items-center space-x-1"
             >
               <Save className="w-3.5 h-3.5" />
-              <span>{isSubmitting ? 'Opslaan...' : isEdit ? 'Expert Opslaan' : 'Expert Toevoegen'}</span>
+              <span>{isSubmitting ? 'Saving...' : isEdit ? 'Save Expert' : 'Add Expert'}</span>
             </button>
           </div>
         </form>

@@ -9,12 +9,8 @@ import {
   ArrowRight,
   RotateCcw,
   AlertTriangle,
-  ShieldCheck,
   FileText,
-  Plus,
-  UserPlus,
   PhoneForwarded,
-  CheckCircle2,
 } from 'lucide-react';
 
 export default function HomeDashboard({
@@ -24,7 +20,6 @@ export default function HomeDashboard({
   onSelectCustomer,
   onOpenCustomerSearch,
   onOpenAddCustomer,
-  onOpenAddEmployee,
   onOpenRouter,
 }) {
   const [filterQuery, setFilterQuery] = useState('');
@@ -63,109 +58,57 @@ export default function HomeDashboard({
   const hasFilters = filterQuery || pcQuery || managerQuery;
 
   return (
-    <div className="space-y-5 animate-in fade-in duration-150">
-      {/* 1. Compact Employee Header & Quick Actions */}
-      <div className="bg-white rounded-xl p-4 sm:p-5 border border-slate-200 shadow-2xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-              Welkom, {activeUser.name}
-            </h1>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {activeUser.role} • SD Worx Kennis- & Dossierbeheer
-            </p>
-          </div>
+    <div className="space-y-4 animate-in fade-in duration-150">
+      {/* 1. Navigation Tabs & Quick Router Action */}
+      <div className="bg-white rounded-xl p-2 border border-slate-200 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+        <div className="flex items-center space-x-1">
+          <button
+            onClick={() => setActiveTab('dossiers')}
+            className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors flex items-center space-x-1.5 ${
+              activeTab === 'dossiers'
+                ? 'bg-slate-900 text-white shadow-2xs'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Building2 className="w-3.5 h-3.5" />
+            <span>Customer Cases ({customers.length})</span>
+          </button>
 
-          {/* Snelle actieknoppen */}
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={onOpenAddCustomer}
-              className="px-3 py-1.5 bg-[#005FB8] hover:bg-[#004b93] text-white text-xs font-semibold rounded-lg transition-colors shadow-2xs flex items-center space-x-1.5"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>+ Nieuw Klantdossier</span>
-            </button>
+          <button
+            onClick={() => setActiveTab('conflicts')}
+            className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors flex items-center space-x-1.5 ${
+              activeTab === 'conflicts'
+                ? 'bg-amber-500 text-white shadow-2xs'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <AlertTriangle className="w-3.5 h-3.5" />
+            <span>Conflict Monitor (1 Active)</span>
+          </button>
 
-            <button
-              onClick={onOpenAddEmployee}
-              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200 transition-colors shadow-2xs flex items-center space-x-1.5"
-            >
-              <UserPlus className="w-3.5 h-3.5 text-[#005FB8]" />
-              <span>+ Nieuwe Expert</span>
-            </button>
-
-            <button
-              onClick={onOpenRouter}
-              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition-colors shadow-2xs flex items-center space-x-1.5"
-            >
-              <PhoneForwarded className="w-3.5 h-3.5" />
-              <span>Expert Router</span>
-            </button>
-          </div>
+          <button
+            onClick={() => setActiveTab('team')}
+            className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors flex items-center space-x-1.5 ${
+              activeTab === 'team'
+                ? 'bg-slate-900 text-white shadow-2xs'
+                : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>SD Worx Experts ({employees?.length || 0})</span>
+          </button>
         </div>
 
-        {/* Compacte overzichtsstatistieken */}
-        <div className="grid grid-cols-3 gap-2.5 sm:gap-3 mt-4 pt-4 border-t border-slate-100">
-          <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-            <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Klantendossiers</div>
-            <div className="text-sm sm:text-base font-bold text-slate-900 mt-0.5">{customers.length} Dossiers</div>
-          </div>
-
-          <div className="bg-amber-50/70 p-2.5 rounded-lg border border-amber-200/50">
-            <div className="text-[10px] uppercase tracking-wider text-amber-800 font-bold">Aandachtspunten</div>
-            <div className="text-sm sm:text-base font-bold text-amber-900 mt-0.5 flex items-center space-x-1">
-              <span>1 Conflict</span>
-              <AlertTriangle className="w-3.5 h-3.5 text-amber-600 inline" />
-            </div>
-          </div>
-
-          <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-            <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">SD Worx Experts</div>
-            <div className="text-sm sm:text-base font-bold text-slate-900 mt-0.5">{employees?.length || 0} Beschikbaar</div>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Navigation Tabs */}
-      <div className="bg-white rounded-xl p-1.5 border border-slate-200 flex items-center space-x-1 shadow-2xs">
         <button
-          onClick={() => setActiveTab('dossiers')}
-          className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors flex items-center space-x-1.5 ${
-            activeTab === 'dossiers'
-              ? 'bg-slate-900 text-white shadow-2xs'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
+          onClick={onOpenRouter}
+          className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors shadow-2xs flex items-center space-x-1.5"
         >
-          <Building2 className="w-3.5 h-3.5" />
-          <span>Klantdossiers ({customers.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('conflicts')}
-          className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors flex items-center space-x-1.5 ${
-            activeTab === 'conflicts'
-              ? 'bg-amber-500 text-white shadow-2xs'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <AlertTriangle className="w-3.5 h-3.5" />
-          <span>Conflict Monitor (1 Actief)</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('team')}
-          className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors flex items-center space-x-1.5 ${
-            activeTab === 'team'
-              ? 'bg-slate-900 text-white shadow-2xs'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <Users className="w-3.5 h-3.5" />
-          <span>SD Worx Experts ({employees?.length || 0})</span>
+          <PhoneForwarded className="w-3.5 h-3.5" />
+          <span>Smart Expert Router</span>
         </button>
       </div>
 
-      {/* 3. TAB 1: Klantdossiers met Filters & Kaarten */}
+      {/* 2. TAB 1: Customer Cases with Filters & Cards */}
       {activeTab === 'dossiers' && (
         <div className="space-y-4">
           <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-2xs">
@@ -174,7 +117,7 @@ export default function HomeDashboard({
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="text"
-                  placeholder="Zoek klantnaam, KBO, telefoon, contactpersoon..."
+                  placeholder="Search company name, enterprise number, contact person, phone..."
                   value={filterQuery}
                   onChange={(e) => setFilterQuery(e.target.value)}
                   className="w-full pl-8 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#005FB8]"
@@ -184,7 +127,7 @@ export default function HomeDashboard({
               <div className="sm:col-span-3">
                 <input
                   type="text"
-                  placeholder="Paritair Comité (bv. PC 200...)"
+                  placeholder="Joint Committee (e.g. 200, 124...)"
                   value={pcQuery}
                   onChange={(e) => setPcQuery(e.target.value)}
                   className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#005FB8]"
@@ -194,7 +137,7 @@ export default function HomeDashboard({
               <div className="sm:col-span-3 flex items-center space-x-1.5">
                 <input
                   type="text"
-                  placeholder="Beheerder (bv. Sarah...)"
+                  placeholder="Account Manager (e.g. Sarah...)"
                   value={managerQuery}
                   onChange={(e) => setManagerQuery(e.target.value)}
                   className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#005FB8]"
@@ -208,6 +151,7 @@ export default function HomeDashboard({
                       setManagerQuery('');
                     }}
                     className="p-2 text-slate-400 hover:text-slate-700 rounded-lg border border-slate-200 bg-slate-50"
+                    title="Reset filters"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
                   </button>
@@ -251,17 +195,17 @@ export default function HomeDashboard({
                     )}
                     <div className="flex items-center space-x-1.5 text-slate-500">
                       <Users className="w-3 h-3 text-slate-400" />
-                      <span>{c.employee_count} werknemers</span>
+                      <span>{c.employee_count} employees</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
                   <span className="text-[#005FB8] font-semibold truncate">
-                    Beheerder: {c.sdworx_account_manager || 'Sarah Vermeulen'}
+                    Manager: {c.sdworx_account_manager || 'Sarah Vermeulen'}
                   </span>
                   <span className="text-slate-400 group-hover:text-[#005FB8] font-bold inline-flex items-center space-x-0.5 shrink-0">
-                    <span>Openen</span>
+                    <span>Open Case</span>
                     <ArrowRight className="w-3 h-3 ml-0.5" />
                   </span>
                 </div>
@@ -271,12 +215,12 @@ export default function HomeDashboard({
         </div>
       )}
 
-      {/* 4. TAB 2: Conflict Center */}
+      {/* 3. TAB 2: Conflict Center */}
       {activeTab === 'conflicts' && (
         <div className="bg-white rounded-xl p-5 border border-slate-200 space-y-4">
           <div className="flex items-center space-x-2">
             <AlertTriangle className="w-5 h-5 text-amber-600" />
-            <h2 className="text-sm font-bold text-slate-900">Actieve Tegenstrijdigheden in Klantdossiers</h2>
+            <h2 className="text-sm font-bold text-slate-900">Active Document Contradictions</h2>
           </div>
 
           <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 space-y-2">
@@ -285,24 +229,24 @@ export default function HomeDashboard({
               <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-200 text-amber-900 rounded">CRITICAL</span>
             </div>
             <p className="text-xs text-slate-700 leading-relaxed">
-              Tegenstrijdigheid ontdekt: Ticket #421 vermeldt <strong>36u/week</strong>, maar het getekend addendum 2024 vermeldt <strong>38u/week</strong>.
+              Contradiction detected: Ticket #421 states <strong>36h/week</strong>, whereas the signed addendum 2024 stipulates <strong>38h/week</strong>.
             </p>
             <div className="pt-2">
               <button
                 onClick={() => onSelectCustomer('CUST-001')}
                 className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg"
               >
-                Dossier Openen & Oplossen
+                Open Case & Resolve Dispute
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 5. TAB 3: Team & Expert Overview */}
+      {/* 4. TAB 3: Team & Expert Overview */}
       {activeTab === 'team' && (
         <div className="bg-white rounded-xl p-5 border border-slate-200 space-y-4">
-          <h2 className="text-sm font-bold text-slate-900">SD Worx Experts & Competentieoverzicht</h2>
+          <h2 className="text-sm font-bold text-slate-900">SD Worx Specialists & Case Track Record</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {employees.map((emp) => (
               <div key={emp.id} className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-3">
@@ -315,7 +259,7 @@ export default function HomeDashboard({
                   </div>
                 </div>
                 <span className="text-[10px] font-bold px-2 py-1 rounded bg-emerald-100 text-emerald-800">
-                  {emp.completed_cases} Cases
+                  {emp.completed_cases} Cases Resolved
                 </span>
               </div>
             ))}

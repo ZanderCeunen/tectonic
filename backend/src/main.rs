@@ -130,6 +130,7 @@ async fn main() {
         )
         .route("/api/customers/:id/documents", get(get_customer_documents))
         .route("/api/customers/:id/conflicts", get(get_customer_conflicts))
+        .route("/api/conflicts/resolve", post(resolve_conflict_endpoint))
         .route("/api/documents", post(create_document))
         .route("/api/documents/:id/file", get(download_document_file))
         .route("/api/documents/:id/feedback", post(submit_document_feedback))
@@ -538,7 +539,13 @@ async fn submit_document_feedback(
     Json(feedback): Json<FeedbackSubmission>,
 ) -> Result<Json<DocumentItem>, StatusCode> {
     let db = state.db.lock().unwrap();
-    match db.update_feedback(&doc_id, &feedback.feedback_type) {
+    let emp_id = if feedback.employee_id.is_empty() {
+        _auth.username.clone()
+    } else {
+        feedback.employee_id.clone()
+    };
+
+    match db.update_feedback(&doc_id, &feedback.feedback_type, &emp_id) {
         Ok(Some(doc)) => {
             let entry = state.audit_chain.append(
                 &_auth.username,
@@ -546,7 +553,7 @@ async fn submit_document_feedback(
                 "SUBMIT_DOCUMENT_FEEDBACK",
                 &doc_id,
                 &format!(
-                    "Feedback geregistreerd in SQLite: {} voor document '{}'",
+                    "Feedback registered in database: {} for document '{}'",
                     feedback.feedback_type, doc.title
                 ),
             );
@@ -554,6 +561,58 @@ async fn submit_document_feedback(
             Ok(Json(doc))
         }
         Ok(None) => Err(StatusCode::NOT_FOUND),
+        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+    }
+}
+
+#[derive(Serialize)]
+struct ConflictResolveResponse {
+    pub success: bool,
+    pub message: String,
+    pub resolution_document: DocumentItem,
+}
+
+async fn resolve_conflict_endpoint(
+    _auth: AuthUser,
+    State(state): State<AppState>,
+    Json(input): Json<crate::models::ResolveConflictInput>,
+) -> Result<Json<ConflictResolveResponse>, StatusCode> {
+    let db = state.db.lock().unwrap();
+    let resolver = if input.resolved_by.is_empty() {
+        _auth.username.clone()
+    } else {
+        input.resolved_by.clone()
+    };
+
+    match db.resolve_conflict(
+        &input.customer_id,
+        &input.field,
+        &input.chosen_value,
+        &input.resolution_note,
+        &resolver,
+    ) {
+        Ok(res_doc) => {
+            let entry = state.audit_chain.append(
+                &resolver,
+                &_auth.role,
+                "RESOLVE_DOCUMENT_CONFLICT",
+                &input.customer_id,
+                &format!(
+                    "Conflict resolved for field '{}' to standard value '{}'. Resolution doc: {}",
+                    input.field, input.chosen_value, res_doc.title
+                ),
+            );
+            db.insert_audit_entry(&entry).ok();
+
+            Ok(Json(ConflictResolveResponse {
+                success: true,
+                message: format!(
+                    "Conflict on '{}' successfully resolved. Standardized to '{}'.",
+                    input.field, input.chosen_value
+                ),
+                resolution_document: res_doc,
+            }))
+        }
         Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }

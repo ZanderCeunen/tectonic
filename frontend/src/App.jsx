@@ -32,24 +32,24 @@ export default function App() {
   const [customerToEdit, setCustomerToEdit] = useState(null);
   const [employeeToEdit, setEmployeeToEdit] = useState(null);
 
-  // 1. Laad initiële data van de Rust Backend
+  // 1. Load initial data from the Rust Backend
   const loadInitialData = async () => {
     setIsLoading(true);
     setBackendError(null);
     try {
-      // Haal klanten op van SQLite database
+      // Fetch customers from SQLite database
       const custRes = await fetch('/api/customers');
-      if (!custRes.ok) throw new Error(`Backend fout bij ophalen klanten: ${custRes.status}`);
+      if (!custRes.ok) throw new Error(`Backend error fetching customers: ${custRes.status}`);
       const custData = await custRes.json();
       setCustomers(custData);
 
-      // Haal medewerkers op van SQLite database
+      // Fetch employees from SQLite database
       const empRes = await fetch('/api/employees');
-      if (!empRes.ok) throw new Error(`Backend fout bij ophalen medewerkers: ${empRes.status}`);
+      if (!empRes.ok) throw new Error(`Backend error fetching employees: ${empRes.status}`);
       const empData = await empRes.json();
       setEmployees(empData);
 
-      // Controleer actieve JWT sessie indien aanwezig
+      // Check active JWT session if present
       if (authToken) {
         try {
           const meRes = await fetch('/api/auth/me', {
@@ -87,8 +87,8 @@ export default function App() {
 
       setIsLoading(false);
     } catch (err) {
-      console.error('Verbinding met Rust backend mislukt:', err);
-      setBackendError(err.message || 'Kon geen verbinding maken met de SD Worx Backend API (http://127.0.0.1:8080).');
+      console.error('Connection to Rust backend failed:', err);
+      setBackendError(err.message || 'Could not connect to SD Worx Backend API (http://127.0.0.1:8080).');
       setIsLoading(false);
     }
   };
@@ -97,7 +97,7 @@ export default function App() {
     loadInitialData();
   }, []);
 
-  // 2. Laad documenten en conflicten voor het geselecteerde klantdossier van SQLite
+  // 2. Load documents and conflicts for the selected customer
   const loadCustomerDocuments = async (customerId) => {
     if (!customerId) {
       setDocuments([]);
@@ -109,12 +109,12 @@ export default function App() {
       const docRes = await fetch(`/api/customers/${customerId}/documents`, {
         headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
       });
-      if (!docRes.ok) throw new Error(`Backend fout bij ophalen documenten: ${docRes.status}`);
+      if (!docRes.ok) throw new Error(`Backend error fetching documents: ${docRes.status}`);
       const docData = await docRes.json();
       setDocuments(docData.documents || []);
       setConflicts(docData.conflicts || []);
     } catch (err) {
-      console.error('Fout bij ophalen documenten:', err);
+      console.error('Error fetching documents:', err);
     }
   };
 
@@ -124,7 +124,7 @@ export default function App() {
     }
   }, [selectedCustomerId, authToken]);
 
-  // 3. Document feedback interactie via Backend
+  // 3. Document feedback interaction via Backend
   const handleFeedback = async (docId, type) => {
     try {
       const res = await fetch(`/api/documents/${docId}/feedback`, {
@@ -142,15 +142,43 @@ export default function App() {
 
       if (res.ok) {
         if (selectedCustomerId) {
-          loadCustomerDocuments(selectedCustomerId);
+          await loadCustomerDocuments(selectedCustomerId);
         }
       }
     } catch (e) {
-      console.error('Fout bij verzenden feedback naar backend:', e);
+      console.error('Error sending feedback to backend:', e);
     }
   };
 
-  // 4. Klantoproep doorverbinden via Backend
+  // 4. Resolve Conflict Handler
+  const handleResolveConflict = async (conflictData) => {
+    try {
+      const res = await fetch('/api/conflicts/resolve', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
+        body: JSON.stringify({
+          customer_id: conflictData.customer_id || selectedCustomerId,
+          fact_key: conflictData.fact_key,
+          resolved_value: conflictData.resolved_value,
+          resolution_notes: conflictData.resolution_notes,
+          resolved_by: activeUser ? activeUser.name : 'Tom De Smet',
+        }),
+      });
+
+      if (res.ok) {
+        if (selectedCustomerId) {
+          await loadCustomerDocuments(selectedCustomerId);
+        }
+      }
+    } catch (e) {
+      console.error('Error resolving conflict:', e);
+    }
+  };
+
+  // 5. Customer handoff via Backend
   const handleExecuteHandoff = async (handoffData) => {
     try {
       const res = await fetch('/api/routing/handoff', {
@@ -176,11 +204,11 @@ export default function App() {
         }
       }
     } catch (e) {
-      console.error('Fout bij registreren oproep in backend:', e);
+      console.error('Error registering handoff in backend:', e);
     }
   };
 
-  // 5. Inloggen & Uitloggen Callbacks
+  // 6. Login & Logout Callbacks
   const handleLoginSuccess = (user, token) => {
     setAuthToken(token);
     setActiveUser({
@@ -198,7 +226,7 @@ export default function App() {
     setActiveUser(null);
   };
 
-  // 6. Klant Opslaan Callback
+  // 7. Customer Save Callback
   const handleSaveCustomer = (savedCustomer) => {
     setCustomers((prev) => {
       const idx = prev.findIndex((c) => c.id === savedCustomer.id);
@@ -212,7 +240,7 @@ export default function App() {
     setSelectedCustomerId(savedCustomer.id);
   };
 
-  // 7. Medewerker Opslaan Callback
+  // 8. Employee Save Callback
   const handleSaveEmployee = (savedEmployee) => {
     setEmployees((prev) => {
       const idx = prev.findIndex((e) => e.id === savedEmployee.id);
@@ -236,9 +264,9 @@ export default function App() {
             <AlertTriangle className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-slate-900">Verbinding met Backend API Vereist</h2>
+            <h2 className="text-base font-bold text-slate-900">Backend API Connection Required</h2>
             <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-              De TECTONIC Dashboard frontend haalt alle echte gegevens op uit SQLite via de Rust Backend. Zorg dat de backend draait op <code className="font-mono bg-slate-100 px-1 py-0.5 rounded">http://127.0.0.1:8080</code>.
+              The TECTONIC Dashboard frontend connects to SQLite through the Rust Backend. Ensure the backend is running on <code className="font-mono bg-slate-100 px-1 py-0.5 rounded">http://127.0.0.1:8080</code>.
             </p>
           </div>
           <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-[11px] font-mono text-slate-700 text-left">
@@ -250,14 +278,14 @@ export default function App() {
             className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl flex items-center justify-center space-x-1.5 transition-colors"
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            <span>Opnieuw Proberen</span>
+            <span>Try Again</span>
           </button>
         </div>
       </div>
     );
   }
 
-  // FLOOW: Als de gebruiker NIET ingelogd is (geen authToken of activeUser), toon de LoginScreen
+  // FLOW: If not logged in, render LoginScreen
   if (!authToken || !activeUser) {
     return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
   }
@@ -275,20 +303,16 @@ export default function App() {
           setCustomerToEdit(null);
           setIsCustomerManagerOpen(true);
         }}
-        onOpenAddEmployee={() => {
-          setEmployeeToEdit(null);
-          setIsEmployeeManagerOpen(true);
-        }}
         onOpenLogin={() => setIsLoginOpen(true)}
         onLogout={handleLogout}
       />
 
-      {/* Hoofdsectie: Klantdossier of Overzichtsdashboard */}
+      {/* Main Content: Customer File or Home Dashboard */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-5">
         {isLoading ? (
           <div className="py-20 text-center text-slate-500 text-xs flex items-center justify-center space-x-2">
             <RefreshCw className="w-4 h-4 animate-spin text-[#005FB8]" />
-            <span>Klantendossiers en SQLite database gegevens laden...</span>
+            <span>Loading customer accounts and database records...</span>
           </div>
         ) : selectedCustomer ? (
           <CustomerHub
@@ -297,6 +321,7 @@ export default function App() {
             conflicts={conflicts}
             activeUser={activeUser}
             onFeedback={handleFeedback}
+            onResolveConflict={handleResolveConflict}
             onOpenRouter={() => setIsRouterOpen(true)}
             onOpenCustomerSearch={() => setIsCustomerSearchOpen(true)}
             onBackToHome={() => setSelectedCustomerId(null)}
@@ -312,16 +337,12 @@ export default function App() {
               setCustomerToEdit(null);
               setIsCustomerManagerOpen(true);
             }}
-            onOpenAddEmployee={() => {
-              setEmployeeToEdit(null);
-              setIsEmployeeManagerOpen(true);
-            }}
             onOpenRouter={() => setIsRouterOpen(true)}
           />
         )}
       </main>
 
-      {/* Modal: Collega Bellen & Vraagstuk Overdragen */}
+      {/* Modal: Smart Routing & Call Transfer */}
       <SmartRouterModal
         isOpen={isRouterOpen}
         onClose={() => setIsRouterOpen(false)}
@@ -332,7 +353,7 @@ export default function App() {
         onExecuteHandoff={handleExecuteHandoff}
       />
 
-      {/* Modal: Uitgebreide Dossierzoeker & Filter */}
+      {/* Modal: Customer Search & Filter */}
       <CustomerSearchModal
         isOpen={isCustomerSearchOpen}
         onClose={() => setIsCustomerSearchOpen(false)}
@@ -341,7 +362,7 @@ export default function App() {
         onSelectCustomer={(id) => setSelectedCustomerId(id)}
       />
 
-      {/* Modal: Login & JWT Auth Switcher */}
+      {/* Modal: Login */}
       <LoginModal
         isOpen={isLoginOpen}
         onClose={() => setIsLoginOpen(false)}
@@ -366,13 +387,13 @@ export default function App() {
         authToken={authToken}
       />
 
-      {/* Zakelijke SD Worx Footer */}
+      {/* SD Worx Footer */}
       <footer className="border-t border-slate-200 bg-white py-3 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 flex items-center justify-between">
           <span className="font-medium text-slate-600">
-            SD Worx Kennisnet & Dossierbeheer
+            SD Worx Knowledge Portal & Case Assistant
           </span>
-          <span>Interne Werknemersomgeving</span>
+          <span>Internal Employee Environment</span>
         </div>
       </footer>
     </div>
