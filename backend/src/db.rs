@@ -596,12 +596,20 @@ impl Database {
             file_path: None,
             file_name: None,
             file_size: None,
-            key_facts: vec![KeyFact {
-                field: field.to_string(),
-                label: field.to_string(),
-                value: chosen_value.to_string(),
-                is_conflicting: false,
-            }],
+            key_facts: vec![
+                KeyFact {
+                    field: field_clean.clone(),
+                    label: field.to_string(),
+                    value: chosen_value.to_string(),
+                    is_conflicting: false,
+                },
+                KeyFact {
+                    field: field.to_string(),
+                    label: field.to_string(),
+                    value: chosen_value.to_string(),
+                    is_conflicting: false,
+                },
+            ],
             tags: vec!["Conflict Resolution".to_string(), "Standardized".to_string()],
             trust: TrustBreakdown {
                 overall_score: 98.0,

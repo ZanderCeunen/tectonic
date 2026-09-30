@@ -82,6 +82,20 @@ impl TrustEngine {
     /// Analyzes all customer documents and flags contradictions across key facts
     pub fn detect_conflicts(docs: &[DocumentItem], customer_id: &str) -> Vec<ConflictAlert> {
         let mut alerts = Vec::new();
+
+        // 1. Collect all resolved fields/topics from Conflict Resolution notes
+        let mut resolved_fields: Vec<String> = Vec::new();
+        for doc in docs {
+            if doc.tags.iter().any(|t| t == "Conflict Resolution")
+                || doc.title.contains("Conflict Resolution Note")
+            {
+                for fact in &doc.key_facts {
+                    resolved_fields.push(fact.field.trim().to_lowercase());
+                    resolved_fields.push(fact.label.trim().to_lowercase());
+                }
+            }
+        }
+
         let mut facts_by_field: HashMap<String, Vec<ConflictingDocRef>> = HashMap::new();
         let mut labels_by_field: HashMap<String, String> = HashMap::new();
 
@@ -103,6 +117,23 @@ impl TrustEngine {
 
         for (field, refs) in facts_by_field {
             if refs.len() < 2 {
+                continue;
+            }
+
+            let field_clean = field.trim().to_lowercase();
+            let label_clean = labels_by_field
+                .get(&field)
+                .map(|l| l.trim().to_lowercase())
+                .unwrap_or_default();
+
+            // Skip if conflict on this field/topic has been explicitly resolved by a consultant note
+            if resolved_fields.iter().any(|r| {
+                !r.is_empty()
+                    && (r == &field_clean
+                        || r == &label_clean
+                        || field_clean.contains(r)
+                        || r.contains(&field_clean))
+            }) {
                 continue;
             }
 
