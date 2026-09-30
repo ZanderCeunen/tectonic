@@ -449,6 +449,79 @@ impl Database {
         Ok(list)
     }
 
+    pub fn get_documents_by_customer_id(&self, customer_id: &str) -> Result<Vec<DocumentItem>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, customer_id, title, source_type, source_label, date, author, author_role, summary, raw_content, unmasked_raw_content, file_path, file_name, file_size, key_facts_json, tags_json, verified_count, outdated_count, questionable_count FROM documents WHERE customer_id = ?1",
+        )?;
+
+        let rows = stmt.query_map(params![customer_id], |row: &Row| {
+            let st_str: String = row.get(3)?;
+            let source_type = match st_str.as_str() {
+                "SignedContract" => DocumentSourceType::SignedContract,
+                "OfficialTemplate" => DocumentSourceType::OfficialTemplate,
+                "CrmNote" => DocumentSourceType::CrmNote,
+                "TicketResolution" => DocumentSourceType::TicketResolution,
+                "TicketComment" => DocumentSourceType::TicketComment,
+                _ => DocumentSourceType::ChatMessage,
+            };
+
+            let unmasked: Option<String> = row.get(10)?;
+            let file_path: Option<String> = row.get(11)?;
+            let file_name: Option<String> = row.get(12)?;
+            let file_size_i: Option<i64> = row.get(13)?;
+            let file_size = file_size_i.map(|s| s as usize);
+
+            let kf_json: String = row.get(14)?;
+            let key_facts: Vec<KeyFact> = serde_json::from_str(&kf_json).unwrap_or_default();
+
+            let tags_json: String = row.get(15)?;
+            let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
+
+            let v_cnt: i64 = row.get(16)?;
+            let o_cnt: i64 = row.get(17)?;
+            let q_cnt: i64 = row.get(18)?;
+
+            Ok(DocumentItem {
+                id: row.get(0)?,
+                customer_id: row.get(1)?,
+                title: row.get(2)?,
+                source_type,
+                source_label: row.get(4)?,
+                date: row.get(5)?,
+                author: row.get(6)?,
+                author_role: row.get(7)?,
+                summary: row.get(8)?,
+                raw_content: row.get(9)?,
+                unmasked_raw_content: unmasked,
+                file_path,
+                file_name,
+                file_size,
+                key_facts,
+                tags,
+                trust: TrustBreakdown {
+                    overall_score: 50.0,
+                    source_score: 50.0,
+                    recency_score: 50.0,
+                    consensus_score: 50.0,
+                    feedback_score: 50.0,
+                    is_authoritative: false,
+                    conflict_flag: false,
+                },
+                feedback: DocumentFeedback {
+                    verified_count: v_cnt as u32,
+                    outdated_count: o_cnt as u32,
+                    questionable_count: q_cnt as u32,
+                },
+            })
+        })?;
+
+        let mut list = Vec::new();
+        for r in rows {
+            list.push(r?);
+        }
+        Ok(list)
+    }
+
     pub fn get_document_by_id(&self, id: &str) -> Result<Option<DocumentItem>> {
         let docs = self.get_documents()?;
         Ok(docs.into_iter().find(|d| d.id == id))

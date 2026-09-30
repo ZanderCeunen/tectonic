@@ -37,14 +37,16 @@ export default function App() {
     setIsLoading(true);
     setBackendError(null);
     try {
+      const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
+
       // Fetch customers from SQLite database
-      const custRes = await fetch('/api/customers');
+      const custRes = await fetch('/api/customers', { headers });
       if (!custRes.ok) throw new Error(`Backend error fetching customers: ${custRes.status}`);
       const custData = await custRes.json();
       setCustomers(custData);
 
       // Fetch employees from SQLite database
-      const empRes = await fetch('/api/employees');
+      const empRes = await fetch('/api/employees', { headers });
       if (!empRes.ok) throw new Error(`Backend error fetching employees: ${empRes.status}`);
       const empData = await empRes.json();
       setEmployees(empData);
@@ -64,24 +66,9 @@ export default function App() {
               clearance_level: meUser.clearance_level || 'Standard',
               avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
             });
-          } else {
-            // Default demo user if token is mock
-            setActiveUser({
-              id: 'USR-002',
-              name: 'Tom De Smet',
-              role: 'Consultant',
-              clearance_level: 'Standard',
-              avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-            });
           }
         } catch (e) {
-          setActiveUser({
-            id: 'USR-002',
-            name: 'Tom De Smet',
-            role: 'Consultant',
-            clearance_level: 'Standard',
-            avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-          });
+          // Token invalid
         }
       }
 
@@ -95,7 +82,7 @@ export default function App() {
 
   useEffect(() => {
     loadInitialData();
-  }, []);
+  }, [authToken]);
 
   // 2. Load documents and conflicts for the selected customer
   const loadCustomerDocuments = async (customerId) => {
