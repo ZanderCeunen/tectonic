@@ -16,4 +16,6 @@ sha2 = "0.10"
 regex = "1.10"
 uuid = { version = "1.8", features = ["v4", "serde"] }
 rusqlite = { version = "0.31", features = ["bundled"] }
+base64 = "0.22"
+
 

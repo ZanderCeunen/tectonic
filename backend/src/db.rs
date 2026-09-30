@@ -47,6 +47,9 @@ impl Database {
                 author_role TEXT NOT NULL,
                 summary TEXT NOT NULL,
                 raw_content TEXT NOT NULL,
+                file_path TEXT,
+                file_name TEXT,
+                file_size INTEGER,
                 key_facts_json TEXT NOT NULL,
                 tags_json TEXT NOT NULL,
                 verified_count INTEGER NOT NULL DEFAULT 0,
@@ -202,11 +205,12 @@ impl Database {
 
         let key_facts_json = serde_json::to_string(&d.key_facts).unwrap_or_default();
         let tags_json = serde_json::to_string(&d.tags).unwrap_or_default();
+        let f_size: Option<i64> = d.file_size.map(|s| s as i64);
 
         self.conn.execute(
             "INSERT OR REPLACE INTO documents 
-            (id, customer_id, title, source_type, source_label, date, author, author_role, summary, raw_content, key_facts_json, tags_json, verified_count, outdated_count, questionable_count)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+            (id, customer_id, title, source_type, source_label, date, author, author_role, summary, raw_content, file_path, file_name, file_size, key_facts_json, tags_json, verified_count, outdated_count, questionable_count)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
             params![
                 d.id,
                 d.customer_id,
@@ -218,6 +222,9 @@ impl Database {
                 d.author_role,
                 d.summary,
                 d.raw_content,
+                d.file_path,
+                d.file_name,
+                f_size,
                 key_facts_json,
                 tags_json,
                 d.feedback.verified_count as i64,
@@ -230,7 +237,7 @@ impl Database {
 
     pub fn get_documents(&self) -> Result<Vec<DocumentItem>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, customer_id, title, source_type, source_label, date, author, author_role, summary, raw_content, key_facts_json, tags_json, verified_count, outdated_count, questionable_count FROM documents",
+            "SELECT id, customer_id, title, source_type, source_label, date, author, author_role, summary, raw_content, file_path, file_name, file_size, key_facts_json, tags_json, verified_count, outdated_count, questionable_count FROM documents",
         )?;
 
         let rows = stmt.query_map([], |row| {
@@ -244,15 +251,20 @@ impl Database {
                 _ => DocumentSourceType::ChatMessage,
             };
 
-            let kf_json: String = row.get(10)?;
+            let file_path: Option<String> = row.get(10)?;
+            let file_name: Option<String> = row.get(11)?;
+            let file_size_i: Option<i64> = row.get(12)?;
+            let file_size = file_size_i.map(|s| s as usize);
+
+            let kf_json: String = row.get(13)?;
             let key_facts: Vec<KeyFact> = serde_json::from_str(&kf_json).unwrap_or_default();
 
-            let tags_json: String = row.get(11)?;
+            let tags_json: String = row.get(14)?;
             let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
 
-            let v_cnt: i64 = row.get(12)?;
-            let o_cnt: i64 = row.get(13)?;
-            let q_cnt: i64 = row.get(14)?;
+            let v_cnt: i64 = row.get(15)?;
+            let o_cnt: i64 = row.get(16)?;
+            let q_cnt: i64 = row.get(17)?;
 
             Ok(DocumentItem {
                 id: row.get(0)?,
@@ -265,6 +277,9 @@ impl Database {
                 author_role: row.get(7)?,
                 summary: row.get(8)?,
                 raw_content: row.get(9)?,
+                file_path,
+                file_name,
+                file_size,
                 key_facts,
                 tags,
                 trust: TrustBreakdown {
@@ -289,6 +304,11 @@ impl Database {
             list.push(r?);
         }
         Ok(list)
+    }
+
+    pub fn get_document_by_id(&self, id: &str) -> Result<Option<DocumentItem>> {
+        let docs = self.get_documents()?;
+        Ok(docs.into_iter().find(|d| d.id == id))
     }
 
     pub fn update_feedback(
@@ -318,8 +338,7 @@ impl Database {
             _ => {}
         }
 
-        let all = self.get_documents()?;
-        Ok(all.into_iter().find(|d| d.id == doc_id))
+        self.get_document_by_id(doc_id)
     }
 
     pub fn insert_employee(&self, e: &Employee) -> Result<()> {

@@ -7,11 +7,12 @@ mod trust_engine;
 
 use axum::{
     extract::{Path, Query, State},
-    http::StatusCode,
+    http::{header, HeaderMap, StatusCode},
     response::IntoResponse,
     routing::{get, post},
     Json, Router,
 };
+use base64::Engine;
 use db::Database;
 use expertise_graph::ExpertiseGraph;
 use mock_data::{get_mock_customers, get_mock_documents, get_mock_employees};
@@ -43,10 +44,11 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    // Map db aanmaken indien niet aanwezig
-    std::fs::create_dir_all("db").ok();
+    // Map uploads aanmaken voor fysieke document-opslag
+    std::fs::create_dir_all("uploads").ok();
 
-    let db_path = "db/tectonic.db";
+    // SQLite database opgeslagen als 'tectonic.db' direct in de backend map
+    let db_path = "tectonic.db";
     let db = Database::new(db_path).expect("Mislukt om SQLite database te openen");
 
     // Seeden bij eerste start
@@ -79,6 +81,7 @@ async fn main() {
         .route("/api/customers/:id/documents", get(get_customer_documents))
         .route("/api/customers/:id/conflicts", get(get_customer_conflicts))
         .route("/api/documents", post(create_document))
+        .route("/api/documents/:id/file", get(download_document_file))
         .route("/api/documents/:id/feedback", post(submit_document_feedback))
         .route("/api/routing/recommend", post(recommend_experts))
         .route("/api/routing/handoff", post(execute_handoff))
@@ -90,13 +93,14 @@ async fn main() {
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
     println!("🚀 TECTONIC Backend gestart op http://127.0.0.1:8080");
-    println!("💾 SQLite Database actief op: {}", db_path);
+    println!("💾 SQLite Database actief: {}", db_path);
+    println!("📁 Fysieke Document Opslag actief in: backend/uploads/");
     println!("🔒 Cryptografische Audit Ledger & PII Redactor actief");
     axum::serve(listener, app).await.unwrap();
 }
 
 async fn health_check() -> impl IntoResponse {
-    (StatusCode::OK, "TECTONIC Backend Status: ACTIVE & HEALTHY (SQLite Active)")
+    (StatusCode::OK, "TECTONIC Backend Status: ACTIVE & HEALTHY (SQLite & Uploads Active)")
 }
 
 async fn list_customers(State(state): State<AppState>) -> Json<Vec<Customer>> {
@@ -227,6 +231,8 @@ pub struct CreateDocumentInput {
     pub author_role: Option<String>,
     pub summary: String,
     pub raw_content: String,
+    pub file_name: Option<String>,
+    pub file_base64: Option<String>,
     pub key_facts: Option<Vec<KeyFact>>,
     pub tags: Option<Vec<String>>,
 }
@@ -249,6 +255,20 @@ async fn create_document(
     let doc_id = format!("DOC-{}", Uuid::new_v4().simple().to_string()[..6].to_uppercase());
     let now_str = chrono::Utc::now().format("%Y-%m-%d").to_string();
 
+    // Verwerk fysiek bestand als base64 is meegegeven
+    let mut saved_file_path: Option<String> = None;
+    let mut saved_file_size: Option<usize> = None;
+
+    if let (Some(b64), Some(fname)) = (input.file_base64, input.file_name.clone()) {
+        if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(&b64) {
+            let file_path = format!("uploads/{}_{}", doc_id, fname);
+            if std::fs::write(&file_path, &bytes).is_ok() {
+                saved_file_size = Some(bytes.len());
+                saved_file_path = Some(file_path);
+            }
+        }
+    }
+
     let doc = DocumentItem {
         id: doc_id.clone(),
         customer_id: input.customer_id.clone(),
@@ -260,6 +280,9 @@ async fn create_document(
         author_role: input.author_role.unwrap_or_else(|| "System User".to_string()),
         summary: input.summary,
         raw_content: input.raw_content,
+        file_path: saved_file_path,
+        file_name: input.file_name,
+        file_size: saved_file_size,
         key_facts: input.key_facts.unwrap_or_default(),
         tags: input.tags.unwrap_or_default(),
         trust: TrustBreakdown {
@@ -280,13 +303,54 @@ async fn create_document(
             "DataIngestor",
             "CREATE_DOCUMENT",
             &doc_id,
-            &format!("Nieuw document toegevoegd voor klant {}: '{}'", input.customer_id, doc.title),
+            &format!(
+                "Nieuw document toegevoegd voor klant {}: '{}' (Bestand opgeslagen: {})",
+                input.customer_id,
+                doc.title,
+                doc.file_path.as_deref().unwrap_or("Geen fysiek bestand")
+            ),
         );
         db.insert_audit_entry(&entry).ok();
         Ok(Json(doc))
     } else {
         Err(StatusCode::INTERNAL_SERVER_ERROR)
     }
+}
+
+async fn download_document_file(
+    Path(doc_id): Path<String>,
+    State(state): State<AppState>,
+) -> Result<impl IntoResponse, StatusCode> {
+    let db = state.db.lock().unwrap();
+    let doc = match db.get_document_by_id(&doc_id) {
+        Ok(Some(d)) => d,
+        _ => return Err(StatusCode::NOT_FOUND),
+    };
+
+    let file_path = match doc.file_path {
+        Some(fp) => fp,
+        None => return Err(StatusCode::NOT_FOUND),
+    };
+
+    let bytes = match std::fs::read(&file_path) {
+        Ok(b) => b,
+        Err(_) => return Err(StatusCode::NOT_FOUND),
+    };
+
+    let file_name = doc.file_name.unwrap_or_else(|| "document.bin".to_string());
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        header::CONTENT_TYPE,
+        "application/octet-stream".parse().unwrap(),
+    );
+    headers.insert(
+        header::CONTENT_DISPOSITION,
+        format!("attachment; filename=\"{}\"", file_name)
+            .parse()
+            .unwrap(),
+    );
+
+    Ok((headers, bytes))
 }
 
 async fn submit_document_feedback(

@@ -98,7 +98,11 @@ pub struct DocumentItem {
     pub author_role: String,
     pub summary: String,
     pub raw_content: String,
+    pub file_path: Option<String>,
+    pub file_name: Option<String>,
+    pub file_size: Option<usize>,
     pub key_facts: Vec<KeyFact>,
+
     pub tags: Vec<String>,
     pub trust: TrustBreakdown,
     pub feedback: DocumentFeedback,
