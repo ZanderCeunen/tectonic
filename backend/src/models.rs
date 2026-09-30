@@ -17,13 +17,17 @@ pub struct Customer {
     pub enterprise_number: String,
     pub customer_code: Option<String>,
     pub industry: String,
-    pub joint_committee: String, // bv. "PC 200 - Aanvullend Paritair Comité voor Bedienden"
+    pub joint_committee: String,
+    pub joint_committee_code: Option<String>,
     pub primary_contact: String,
     pub contact_email: String,
     pub contact_phone: Option<String>,
     pub sdworx_account_manager: Option<String>,
+    pub sdworx_team: Option<String>,
     pub employee_count: usize,
     pub location: String,
+    pub payroll_frequency: Option<String>,
+    pub active_dossier_status: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -80,9 +84,9 @@ pub struct DocumentFeedback {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KeyFact {
-    pub field: String,       // bv. "werkregime", "thuiswerk_dagen", "eindejaarspremie"
-    pub label: String,       // bv. "Wekelijks Werkregime"
-    pub value: String,       // bv. "38u/week"
+    pub field: String,
+    pub label: String,
+    pub value: String,
     pub is_conflicting: bool,
 }
 
@@ -98,11 +102,8 @@ pub struct DocumentItem {
     pub author_role: String,
     pub summary: String,
     pub raw_content: String,
-    pub file_path: Option<String>,
-    pub file_name: Option<String>,
-    pub file_size: Option<usize>,
+    pub unmasked_raw_content: Option<String>,
     pub key_facts: Vec<KeyFact>,
-
     pub tags: Vec<String>,
     pub trust: TrustBreakdown,
     pub feedback: DocumentFeedback,
@@ -125,7 +126,7 @@ pub struct ConflictAlert {
     pub field: String,
     pub conflicting_docs: Vec<ConflictingDocRef>,
     pub consensus_value: String,
-    pub impact_severity: String, // "CRITICAL", "HIGH", "MEDIUM"
+    pub impact_severity: String,
     pub explanation: String,
     pub resolution_action: String,
 }
@@ -144,11 +145,13 @@ pub struct Employee {
     pub name: String,
     pub title: String,
     pub department: String,
+    pub extension: Option<String>,
+    pub direct_phone: Option<String>,
     pub avatar_url: String,
     pub availability: AvailabilityStatus,
     pub completed_cases: usize,
-    pub customer_familiarity: HashMap<String, f64>, // customer_id -> score (0..100)
-    pub domain_expertise: HashMap<String, f64>,     // domain -> score (0..100)
+    pub customer_familiarity: HashMap<String, f64>,
+    pub domain_expertise: HashMap<String, f64>,
     pub recent_activity: String,
 }
 
@@ -194,6 +197,6 @@ pub struct AuditEntry {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FeedbackSubmission {
     pub document_id: String,
-    pub feedback_type: String, // "VERIFIED", "OUTDATED", "QUESTIONABLE"
+    pub feedback_type: String,
     pub employee_id: String,
 }

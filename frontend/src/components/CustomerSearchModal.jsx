@@ -204,11 +204,6 @@ export default function CustomerSearchModal({
                       <span className="text-xs font-bold text-slate-900 truncate">
                         {cust.name}
                       </span>
-                      {isSelected && (
-                        <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-sdworx-orange text-white">
-                          Nu geopend
-                        </span>
-                      )}
                       <span className="text-[11px] font-mono text-slate-400">
                         {cust.enterprise_number}
                       </span>

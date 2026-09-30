@@ -1,5 +1,5 @@
 import React from 'react';
-import { Building2, Search, ChevronDown, User, Phone, Home } from 'lucide-react';
+import { Building2, Search, ChevronDown, User, Phone, Home, FolderOpen } from 'lucide-react';
 
 export default function Header({
   customers,
@@ -38,41 +38,32 @@ export default function Header({
               onClick={onGoHome}
               className="text-xs font-bold text-sdworx-navy hover:text-sdworx-blue hidden sm:flex items-center space-x-1"
             >
-              <span>Kennisnet & Dossierassistent</span>
+              <span>Kennisnet & Dossierbeheer</span>
             </button>
           </div>
 
-          {/* Brede Dossierzoeker & Wisselaar */}
-          <div className="flex-1 max-w-lg mx-4">
+          {/* Duidelijke Knop voor Dossierkeuze & Popup Zoeker */}
+          <div className="flex items-center space-x-2">
             <button
               onClick={onOpenCustomerSearch}
-              className="w-full text-left bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-slate-300 rounded py-1.5 px-3 flex items-center justify-between transition-colors group text-slate-800"
-              title="Zoek klant op naam, KBO, telefoonnummer (+32...), contactpersoon of beheerder"
+              className="inline-flex items-center space-x-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200/80 border border-slate-300 rounded text-xs font-semibold text-slate-800 transition-colors shadow-2xs group"
+              title="Open de dossierzoeker popup (Zoek op naam, KBO, telefoon, PC of beheerder)"
             >
-              <div className="flex items-center space-x-2 min-w-0">
-                <Search className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 shrink-0" />
-                <div className="truncate text-xs">
-                  {selectedCustomer ? (
-                    <>
-                      <span className="font-bold text-slate-900 mr-1.5">{selectedCustomer.name}</span>
-                      <span className="text-slate-500 text-[11px] hidden md:inline">
-                        • {selectedCustomer.joint_committee.split(' - ')[0]} • {selectedCustomer.location}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-slate-500 font-medium">
-                      Zoek dossier op naam, KBO, telefoon of contactpersoon...
-                    </span>
-                  )}
-                </div>
-              </div>
+              <FolderOpen className="w-3.5 h-3.5 text-sdworx-navy" />
+              <span className="text-slate-500 font-normal">Dossier:</span>
+              <span className="text-sdworx-navy font-bold truncate max-w-[180px] sm:max-w-xs">
+                {selectedCustomer ? selectedCustomer.name : 'Geen dossier gekozen'}
+              </span>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-800" />
+            </button>
 
-              <div className="flex items-center space-x-1 shrink-0 ml-2">
-                <span className="text-[10px] bg-sdworx-navy hover:bg-sdworx-navy-dark text-white px-2 py-0.5 rounded font-semibold transition-colors">
-                  {selectedCustomer ? 'Wissel Klant' : 'Klant Kiezen'}
-                </span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-              </div>
+            <button
+              onClick={onOpenCustomerSearch}
+              className="inline-flex items-center space-x-1 px-2.5 py-1.5 bg-sdworx-navy hover:bg-sdworx-navy-dark text-white rounded text-xs font-semibold transition-colors shadow-2xs"
+              title="Open uitgebreide zoek-popup"
+            >
+              <Search className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">Zoek Dossier (Popup)</span>
             </button>
           </div>
 

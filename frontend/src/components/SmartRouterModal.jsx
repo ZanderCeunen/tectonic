@@ -13,10 +13,6 @@ export default function SmartRouterModal({
   if (!isOpen) return null;
 
   const [selectedDomain, setSelectedDomain] = useState('Internationale Detachering & Expat');
-  const [callerName, setCallerName] = useState(customer?.primary_contact || 'Marc Vanhove');
-  const [inquiryNotes, setInquiryNotes] = useState(
-    'Klant vraagt toelichting over het 38u werkregime en grensoverschrijdend telewerk.'
-  );
   const [isCalling, setIsCalling] = useState(false);
   const [callSuccess, setCallSuccess] = useState(null);
 
@@ -32,7 +28,7 @@ export default function SmartRouterModal({
     'Voedingsnijverheid PC 118',
   ];
 
-  // Filter DE INGELOGDE MEDEWERKER ERUIT (niet naar jezelf kunnen bellen)
+  // Filter actieve medewerker eruit (jezelf niet kunnen bellen)
   const availableEmployees = employees.filter(
     (emp) => emp.name !== activeUser.name && emp.id !== activeUser.id
   );
@@ -70,18 +66,18 @@ export default function SmartRouterModal({
       onExecuteHandoff({
         customer_id: customer?.id,
         employee_id: expert.id,
-        caller_name: callerName,
-        inquiry_summary: inquiryNotes,
+        caller_name: customer?.primary_contact || 'Klant',
+        inquiry_summary: `Telefonisch overleg over ${selectedDomain}`,
         expert_name: expert.name,
       });
       setIsCalling(false);
       setCallSuccess(expert);
-    }, 450);
+    }, 400);
   };
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg max-w-xl w-full border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div className="bg-white rounded-lg max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
         {/* Header */}
         <div className="bg-sdworx-navy text-white px-5 py-3.5 flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
@@ -90,10 +86,10 @@ export default function SmartRouterModal({
             </div>
             <div>
               <h3 className="text-sm font-bold text-white">
-                Collega Bellen & Vraagstuk Overdragen
+                Collega Bellen voor Dossier
               </h3>
               <p className="text-[11px] text-slate-300">
-                Dossier: {customer?.name} ({customer?.joint_committee?.split(' - ')[0] || 'Algemeen'})
+                {customer?.name} ({customer?.joint_committee?.split(' - ')[0] || 'Algemeen'})
               </p>
             </div>
           </div>
@@ -113,11 +109,11 @@ export default function SmartRouterModal({
                 <Check className="w-6 h-6" />
               </div>
               <h4 className="text-sm font-bold text-slate-900">
-                Verbinding gemaakt met {callSuccess.name}
+                Verbonden met {callSuccess.name}
               </h4>
               <p className="text-xs text-slate-600 max-w-sm mx-auto leading-relaxed">
-                De oproep is doorgeschakeld naar toestel <strong className="text-sdworx-navy font-mono">int. {callSuccess.extension || '4102'}</strong>.
-                Het dossier van <strong>{customer?.name}</strong> en jouw toelichting zijn direct op het scherm van je collega geopend.
+                De verbinding is actief op toestel <strong className="text-sdworx-navy font-mono">int. {callSuccess.extension || '4102'}</strong>.
+                Het dossier van <strong>{customer?.name}</strong> is automatisch voor je collega geopend.
               </p>
               <div className="pt-2">
                 <button
@@ -125,68 +121,40 @@ export default function SmartRouterModal({
                     setCallSuccess(null);
                     onClose();
                   }}
-                  className="px-4 py-1.5 bg-sdworx-navy hover:bg-sdworx-navy-dark text-white text-xs font-semibold rounded-md transition-colors"
+                  className="px-4 py-1.5 bg-sdworx-navy hover:bg-sdworx-navy-dark text-white text-xs font-semibold rounded transition-colors"
                 >
-                  Venster Sluiten
+                  Gesprek Beëindigen / Sluiten
                 </button>
               </div>
             </div>
           ) : (
             <>
               {/* Vraagstuk selecteren */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Onderwerp / Vakgebied
-                  </label>
-                  <select
-                    value={selectedDomain}
-                    onChange={(e) => setSelectedDomain(e.target.value)}
-                    className="w-full text-xs py-1.5 px-2.5 bg-slate-50 border border-slate-200 rounded-md font-medium text-slate-800 focus:outline-none focus:border-sdworx-blue"
-                  >
-                    {domains.map((dom) => (
-                      <option key={dom} value={dom}>
-                        {dom}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Beller / Klantcontact
-                  </label>
-                  <input
-                    type="text"
-                    value={callerName}
-                    onChange={(e) => setCallerName(e.target.value)}
-                    className="w-full text-xs py-1.5 px-2.5 bg-slate-50 border border-slate-200 rounded-md text-slate-800 focus:outline-none focus:border-sdworx-blue"
-                  />
-                </div>
-              </div>
-
-              {/* Notitie voor collega */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Korte notitie / toelichting voor collega
+                  Waarover gaat de vraag van de beller?
                 </label>
-                <input
-                  type="text"
-                  value={inquiryNotes}
-                  onChange={(e) => setInquiryNotes(e.target.value)}
-                  className="w-full text-xs py-1.5 px-2.5 bg-slate-50 border border-slate-200 rounded-md text-slate-800 focus:outline-none focus:border-sdworx-blue"
-                  placeholder="bv. Vraagt bevestiging werkuren en A1 grensarbeid..."
-                />
+                <select
+                  value={selectedDomain}
+                  onChange={(e) => setSelectedDomain(e.target.value)}
+                  className="w-full text-xs py-2 px-2.5 bg-slate-50 border border-slate-300 rounded font-medium text-slate-900 focus:outline-none focus:border-sdworx-blue"
+                >
+                  {domains.map((dom) => (
+                    <option key={dom} value={dom}>
+                      {dom}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              {/* Aanbevolen collega's */}
+              {/* Aanbevolen collega's om direct te bellen */}
               <div>
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-600 mb-2">
-                  <span>Beschikbare collega's met ervaring op dit dossier</span>
-                  <span className="text-[11px] text-slate-400">Jezelf ({activeUser.name}) uitgesloten</span>
+                  <span>Beschikbare collega's gerangschikt op klantervaring</span>
+                  <span className="text-[11px] text-slate-400">Direct intern bellen</span>
                 </div>
 
-                <div className="divide-y divide-slate-100 border border-slate-200 rounded-md max-h-60 overflow-y-auto">
+                <div className="divide-y divide-slate-100 border border-slate-200 rounded max-h-64 overflow-y-auto">
                   {rankedMatches.map((expert, idx) => {
                     const isTop = idx === 0;
                     return (
@@ -213,11 +181,11 @@ export default function SmartRouterModal({
                                 </span>
                               )}
                             </div>
-                            <p className="text-[11px] text-slate-500 truncate">
-                              {expert.title} • <span className="font-mono text-slate-700 font-semibold">int. {expert.extension}</span>
+                            <p className="text-[11px] text-slate-600 truncate">
+                              {expert.title} • <span className="font-mono text-sdworx-navy font-bold">int. {expert.extension}</span>
                             </p>
                             <p className="text-[11px] text-slate-400 mt-0.5">
-                              {expert.customerScore}% klantaffiniteit • {expert.completed_cases} cases afgewerkt
+                              {expert.customerScore}% dossierkennis • {expert.completed_cases} cases afgerond
                             </p>
                           </div>
                         </div>
@@ -230,7 +198,7 @@ export default function SmartRouterModal({
                                 : 'text-slate-400'
                             }`}
                           >
-                            {expert.availability === 'Available' ? '● Vrij' : '● In gesprek'}
+                            {expert.availability === 'Available' ? '● Vrij' : '● Bezet'}
                           </span>
 
                           <button
@@ -242,7 +210,7 @@ export default function SmartRouterModal({
                                 : 'bg-slate-800 hover:bg-slate-900 text-white'
                             }`}
                           >
-                            <Phone className="w-3 h-3" />
+                            <Phone className="w-3.5 h-3.5" />
                             <span>Bellen</span>
                           </button>
                         </div>
