@@ -121,7 +121,7 @@ impl DocumentSourceType {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct TrustBreakdown {
     pub overall_score: f64,
     pub source_score: f64,
