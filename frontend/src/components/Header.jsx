@@ -62,11 +62,11 @@ export default function Header({
             {/* Quick Action: New Customer File */}
             <button
               onClick={onOpenAddCustomer}
-              className="inline-flex items-center space-x-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium border border-slate-200 transition-colors"
+              className="inline-flex items-center space-x-1.5 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold border border-slate-200 transition-colors shadow-2xs"
               title="Register New Customer File"
             >
               <Plus className="w-3.5 h-3.5 text-emerald-600" />
-              <span className="hidden lg:inline">+ Customer</span>
+              <span className="hidden lg:inline">Customer</span>
             </button>
           </div>
 

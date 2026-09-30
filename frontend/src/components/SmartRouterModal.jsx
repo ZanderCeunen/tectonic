@@ -16,16 +16,6 @@ export default function SmartRouterModal({
   const [isCalling, setIsCalling] = useState(false);
   const [callSuccess, setCallSuccess] = useState(null);
 
-  const quickPills = [
-    'Cross-border Expat & A1 Postings',
-    'Construction Bad-Weather PC 124',
-    'Hospitality & Flexi-jobs PC 302',
-    'Chemical Industry Shifts PC 207',
-    'CBA 200 White-Collar Rules',
-    'Flexible Benefits & Cafeteria Plan',
-    'Healthcare & IFIC Scale PC 330',
-  ];
-
   const availableEmployees = useMemo(() => {
     return employees.filter(
       (emp) => emp.name !== activeUser?.name && emp.id !== activeUser?.id
@@ -238,15 +228,15 @@ export default function SmartRouterModal({
           ) : (
             <>
               {/* Google Search-like Question & Keyword Input */}
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <label className="block text-xs font-bold text-slate-800">
-                  Ask a question or enter keywords (Google Search style):
+                  Search colleague by question or keywords:
                 </label>
                 <div className="relative">
                   <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     type="text"
-                    placeholder="e.g. 'Who has experience with A1 expat telework?', 'Overtime calculation in construction PC 124'..."
+                    placeholder="e.g. 'Who has experience with A1 expat telework?', 'Construction PC 124 bad weather'..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-9 pr-3 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#005FB8] focus:bg-white transition-all shadow-2xs font-medium"
@@ -260,25 +250,6 @@ export default function SmartRouterModal({
                       ✕
                     </button>
                   )}
-                </div>
-
-                {/* Quick Suggestion Pills */}
-                <div className="flex items-center space-x-1.5 overflow-x-auto py-1 text-[11px]">
-                  <span className="text-slate-400 text-[10px] uppercase font-bold shrink-0">Topics:</span>
-                  {quickPills.map((pill) => (
-                    <button
-                      key={pill}
-                      type="button"
-                      onClick={() => setSearchQuery(pill)}
-                      className={`px-2 py-0.5 rounded-md transition-colors shrink-0 text-[11px] font-medium ${
-                        searchQuery === pill
-                          ? 'bg-[#005FB8] text-white'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                      }`}
-                    >
-                      {pill}
-                    </button>
-                  ))}
                 </div>
               </div>
 
