@@ -126,44 +126,20 @@ impl Database {
         emps: Vec<Employee>,
         users: Vec<UserAccount>,
     ) -> Result<()> {
-        let user_count: i64 = self
-            .conn
-            .query_row("SELECT COUNT(*) FROM users", [], |row: &Row| row.get(0))
-            .unwrap_or(0);
-        if user_count == 0 {
-            for u in users {
-                self.insert_user(&u)?;
-            }
+        for u in users {
+            self.insert_user(&u)?;
         }
 
-        let cust_count: i64 = self
-            .conn
-            .query_row("SELECT COUNT(*) FROM customers", [], |row: &Row| row.get(0))
-            .unwrap_or(0);
-        if cust_count == 0 {
-            for c in customers {
-                self.insert_customer(&c)?;
-            }
+        for c in customers {
+            self.insert_customer(&c)?;
         }
 
-        let doc_count: i64 = self
-            .conn
-            .query_row("SELECT COUNT(*) FROM documents", [], |row: &Row| row.get(0))
-            .unwrap_or(0);
-        if doc_count == 0 {
-            for d in docs {
-                self.insert_document(&d)?;
-            }
+        for d in docs {
+            self.insert_document(&d)?;
         }
 
-        let emp_count: i64 = self
-            .conn
-            .query_row("SELECT COUNT(*) FROM employees", [], |row: &Row| row.get(0))
-            .unwrap_or(0);
-        if emp_count == 0 {
-            for e in emps {
-                self.insert_employee(&e)?;
-            }
+        for e in emps {
+            self.insert_employee(&e)?;
         }
 
         Ok(())

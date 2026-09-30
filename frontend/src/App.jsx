@@ -161,9 +161,9 @@ export default function App() {
         },
         body: JSON.stringify({
           customer_id: conflictData.customer_id || selectedCustomerId,
-          fact_key: conflictData.fact_key,
-          resolved_value: conflictData.resolved_value,
-          resolution_notes: conflictData.resolution_notes,
+          field: conflictData.field || conflictData.fact_key,
+          chosen_value: conflictData.chosen_value || conflictData.resolved_value,
+          resolution_note: conflictData.resolution_note || conflictData.resolution_notes || 'Resolved by consultant',
           resolved_by: activeUser ? activeUser.name : 'Tom De Smet',
         }),
       });
@@ -172,6 +172,8 @@ export default function App() {
         if (selectedCustomerId) {
           await loadCustomerDocuments(selectedCustomerId);
         }
+      } else {
+        console.error('Failed to resolve conflict on backend, status:', res.status);
       }
     } catch (e) {
       console.error('Error resolving conflict:', e);
