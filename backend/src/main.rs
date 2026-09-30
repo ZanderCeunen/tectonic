@@ -175,6 +175,9 @@ async fn login_user(
     let user = match db.get_user_by_username(clean_username) {
         Ok(Some(u)) => u,
         _ => {
+            // Constant-time dummy verification to eliminate timing enumeration attacks
+            let dummy_hash = "$2b$04$e9y.U725M.5Q3aH9eY8O9uB7l1J8q0W2k3L4m5N6o7P8q9R0S1T2U";
+            let _ = bcrypt::verify(clean_password, dummy_hash);
             eprintln!("🔒 Login mislukt: Gebruiker '{}' niet gevonden in SQLite.", clean_username);
             return Err(StatusCode::UNAUTHORIZED);
         }
@@ -228,30 +231,35 @@ async fn get_current_user_profile(
 }
 
 async fn list_users(
-    _auth: AuthUser,
+    auth: AuthUser,
     State(state): State<AppState>,
-) -> Json<Vec<UserAccount>> {
+) -> Result<Json<Vec<UserAccount>>, StatusCode> {
+    if auth.role != "Admin" && auth.clearance != "Admin" {
+        return Err(StatusCode::FORBIDDEN);
+    }
     let db = state.db.lock().unwrap();
-    Json(db.get_users().unwrap_or_default())
+    Ok(Json(db.get_users().unwrap_or_default()))
 }
 
 async fn create_user(
-    _auth: AuthUser,
+    auth: AuthUser,
     State(state): State<AppState>,
     Json(mut user): Json<UserAccount>,
 ) -> Result<Json<UserAccount>, StatusCode> {
+    if auth.role != "Admin" && auth.clearance != "Admin" {
+        return Err(StatusCode::FORBIDDEN);
+    }
     let db = state.db.lock().unwrap();
     if user.id.is_empty() {
         user.id = format!("USR-{}", Uuid::new_v4().simple().to_string()[..6].to_uppercase());
     }
-    // Hash password if plain text
     if !user.password_hash.starts_with("$2") {
         user.password_hash = bcrypt::hash(&user.password_hash, 4).unwrap_or(user.password_hash);
     }
     if db.insert_user(&user).is_ok() {
         let entry = state.audit_chain.append(
-            "ADMIN",
-            "SystemAdmin",
+            &auth.username,
+            &auth.role,
             "CREATE_USER_ACCOUNT",
             &user.id,
             &format!("Nieuw gebruikersaccount aangemaakt: {}", user.username),
@@ -264,12 +272,16 @@ async fn create_user(
 }
 
 // --- CUSTOMER HANDLERS ---
-async fn list_customers(State(state): State<AppState>) -> Json<Vec<Customer>> {
+async fn list_customers(
+    _auth: AuthUser,
+    State(state): State<AppState>,
+) -> Json<Vec<Customer>> {
     let db = state.db.lock().unwrap();
     Json(db.get_customers().unwrap_or_default())
 }
 
 async fn get_customer(
+    _auth: AuthUser,
     Path(id): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Json<Customer>, StatusCode> {
@@ -281,15 +293,18 @@ async fn get_customer(
 }
 
 async fn create_customer(
-    _auth: AuthUser,
+    auth: AuthUser,
     State(state): State<AppState>,
     Json(customer): Json<Customer>,
 ) -> Result<Json<Customer>, StatusCode> {
+    if auth.clearance != "Senior" && auth.clearance != "Admin" && auth.role != "SeniorPayrollOfficer" && auth.role != "Admin" {
+        return Err(StatusCode::FORBIDDEN);
+    }
     let db = state.db.lock().unwrap();
     if db.insert_customer(&customer).is_ok() {
         let entry = state.audit_chain.append(
-            &_auth.username,
-            &_auth.role,
+            &auth.username,
+            &auth.role,
             "CREATE_CUSTOMER",
             &customer.id,
             &format!("Nieuwe klant geregistreerd in SQLite: {}", customer.name),
@@ -302,17 +317,20 @@ async fn create_customer(
 }
 
 async fn update_customer(
-    _auth: AuthUser,
+    auth: AuthUser,
     Path(id): Path<String>,
     State(state): State<AppState>,
     Json(mut customer): Json<Customer>,
 ) -> Result<Json<Customer>, StatusCode> {
+    if auth.clearance != "Senior" && auth.clearance != "Admin" && auth.role != "SeniorPayrollOfficer" && auth.role != "Admin" {
+        return Err(StatusCode::FORBIDDEN);
+    }
     customer.id = id;
     let db = state.db.lock().unwrap();
     if db.insert_customer(&customer).is_ok() {
         let entry = state.audit_chain.append(
-            &_auth.username,
-            &_auth.role,
+            &auth.username,
+            &auth.role,
             "UPDATE_CUSTOMER",
             &customer.id,
             &format!("Klantgegevens bijgewerkt in SQLite: {}", customer.name),
@@ -329,8 +347,6 @@ async fn update_customer(
 struct DocQuery {
     pub redact_pii: Option<bool>,
     pub redact_salaries: Option<bool>,
-    pub actor: Option<String>,
-    pub actor_role: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -341,22 +357,34 @@ struct CustomerDocumentsResponse {
 }
 
 async fn get_customer_documents(
+    auth: AuthUser,
     Path(customer_id): Path<String>,
     Query(query): Query<DocQuery>,
     State(state): State<AppState>,
 ) -> Json<CustomerDocumentsResponse> {
     let db = state.db.lock().unwrap();
-    let all_docs = db.get_documents().unwrap_or_default();
-    let customer_docs: Vec<DocumentItem> = all_docs
-        .into_iter()
-        .filter(|d| d.customer_id == customer_id)
-        .collect();
+    let customer_docs = db.get_documents_by_customer_id(&customer_id).unwrap_or_default();
 
     let (evaluated_docs, conflicts) =
         TrustEngine::evaluate_all_documents(customer_docs, &customer_id);
 
-    let redact_pii = query.redact_pii.unwrap_or(true);
-    let redact_salaries = query.redact_salaries.unwrap_or(true);
+    // Security RBAC Check: Only users with Senior or Admin clearance can unmask PII or Salaries!
+    let has_senior_clearance = auth.clearance == "Senior"
+        || auth.clearance == "Admin"
+        || auth.role == "SeniorPayrollOfficer"
+        || auth.role == "Admin";
+
+    let redact_pii = if !has_senior_clearance {
+        true
+    } else {
+        query.redact_pii.unwrap_or(true)
+    };
+
+    let redact_salaries = if !has_senior_clearance {
+        true
+    } else {
+        query.redact_salaries.unwrap_or(true)
+    };
 
     let sanitized_docs: Vec<DocumentItem> = evaluated_docs
         .into_iter()
@@ -368,11 +396,9 @@ async fn get_customer_documents(
         })
         .collect();
 
-    let actor = query.actor.unwrap_or_else(|| "Tom De Smet".to_string());
-    let role = query.actor_role.unwrap_or_else(|| "Consultant".to_string());
     let entry = state.audit_chain.append(
-        &actor,
-        &role,
+        &auth.username,
+        &auth.role,
         "VIEW_CUSTOMER_DOCUMENTS",
         &customer_id,
         &format!(
@@ -392,16 +418,12 @@ async fn get_customer_documents(
 }
 
 async fn get_customer_conflicts(
+    _auth: AuthUser,
     Path(customer_id): Path<String>,
     State(state): State<AppState>,
 ) -> Json<Vec<crate::models::ConflictAlert>> {
     let db = state.db.lock().unwrap();
-    let all_docs = db.get_documents().unwrap_or_default();
-    let customer_docs: Vec<DocumentItem> = all_docs
-        .into_iter()
-        .filter(|d| d.customer_id == customer_id)
-        .collect();
-
+    let customer_docs = db.get_documents_by_customer_id(&customer_id).unwrap_or_default();
     let (_, conflicts) = TrustEngine::evaluate_all_documents(customer_docs, &customer_id);
     Json(conflicts)
 }
@@ -422,7 +444,7 @@ pub struct CreateDocumentInput {
 }
 
 async fn create_document(
-    _auth: AuthUser,
+    auth: AuthUser,
     State(state): State<AppState>,
     Json(input): Json<CreateDocumentInput>,
 ) -> Result<Json<DocumentItem>, StatusCode> {
@@ -443,18 +465,45 @@ async fn create_document(
     let mut saved_file_path: Option<String> = None;
     let mut saved_file_size: Option<usize> = None;
 
-    if let (Some(b64), Some(fname)) = (input.file_base64, input.file_name.clone()) {
+    if let (Some(b64), Some(raw_fname)) = (input.file_base64, input.file_name.clone()) {
+        // Enforce max 15MB base64 payload size limit (~10MB file limit)
+        if b64.len() > 15 * 1024 * 1024 {
+            return Err(StatusCode::PAYLOAD_TOO_LARGE);
+        }
+
+        // Sanitize filename to eliminate path traversal sequences
+        let safe_fname = std::path::Path::new(&raw_fname)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("file.bin")
+            .replace(|c: char| !c.is_alphanumeric() && c != '.' && c != '_' && c != '-', "");
+
+        let file_path = format!("uploads/{}_{}", doc_id, safe_fname);
+
         if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(&b64) {
-            let file_path = format!("uploads/{}_{}", doc_id, fname);
             if std::fs::write::<&String, &[u8]>(&file_path, &bytes).is_ok() {
-                saved_file_size = Some(bytes.len());
-                saved_file_path = Some(file_path);
+                // Verify canonical path resides strictly inside uploads/ directory
+                if let (Ok(canonical_uploads), Ok(canonical_file)) = (
+                    std::fs::canonicalize("uploads"),
+                    std::fs::canonicalize(&file_path),
+                ) {
+                    if canonical_file.starts_with(&canonical_uploads) {
+                        saved_file_size = Some(bytes.len());
+                        saved_file_path = Some(file_path);
+                    } else {
+                        std::fs::remove_file(&file_path).ok();
+                        return Err(StatusCode::FORBIDDEN);
+                    }
+                } else {
+                    saved_file_size = Some(bytes.len());
+                    saved_file_path = Some(file_path);
+                }
             }
         }
     }
 
     let unmasked = input.raw_content.clone();
-    let doc = DocumentItem {
+    let mut doc = DocumentItem {
         id: doc_id.clone(),
         customer_id: input.customer_id.clone(),
         title: input.title,
@@ -462,7 +511,7 @@ async fn create_document(
         source_label: st.label().to_string(),
         date: now_str,
         author: input.author,
-        author_role: input.author_role.unwrap_or_else(|| "System User".to_string()),
+        author_role: input.author_role.unwrap_or_else(|| auth.role.clone()),
         summary: input.summary,
         raw_content: input.raw_content,
         unmasked_raw_content: Some(unmasked),
@@ -471,22 +520,17 @@ async fn create_document(
         file_size: saved_file_size,
         key_facts: input.key_facts.unwrap_or_default(),
         tags: input.tags.unwrap_or_default(),
-        trust: TrustBreakdown {
-            overall_score: st.base_score(),
-            source_score: st.base_score(),
-            recency_score: 100.0,
-            consensus_score: 80.0,
-            feedback_score: 75.0,
-            is_authoritative: st.base_score() >= 85.0,
-            conflict_flag: false,
-        },
+        trust: TrustBreakdown::default(),
         feedback: DocumentFeedback::default(),
     };
 
+    // Compute trust score strictly server-side
+    doc.trust = TrustEngine::compute_trust(&doc, 80.0, false);
+
     if db.insert_document(&doc).is_ok() {
         let entry = state.audit_chain.append(
-            &_auth.username,
-            &_auth.role,
+            &auth.username,
+            &auth.role,
             "CREATE_DOCUMENT",
             &doc_id,
             &format!(
@@ -502,6 +546,7 @@ async fn create_document(
 }
 
 async fn download_document_file(
+    _auth: AuthUser,
     Path(doc_id): Path<String>,
     State(state): State<AppState>,
 ) -> Result<impl IntoResponse, StatusCode> {
@@ -516,7 +561,14 @@ async fn download_document_file(
         None => return Err(StatusCode::NOT_FOUND),
     };
 
-    let bytes = match std::fs::read(&file_path) {
+    // Verify canonical path is inside uploads/ base directory
+    let canonical_uploads = std::fs::canonicalize("uploads").map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let canonical_file = std::fs::canonicalize(&file_path).map_err(|_| StatusCode::FORBIDDEN)?;
+    if !canonical_file.starts_with(&canonical_uploads) {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    let bytes = match std::fs::read(&canonical_file) {
         Ok(b) => b,
         Err(_) => return Err(StatusCode::NOT_FOUND),
     };
@@ -538,14 +590,14 @@ async fn download_document_file(
 }
 
 async fn submit_document_feedback(
-    _auth: AuthUser,
+    auth: AuthUser,
     Path(doc_id): Path<String>,
     State(state): State<AppState>,
     Json(feedback): Json<FeedbackSubmission>,
 ) -> Result<Json<DocumentItem>, StatusCode> {
     let db = state.db.lock().unwrap();
     let emp_id = if feedback.employee_id.is_empty() {
-        _auth.username.clone()
+        auth.username.clone()
     } else {
         feedback.employee_id.clone()
     };
@@ -553,8 +605,8 @@ async fn submit_document_feedback(
     match db.update_feedback(&doc_id, &feedback.feedback_type, &emp_id) {
         Ok(Some(doc)) => {
             let entry = state.audit_chain.append(
-                &_auth.username,
-                &_auth.role,
+                &auth.username,
+                &auth.role,
                 "SUBMIT_DOCUMENT_FEEDBACK",
                 &doc_id,
                 &format!(
@@ -578,13 +630,13 @@ struct ConflictResolveResponse {
 }
 
 async fn resolve_conflict_endpoint(
-    _auth: AuthUser,
+    auth: AuthUser,
     State(state): State<AppState>,
     Json(input): Json<crate::models::ResolveConflictInput>,
 ) -> Result<Json<ConflictResolveResponse>, StatusCode> {
     let db = state.db.lock().unwrap();
     let resolver = if input.resolved_by.is_empty() {
-        _auth.username.clone()
+        auth.username.clone()
     } else {
         input.resolved_by.clone()
     };
@@ -598,8 +650,8 @@ async fn resolve_conflict_endpoint(
     ) {
         Ok(res_doc) => {
             let entry = state.audit_chain.append(
-                &resolver,
-                &_auth.role,
+                &auth.username,
+                &auth.role,
                 "RESOLVE_DOCUMENT_CONFLICT",
                 &input.customer_id,
                 &format!(
@@ -624,6 +676,7 @@ async fn resolve_conflict_endpoint(
 
 // --- ROUTING HANDLERS ---
 async fn recommend_experts(
+    auth: AuthUser,
     State(state): State<AppState>,
     Json(req): Json<RoutingRequest>,
 ) -> Json<Vec<RoutingRecommendation>> {
@@ -636,8 +689,8 @@ async fn recommend_experts(
     let query_summary = req.query.as_deref().unwrap_or_else(|| req.domain.as_deref().unwrap_or("Zoekopdracht"));
 
     let entry = state.audit_chain.append(
-        "ROUTING_ENGINE",
-        "AlgorithmicRouter",
+        &auth.username,
+        &auth.role,
         "CALCULATE_ROUTING_MATCH",
         target_cust,
         &format!(
@@ -663,11 +716,17 @@ struct HandoffResponse {
 }
 
 async fn execute_handoff(
-    _auth: AuthUser,
+    auth: AuthUser,
     State(state): State<AppState>,
     Json(handoff): Json<HandoffRequest>,
 ) -> Result<Json<HandoffResponse>, StatusCode> {
     let db = state.db.lock().unwrap();
+
+    // Verify customer exists in database
+    if db.get_customer_by_id(&handoff.customer_id).unwrap_or(None).is_none() {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
     match db.record_handoff(
         &handoff.employee_id,
         &handoff.customer_id,
@@ -676,8 +735,8 @@ async fn execute_handoff(
     ) {
         Ok(Some(emp)) => {
             let entry = state.audit_chain.append(
-                &_auth.username,
-                &_auth.role,
+                &auth.username,
+                &auth.role,
                 "EXECUTE_WARM_HANDOFF",
                 &handoff.customer_id,
                 &format!(
@@ -700,7 +759,10 @@ async fn execute_handoff(
 }
 
 // --- EMPLOYEE HANDLERS ---
-async fn list_employees(State(state): State<AppState>) -> Json<Vec<crate::models::Employee>> {
+async fn list_employees(
+    _auth: AuthUser,
+    State(state): State<AppState>,
+) -> Json<Vec<crate::models::Employee>> {
     let db = state.db.lock().unwrap();
     let mut employees = db.get_employees().unwrap_or_default();
     employees.sort_by(|a, b| b.completed_cases.cmp(&a.completed_cases));
@@ -708,18 +770,21 @@ async fn list_employees(State(state): State<AppState>) -> Json<Vec<crate::models
 }
 
 async fn create_employee(
-    _auth: AuthUser,
+    auth: AuthUser,
     State(state): State<AppState>,
     Json(mut emp): Json<crate::models::Employee>,
 ) -> Result<Json<crate::models::Employee>, StatusCode> {
+    if auth.clearance != "Senior" && auth.clearance != "Admin" && auth.role != "SeniorPayrollOfficer" && auth.role != "Admin" {
+        return Err(StatusCode::FORBIDDEN);
+    }
     let db = state.db.lock().unwrap();
     if emp.id.is_empty() {
         emp.id = format!("EMP-{}", Uuid::new_v4().simple().to_string()[..6].to_uppercase());
     }
     if db.insert_employee(&emp).is_ok() {
         let entry = state.audit_chain.append(
-            &_auth.username,
-            &_auth.role,
+            &auth.username,
+            &auth.role,
             "CREATE_EMPLOYEE",
             &emp.id,
             &format!("Nieuwe medewerker toegevoegd aan SQLite: {}", emp.name),
@@ -732,17 +797,20 @@ async fn create_employee(
 }
 
 async fn update_employee(
-    _auth: AuthUser,
+    auth: AuthUser,
     Path(id): Path<String>,
     State(state): State<AppState>,
     Json(mut emp): Json<crate::models::Employee>,
 ) -> Result<Json<crate::models::Employee>, StatusCode> {
+    if auth.clearance != "Senior" && auth.clearance != "Admin" && auth.role != "SeniorPayrollOfficer" && auth.role != "Admin" {
+        return Err(StatusCode::FORBIDDEN);
+    }
     emp.id = id;
     let db = state.db.lock().unwrap();
     if db.insert_employee(&emp).is_ok() {
         let entry = state.audit_chain.append(
-            &_auth.username,
-            &_auth.role,
+            &auth.username,
+            &auth.role,
             "UPDATE_EMPLOYEE",
             &emp.id,
             &format!("Medewerkergegevens bijgewerkt in SQLite: {}", emp.name),
@@ -762,16 +830,22 @@ struct AuditChainResponse {
     pub entries: Vec<AuditEntry>,
 }
 
-async fn get_audit_chain(State(state): State<AppState>) -> Json<AuditChainResponse> {
+async fn get_audit_chain(
+    auth: AuthUser,
+    State(state): State<AppState>,
+) -> Result<Json<AuditChainResponse>, StatusCode> {
+    if auth.role != "Admin" && auth.clearance != "Admin" {
+        return Err(StatusCode::FORBIDDEN);
+    }
     let is_valid = state.audit_chain.verify_integrity();
     let entries = state.audit_chain.get_entries();
     let total_entries = entries.len();
 
-    Json(AuditChainResponse {
+    Ok(Json(AuditChainResponse {
         is_valid,
         total_entries,
         entries,
-    })
+    }))
 }
 
 #[derive(Serialize)]
@@ -780,7 +854,13 @@ struct IntegrityResponse {
     pub status: String,
 }
 
-async fn verify_audit_integrity(State(state): State<AppState>) -> Json<IntegrityResponse> {
+async fn verify_audit_integrity(
+    auth: AuthUser,
+    State(state): State<AppState>,
+) -> Result<Json<IntegrityResponse>, StatusCode> {
+    if auth.role != "Admin" && auth.clearance != "Admin" {
+        return Err(StatusCode::FORBIDDEN);
+    }
     let is_valid = state.audit_chain.verify_integrity();
     let status = if is_valid {
         "Cryptografische integriteit van alle audit logs geverifieerd (SHA-256 keten intact).".to_string()
@@ -788,5 +868,5 @@ async fn verify_audit_integrity(State(state): State<AppState>) -> Json<Integrity
         "WAARSCHUWING: Corruptie of manipulatie gedetecteerd in audit ledger!".to_string()
     };
 
-    Json(IntegrityResponse { is_valid, status })
+    Ok(Json(IntegrityResponse { is_valid, status }))
 }
