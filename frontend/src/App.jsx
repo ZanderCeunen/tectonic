@@ -140,6 +140,29 @@ export default function App() {
   // 4. Resolve Conflict Handler
   const handleResolveConflict = async (conflictData) => {
     try {
+      const custId = conflictData.customer_id || selectedCustomerId;
+      const fld = conflictData.field || conflictData.topic || 'work_schedule';
+      const val = conflictData.chosen_value || conflictData.resolved_value;
+
+      // Optimistically clear the active conflict and standardize key facts
+      setConflicts([]);
+      setDocuments((prevDocs) =>
+        prevDocs.map((doc) => ({
+          ...doc,
+          key_facts: doc.key_facts?.map((fact) =>
+            fact.field.toLowerCase() === fld.toLowerCase() || fact.label.toLowerCase() === fld.toLowerCase()
+              ? { ...fact, value: val, is_conflicting: false }
+              : fact
+          ),
+          trust: {
+            ...doc.trust,
+            conflict_flag: false,
+            consensus_score: 95.0,
+            overall_score: Math.min(98, Math.max(doc.trust?.overall_score || 50, 90)),
+          },
+        }))
+      );
+
       const res = await fetch('/api/conflicts/resolve', {
         method: 'POST',
         headers: {
@@ -147,17 +170,17 @@ export default function App() {
           ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
         },
         body: JSON.stringify({
-          customer_id: conflictData.customer_id || selectedCustomerId,
-          field: conflictData.field || conflictData.fact_key,
-          chosen_value: conflictData.chosen_value || conflictData.resolved_value,
+          customer_id: custId,
+          field: fld,
+          chosen_value: val,
           resolution_note: conflictData.resolution_note || conflictData.resolution_notes || 'Resolved by consultant',
           resolved_by: activeUser ? activeUser.name : 'Tom De Smet',
         }),
       });
 
       if (res.ok) {
-        if (selectedCustomerId) {
-          await loadCustomerDocuments(selectedCustomerId);
+        if (custId) {
+          await loadCustomerDocuments(custId);
         }
       } else {
         console.error('Failed to resolve conflict on backend, status:', res.status);

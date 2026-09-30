@@ -17,6 +17,17 @@ export default function DocumentCard({ doc, activeUser, onFeedback }) {
   const [expanded, setExpanded] = useState(false);
   const [showUnmasked, setShowUnmasked] = useState(false);
   const [userVote, setUserVote] = useState(null);
+  const [localFeedback, setLocalFeedback] = useState({
+    verified_count: doc.feedback?.verified_count || 0,
+    outdated_count: doc.feedback?.outdated_count || 0,
+  });
+
+  useEffect(() => {
+    setLocalFeedback({
+      verified_count: doc.feedback?.verified_count || 0,
+      outdated_count: doc.feedback?.outdated_count || 0,
+    });
+  }, [doc.feedback]);
 
   useEffect(() => {
     const saved = localStorage.getItem(`doc_vote_${doc.id}_${activeUser?.name || 'default'}`);
@@ -29,8 +40,12 @@ export default function DocumentCard({ doc, activeUser, onFeedback }) {
   const hasPayrollClearance = activeUser?.role === 'Senior Payroll Officer' || activeUser?.role === 'Admin';
 
   const handleVote = (type) => {
-    if (userVote === type) return; // Prevent duplicate spam
     setUserVote(type);
+    setLocalFeedback((prev) => ({
+      ...prev,
+      verified_count: type === 'VERIFIED' ? (prev.verified_count || 0) + 1 : prev.verified_count,
+      outdated_count: type === 'OUTDATED' ? (prev.outdated_count || 0) + 1 : prev.outdated_count,
+    }));
     localStorage.setItem(`doc_vote_${doc.id}_${activeUser?.name || 'default'}`, type);
     if (onFeedback) {
       onFeedback(doc.id, type);
@@ -177,7 +192,7 @@ export default function DocumentCard({ doc, activeUser, onFeedback }) {
                   userVote === 'VERIFIED' ? 'bg-white/20 text-white' : 'bg-emerald-200/80 text-emerald-900'
                 }`}
               >
-                {doc.feedback?.verified_count || 0}
+                {localFeedback.verified_count}
               </span>
             </button>
 
@@ -197,7 +212,7 @@ export default function DocumentCard({ doc, activeUser, onFeedback }) {
                   userVote === 'OUTDATED' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
                 }`}
               >
-                {doc.feedback?.outdated_count || 0}
+                {localFeedback.outdated_count}
               </span>
             </button>
           </div>

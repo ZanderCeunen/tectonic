@@ -511,44 +511,6 @@ impl Database {
     ) -> Result<Option<DocumentItem>> {
         let f_type = feedback_type.to_uppercase();
         
-        let mut check_stmt = self.conn.prepare(
-            "SELECT vote_type FROM document_user_votes WHERE document_id = ?1 AND employee_id = ?2",
-        )?;
-        let existing_vote: Option<String> = check_stmt
-            .query_row(params![doc_id, employee_id], |row| row.get(0))
-            .ok();
-
-        if let Some(prev_vote) = existing_vote {
-            if prev_vote == f_type {
-                // User already submitted this vote, return current doc
-                return self.get_document_by_id(doc_id);
-            } else {
-                // Revert previous vote count
-                match prev_vote.as_str() {
-                    "VERIFIED" => {
-                        self.conn.execute(
-                            "UPDATE documents SET verified_count = MAX(0, verified_count - 1) WHERE id = ?1",
-                            params![doc_id],
-                        )?;
-                    }
-                    "OUTDATED" => {
-                        self.conn.execute(
-                            "UPDATE documents SET outdated_count = MAX(0, outdated_count - 1) WHERE id = ?1",
-                            params![doc_id],
-                        )?;
-                    }
-                    "QUESTIONABLE" => {
-                        self.conn.execute(
-                            "UPDATE documents SET questionable_count = MAX(0, questionable_count - 1) WHERE id = ?1",
-                            params![doc_id],
-                        )?;
-                    }
-                    _ => {}
-                }
-            }
-        }
-
-        // Apply new vote count
         match f_type.as_str() {
             "VERIFIED" => {
                 self.conn.execute(
@@ -587,12 +549,19 @@ impl Database {
         resolution_note: &str,
         resolved_by: &str,
     ) -> Result<DocumentItem> {
+        let field_clean = field.trim().to_lowercase();
         let docs = self.get_documents()?;
         for mut doc in docs {
             if doc.customer_id == customer_id {
                 let mut modified = false;
                 for fact in &mut doc.key_facts {
-                    if fact.field == field {
+                    let fact_field = fact.field.trim().to_lowercase();
+                    let fact_label = fact.label.trim().to_lowercase();
+                    if fact_field == field_clean
+                        || fact_label == field_clean
+                        || field_clean.contains(&fact_field)
+                        || fact_field.contains(&field_clean)
+                    {
                         fact.value = chosen_value.to_string();
                         fact.is_conflicting = false;
                         modified = true;
@@ -635,7 +604,7 @@ impl Database {
             }],
             tags: vec!["Conflict Resolution".to_string(), "Standardized".to_string()],
             trust: TrustBreakdown {
-                overall_score: 96.0,
+                overall_score: 98.0,
                 source_score: 95.0,
                 recency_score: 100.0,
                 consensus_score: 100.0,
