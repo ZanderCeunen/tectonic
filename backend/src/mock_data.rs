@@ -684,3 +684,44 @@ pub fn get_mock_employees() -> Vec<Employee> {
         },
     ]
 }
+
+pub fn get_mock_users() -> Vec<crate::models::UserAccount> {
+    use crate::models::{UserAccount, UserRole};
+
+    let admin_hash = bcrypt::hash("Admin123!", 4).unwrap_or_default();
+    let consultant_hash = bcrypt::hash("Payroll123!", 4).unwrap_or_default();
+
+    vec![
+        UserAccount {
+            id: "USR-001".to_string(),
+            username: "admin".to_string(),
+            name: "System Administrator".to_string(),
+            email: "admin@sdworx.com".to_string(),
+            password_hash: admin_hash.clone(),
+            role: UserRole::Admin,
+            clearance_level: "Admin".to_string(),
+            employee_id: None,
+        },
+        UserAccount {
+            id: "USR-002".to_string(),
+            username: "tom.desmet".to_string(),
+            name: "Tom De Smet".to_string(),
+            email: "tom.desmet@sdworx.com".to_string(),
+            password_hash: consultant_hash.clone(),
+            role: UserRole::Consultant,
+            clearance_level: "Standard".to_string(),
+            employee_id: Some("EMP-003".to_string()),
+        },
+        UserAccount {
+            id: "USR-003".to_string(),
+            username: "sarah.vermeulen".to_string(),
+            name: "Sarah Vermeulen".to_string(),
+            email: "sarah.vermeulen@sdworx.com".to_string(),
+            password_hash: consultant_hash.clone(),
+            role: UserRole::SeniorPayrollOfficer,
+            clearance_level: "Senior".to_string(),
+            employee_id: Some("EMP-001".to_string()),
+        },
+    ]
+}
+

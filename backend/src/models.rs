@@ -10,6 +10,60 @@ pub enum UserRole {
     Auditor,
 }
 
+impl UserRole {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            UserRole::Admin => "Admin",
+            UserRole::SeniorPayrollOfficer => "Senior Payroll Officer",
+            UserRole::Consultant => "Consultant",
+            UserRole::Auditor => "Auditor",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "Admin" => UserRole::Admin,
+            "Senior Payroll Officer" | "SeniorPayrollOfficer" => UserRole::SeniorPayrollOfficer,
+            "Auditor" => UserRole::Auditor,
+            _ => UserRole::Consultant,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserAccount {
+    pub id: String,
+    pub username: String,
+    pub name: String,
+    pub email: String,
+    #[serde(skip_serializing)]
+    pub password_hash: String,
+    pub role: UserRole,
+    pub clearance_level: String, // "Standard" | "Senior" | "Admin"
+    pub employee_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoginRequest {
+    pub username: String,
+    pub password: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoginResponse {
+    pub token: String,
+    pub user: UserAccount,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Claims {
+    pub sub: String,
+    pub username: String,
+    pub role: String,
+    pub clearance: String,
+    pub exp: usize,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Customer {
     pub id: String,
@@ -103,6 +157,9 @@ pub struct DocumentItem {
     pub summary: String,
     pub raw_content: String,
     pub unmasked_raw_content: Option<String>,
+    pub file_path: Option<String>,
+    pub file_name: Option<String>,
+    pub file_size: Option<usize>,
     pub key_facts: Vec<KeyFact>,
     pub tags: Vec<String>,
     pub trust: TrustBreakdown,

@@ -1,9 +1,9 @@
 use crate::models::{
     AuditEntry, AvailabilityStatus, Customer, DocumentFeedback, DocumentItem, DocumentSourceType,
-    Employee, KeyFact, TrustBreakdown,
+    Employee, KeyFact, TrustBreakdown, UserAccount, UserRole,
 };
 use chrono::{DateTime, Utc};
-use rusqlite::{params, Connection, Result};
+use rusqlite::{params, Connection, Result, Row};
 use std::collections::HashMap;
 
 pub struct Database {
@@ -21,6 +21,17 @@ impl Database {
     fn create_tables(&self) -> Result<()> {
         self.conn.execute_batch(
             "
+            CREATE TABLE IF NOT EXISTS users (
+                id TEXT PRIMARY KEY,
+                username TEXT UNIQUE NOT NULL,
+                name TEXT NOT NULL,
+                email TEXT NOT NULL,
+                password_hash TEXT NOT NULL,
+                role TEXT NOT NULL,
+                clearance_level TEXT NOT NULL,
+                employee_id TEXT
+            );
+
             CREATE TABLE IF NOT EXISTS customers (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -28,12 +39,16 @@ impl Database {
                 customer_code TEXT,
                 industry TEXT NOT NULL,
                 joint_committee TEXT NOT NULL,
+                joint_committee_code TEXT,
                 primary_contact TEXT NOT NULL,
                 contact_email TEXT NOT NULL,
                 contact_phone TEXT,
                 sdworx_account_manager TEXT,
+                sdworx_team TEXT,
                 employee_count INTEGER NOT NULL,
-                location TEXT NOT NULL
+                location TEXT NOT NULL,
+                payroll_frequency TEXT,
+                active_dossier_status TEXT
             );
 
             CREATE TABLE IF NOT EXISTS documents (
@@ -47,6 +62,7 @@ impl Database {
                 author_role TEXT NOT NULL,
                 summary TEXT NOT NULL,
                 raw_content TEXT NOT NULL,
+                unmasked_raw_content TEXT,
                 file_path TEXT,
                 file_name TEXT,
                 file_size INTEGER,
@@ -63,6 +79,8 @@ impl Database {
                 name TEXT NOT NULL,
                 title TEXT NOT NULL,
                 department TEXT NOT NULL,
+                extension TEXT,
+                direct_phone TEXT,
                 avatar_url TEXT NOT NULL,
                 availability TEXT NOT NULL,
                 completed_cases INTEGER NOT NULL DEFAULT 0,
@@ -90,7 +108,7 @@ impl Database {
     pub fn is_empty(&self) -> Result<bool> {
         let count: i64 = self
             .conn
-            .query_row("SELECT COUNT(*) FROM customers", [], |row| row.get(0))?;
+            .query_row("SELECT COUNT(*) FROM customers", [], |row: &Row| row.get(0))?;
         Ok(count == 0)
     }
 
@@ -99,7 +117,11 @@ impl Database {
         customers: Vec<Customer>,
         docs: Vec<DocumentItem>,
         emps: Vec<Employee>,
+        users: Vec<UserAccount>,
     ) -> Result<()> {
+        for u in users {
+            self.insert_user(&u)?;
+        }
         for c in customers {
             self.insert_customer(&c)?;
         }
@@ -112,11 +134,81 @@ impl Database {
         Ok(())
     }
 
+    // --- USER MANAGEMENT ---
+    pub fn insert_user(&self, u: &UserAccount) -> Result<()> {
+        self.conn.execute(
+            "INSERT OR REPLACE INTO users (id, username, name, email, password_hash, role, clearance_level, employee_id)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                u.id,
+                u.username,
+                u.name,
+                u.email,
+                u.password_hash,
+                u.role.as_str(),
+                u.clearance_level,
+                u.employee_id
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_user_by_username(&self, username: &str) -> Result<Option<UserAccount>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, username, name, email, password_hash, role, clearance_level, employee_id FROM users WHERE username = ?1",
+        )?;
+        let mut rows = stmt.query_map(params![username], |row: &Row| {
+            let role_str: String = row.get(5)?;
+            Ok(UserAccount {
+                id: row.get(0)?,
+                username: row.get(1)?,
+                name: row.get(2)?,
+                email: row.get(3)?,
+                password_hash: row.get(4)?,
+                role: UserRole::from_str(&role_str),
+                clearance_level: row.get(6)?,
+                employee_id: row.get(7)?,
+            })
+        })?;
+
+        if let Some(r) = rows.next() {
+            Ok(Some(r?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn get_users(&self) -> Result<Vec<UserAccount>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, username, name, email, password_hash, role, clearance_level, employee_id FROM users",
+        )?;
+        let rows = stmt.query_map([], |row: &Row| {
+            let role_str: String = row.get(5)?;
+            Ok(UserAccount {
+                id: row.get(0)?,
+                username: row.get(1)?,
+                name: row.get(2)?,
+                email: row.get(3)?,
+                password_hash: row.get(4)?,
+                role: UserRole::from_str(&role_str),
+                clearance_level: row.get(6)?,
+                employee_id: row.get(7)?,
+            })
+        })?;
+
+        let mut list = Vec::new();
+        for r in rows {
+            list.push(r?);
+        }
+        Ok(list)
+    }
+
+    // --- CUSTOMER MANAGEMENT ---
     pub fn insert_customer(&self, c: &Customer) -> Result<()> {
         self.conn.execute(
             "INSERT OR REPLACE INTO customers 
-            (id, name, enterprise_number, customer_code, industry, joint_committee, primary_contact, contact_email, contact_phone, sdworx_account_manager, employee_count, location)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+            (id, name, enterprise_number, customer_code, industry, joint_committee, joint_committee_code, primary_contact, contact_email, contact_phone, sdworx_account_manager, sdworx_team, employee_count, location, payroll_frequency, active_dossier_status)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
             params![
                 c.id,
                 c.name,
@@ -124,12 +216,16 @@ impl Database {
                 c.customer_code,
                 c.industry,
                 c.joint_committee,
+                c.joint_committee_code,
                 c.primary_contact,
                 c.contact_email,
                 c.contact_phone,
                 c.sdworx_account_manager,
+                c.sdworx_team,
                 c.employee_count as i64,
-                c.location
+                c.location,
+                c.payroll_frequency,
+                c.active_dossier_status
             ],
         )?;
         Ok(())
@@ -137,10 +233,10 @@ impl Database {
 
     pub fn get_customers(&self) -> Result<Vec<Customer>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, name, enterprise_number, customer_code, industry, joint_committee, primary_contact, contact_email, contact_phone, sdworx_account_manager, employee_count, location FROM customers",
+            "SELECT id, name, enterprise_number, customer_code, industry, joint_committee, joint_committee_code, primary_contact, contact_email, contact_phone, sdworx_account_manager, sdworx_team, employee_count, location, payroll_frequency, active_dossier_status FROM customers",
         )?;
-        let rows = stmt.query_map([], |row| {
-            let emp_count: i64 = row.get(10)?;
+        let rows = stmt.query_map([], |row: &Row| {
+            let emp_count: i64 = row.get(12)?;
             Ok(Customer {
                 id: row.get(0)?,
                 name: row.get(1)?,
@@ -148,12 +244,16 @@ impl Database {
                 customer_code: row.get(3)?,
                 industry: row.get(4)?,
                 joint_committee: row.get(5)?,
-                primary_contact: row.get(6)?,
-                contact_email: row.get(7)?,
-                contact_phone: row.get(8)?,
-                sdworx_account_manager: row.get(9)?,
+                joint_committee_code: row.get(6)?,
+                primary_contact: row.get(7)?,
+                contact_email: row.get(8)?,
+                contact_phone: row.get(9)?,
+                sdworx_account_manager: row.get(10)?,
+                sdworx_team: row.get(11)?,
                 employee_count: emp_count as usize,
-                location: row.get(11)?,
+                location: row.get(13)?,
+                payroll_frequency: row.get(14)?,
+                active_dossier_status: row.get(15)?,
             })
         })?;
 
@@ -166,10 +266,10 @@ impl Database {
 
     pub fn get_customer_by_id(&self, id: &str) -> Result<Option<Customer>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, name, enterprise_number, customer_code, industry, joint_committee, primary_contact, contact_email, contact_phone, sdworx_account_manager, employee_count, location FROM customers WHERE id = ?1",
+            "SELECT id, name, enterprise_number, customer_code, industry, joint_committee, joint_committee_code, primary_contact, contact_email, contact_phone, sdworx_account_manager, sdworx_team, employee_count, location, payroll_frequency, active_dossier_status FROM customers WHERE id = ?1",
         )?;
-        let mut rows = stmt.query_map(params![id], |row| {
-            let emp_count: i64 = row.get(10)?;
+        let mut rows = stmt.query_map(params![id], |row: &Row| {
+            let emp_count: i64 = row.get(12)?;
             Ok(Customer {
                 id: row.get(0)?,
                 name: row.get(1)?,
@@ -177,12 +277,16 @@ impl Database {
                 customer_code: row.get(3)?,
                 industry: row.get(4)?,
                 joint_committee: row.get(5)?,
-                primary_contact: row.get(6)?,
-                contact_email: row.get(7)?,
-                contact_phone: row.get(8)?,
-                sdworx_account_manager: row.get(9)?,
+                joint_committee_code: row.get(6)?,
+                primary_contact: row.get(7)?,
+                contact_email: row.get(8)?,
+                contact_phone: row.get(9)?,
+                sdworx_account_manager: row.get(10)?,
+                sdworx_team: row.get(11)?,
                 employee_count: emp_count as usize,
-                location: row.get(11)?,
+                location: row.get(13)?,
+                payroll_frequency: row.get(14)?,
+                active_dossier_status: row.get(15)?,
             })
         })?;
 
@@ -193,6 +297,7 @@ impl Database {
         }
     }
 
+    // --- DOCUMENT MANAGEMENT ---
     pub fn insert_document(&self, d: &DocumentItem) -> Result<()> {
         let source_type_str = match d.source_type {
             DocumentSourceType::SignedContract => "SignedContract",
@@ -209,8 +314,8 @@ impl Database {
 
         self.conn.execute(
             "INSERT OR REPLACE INTO documents 
-            (id, customer_id, title, source_type, source_label, date, author, author_role, summary, raw_content, file_path, file_name, file_size, key_facts_json, tags_json, verified_count, outdated_count, questionable_count)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
+            (id, customer_id, title, source_type, source_label, date, author, author_role, summary, raw_content, unmasked_raw_content, file_path, file_name, file_size, key_facts_json, tags_json, verified_count, outdated_count, questionable_count)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)",
             params![
                 d.id,
                 d.customer_id,
@@ -222,6 +327,7 @@ impl Database {
                 d.author_role,
                 d.summary,
                 d.raw_content,
+                d.unmasked_raw_content,
                 d.file_path,
                 d.file_name,
                 f_size,
@@ -237,10 +343,10 @@ impl Database {
 
     pub fn get_documents(&self) -> Result<Vec<DocumentItem>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, customer_id, title, source_type, source_label, date, author, author_role, summary, raw_content, file_path, file_name, file_size, key_facts_json, tags_json, verified_count, outdated_count, questionable_count FROM documents",
+            "SELECT id, customer_id, title, source_type, source_label, date, author, author_role, summary, raw_content, unmasked_raw_content, file_path, file_name, file_size, key_facts_json, tags_json, verified_count, outdated_count, questionable_count FROM documents",
         )?;
 
-        let rows = stmt.query_map([], |row| {
+        let rows = stmt.query_map([], |row: &Row| {
             let st_str: String = row.get(3)?;
             let source_type = match st_str.as_str() {
                 "SignedContract" => DocumentSourceType::SignedContract,
@@ -251,20 +357,21 @@ impl Database {
                 _ => DocumentSourceType::ChatMessage,
             };
 
-            let file_path: Option<String> = row.get(10)?;
-            let file_name: Option<String> = row.get(11)?;
-            let file_size_i: Option<i64> = row.get(12)?;
+            let unmasked: Option<String> = row.get(10)?;
+            let file_path: Option<String> = row.get(11)?;
+            let file_name: Option<String> = row.get(12)?;
+            let file_size_i: Option<i64> = row.get(13)?;
             let file_size = file_size_i.map(|s| s as usize);
 
-            let kf_json: String = row.get(13)?;
+            let kf_json: String = row.get(14)?;
             let key_facts: Vec<KeyFact> = serde_json::from_str(&kf_json).unwrap_or_default();
 
-            let tags_json: String = row.get(14)?;
+            let tags_json: String = row.get(15)?;
             let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
 
-            let v_cnt: i64 = row.get(15)?;
-            let o_cnt: i64 = row.get(16)?;
-            let q_cnt: i64 = row.get(17)?;
+            let v_cnt: i64 = row.get(16)?;
+            let o_cnt: i64 = row.get(17)?;
+            let q_cnt: i64 = row.get(18)?;
 
             Ok(DocumentItem {
                 id: row.get(0)?,
@@ -277,6 +384,7 @@ impl Database {
                 author_role: row.get(7)?,
                 summary: row.get(8)?,
                 raw_content: row.get(9)?,
+                unmasked_raw_content: unmasked,
                 file_path,
                 file_name,
                 file_size,
@@ -341,6 +449,7 @@ impl Database {
         self.get_document_by_id(doc_id)
     }
 
+    // --- EMPLOYEE MANAGEMENT ---
     pub fn insert_employee(&self, e: &Employee) -> Result<()> {
         let avail_str = match e.availability {
             AvailabilityStatus::Available => "Available",
@@ -354,13 +463,15 @@ impl Database {
 
         self.conn.execute(
             "INSERT OR REPLACE INTO employees 
-            (id, name, title, department, avatar_url, availability, completed_cases, customer_familiarity_json, domain_expertise_json, recent_activity)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            (id, name, title, department, extension, direct_phone, avatar_url, availability, completed_cases, customer_familiarity_json, domain_expertise_json, recent_activity)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
             params![
                 e.id,
                 e.name,
                 e.title,
                 e.department,
+                e.extension,
+                e.direct_phone,
                 e.avatar_url,
                 avail_str,
                 e.completed_cases as i64,
@@ -374,11 +485,11 @@ impl Database {
 
     pub fn get_employees(&self) -> Result<Vec<Employee>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, name, title, department, avatar_url, availability, completed_cases, customer_familiarity_json, domain_expertise_json, recent_activity FROM employees",
+            "SELECT id, name, title, department, extension, direct_phone, avatar_url, availability, completed_cases, customer_familiarity_json, domain_expertise_json, recent_activity FROM employees",
         )?;
 
-        let rows = stmt.query_map([], |row| {
-            let avail_str: String = row.get(5)?;
+        let rows = stmt.query_map([], |row: &Row| {
+            let avail_str: String = row.get(7)?;
             let availability = match avail_str.as_str() {
                 "Available" => AvailabilityStatus::Available,
                 "InCall" => AvailabilityStatus::InCall,
@@ -386,11 +497,11 @@ impl Database {
                 _ => AvailabilityStatus::Away,
             };
 
-            let comp_cases: i64 = row.get(6)?;
-            let cust_json: String = row.get(7)?;
+            let comp_cases: i64 = row.get(8)?;
+            let cust_json: String = row.get(9)?;
             let cust_fam: HashMap<String, f64> = serde_json::from_str(&cust_json).unwrap_or_default();
 
-            let dom_json: String = row.get(8)?;
+            let dom_json: String = row.get(10)?;
             let dom_exp: HashMap<String, f64> = serde_json::from_str(&dom_json).unwrap_or_default();
 
             Ok(Employee {
@@ -398,12 +509,14 @@ impl Database {
                 name: row.get(1)?,
                 title: row.get(2)?,
                 department: row.get(3)?,
-                avatar_url: row.get(4)?,
+                extension: row.get(4)?,
+                direct_phone: row.get(5)?,
+                avatar_url: row.get(6)?,
                 availability,
                 completed_cases: comp_cases as usize,
                 customer_familiarity: cust_fam,
                 domain_expertise: dom_exp,
-                recent_activity: row.get(9)?,
+                recent_activity: row.get(11)?,
             })
         })?;
 
@@ -441,6 +554,7 @@ impl Database {
         }
     }
 
+    // --- AUDIT TRAIL ---
     pub fn insert_audit_entry(&self, entry: &AuditEntry) -> Result<()> {
         self.conn.execute(
             "INSERT OR REPLACE INTO audit_entries
@@ -466,7 +580,7 @@ impl Database {
             "SELECT index_id, timestamp, actor, actor_role, action, resource, details, prev_hash, hash FROM audit_entries ORDER BY index_id ASC",
         )?;
 
-        let rows = stmt.query_map([], |row| {
+        let rows = stmt.query_map([], |row: &Row| {
             let idx: i64 = row.get(0)?;
             let ts_str: String = row.get(1)?;
             let ts = DateTime::parse_from_rfc3339(&ts_str)

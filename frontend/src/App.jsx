@@ -4,6 +4,9 @@ import HomeDashboard from './components/HomeDashboard';
 import CustomerHub from './components/CustomerHub';
 import SmartRouterModal from './components/SmartRouterModal';
 import CustomerSearchModal from './components/CustomerSearchModal';
+import LoginModal from './components/LoginModal';
+import CustomerManagerModal from './components/CustomerManagerModal';
+import EmployeeManagerModal from './components/EmployeeManagerModal';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 export default function App() {
@@ -15,14 +18,24 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [backendError, setBackendError] = useState(null);
 
+  const [authToken, setAuthToken] = useState(localStorage.getItem('tectonic_jwt') || '');
+
+  // Modals state
   const [isRouterOpen, setIsRouterOpen] = useState(false);
   const [isCustomerSearchOpen, setIsCustomerSearchOpen] = useState(false);
+  const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [isCustomerManagerOpen, setIsCustomerManagerOpen] = useState(false);
+  const [isEmployeeManagerOpen, setIsEmployeeManagerOpen] = useState(false);
+
+  const [customerToEdit, setCustomerToEdit] = useState(null);
+  const [employeeToEdit, setEmployeeToEdit] = useState(null);
 
   // Ingelogde medewerker bij SD Worx
   const [activeUser, setActiveUser] = useState({
-    id: 'EMP-003',
+    id: 'USR-002',
     name: 'Tom De Smet',
-    role: 'Payroll Consultant',
+    role: 'Consultant',
+    clearance_level: 'Standard',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
   });
 
@@ -48,6 +61,27 @@ export default function App() {
       const empData = await empRes.json();
       setEmployees(empData);
 
+      // Controleer actieve JWT sessie indien aanwezig
+      if (authToken) {
+        try {
+          const meRes = await fetch('/api/auth/me', {
+            headers: { Authorization: `Bearer ${authToken}` },
+          });
+          if (meRes.ok) {
+            const meUser = await meRes.json();
+            setActiveUser({
+              id: meUser.id,
+              name: meUser.name,
+              role: meUser.role,
+              clearance_level: meUser.clearance_level,
+              avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+            });
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+
       setIsLoading(false);
     } catch (err) {
       console.error('Verbinding met Rust backend mislukt:', err);
@@ -60,7 +94,7 @@ export default function App() {
     loadInitialData();
   }, []);
 
-  // 2. Laad documenten en conflicten voor het geselecteerde klantdossier van de Backend
+  // 2. Laad documenten en conflicten voor het geselecteerde klantdossier
   const loadCustomerDocuments = async (customerId) => {
     if (!customerId) {
       setDocuments([]);
@@ -69,7 +103,9 @@ export default function App() {
     }
 
     try {
-      const docRes = await fetch(`/api/customers/${customerId}/documents`);
+      const docRes = await fetch(`/api/customers/${customerId}/documents`, {
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+      });
       if (!docRes.ok) throw new Error(`Backend fout bij ophalen documenten: ${docRes.status}`);
       const docData = await docRes.json();
       setDocuments(docData.documents || []);
@@ -83,14 +119,17 @@ export default function App() {
     if (selectedCustomerId) {
       loadCustomerDocuments(selectedCustomerId);
     }
-  }, [selectedCustomerId]);
+  }, [selectedCustomerId, authToken]);
 
   // 3. Document feedback interactie via Backend
   const handleFeedback = async (docId, type) => {
     try {
       const res = await fetch(`/api/documents/${docId}/feedback`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
         body: JSON.stringify({
           document_id: docId,
           feedback_type: type,
@@ -99,7 +138,6 @@ export default function App() {
       });
 
       if (res.ok) {
-        // Herlaad documenten van de backend om de wiskundig berekende Trust Score en consensus te updaten
         if (selectedCustomerId) {
           loadCustomerDocuments(selectedCustomerId);
         }
@@ -114,7 +152,10 @@ export default function App() {
     try {
       const res = await fetch('/api/routing/handoff', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
         body: JSON.stringify({
           customer_id: selectedCustomerId,
           employee_id: handoffData.employee_id,
@@ -125,7 +166,6 @@ export default function App() {
       });
 
       if (res.ok) {
-        // Herlaad medewerkers van de backend om de verhoogde cases en affiniteitsscores te updaten
         const empRes = await fetch('/api/employees');
         if (empRes.ok) {
           const empData = await empRes.json();
@@ -135,6 +175,45 @@ export default function App() {
     } catch (e) {
       console.error('Fout bij registreren oproep in backend:', e);
     }
+  };
+
+  // 5. Inloggen Callback
+  const handleLoginSuccess = (user, token) => {
+    setAuthToken(token);
+    setActiveUser({
+      id: user.id,
+      name: user.name,
+      role: typeof user.role === 'string' ? user.role : 'Consultant',
+      clearance_level: user.clearance_level || 'Standard',
+      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+    });
+  };
+
+  // 6. Klant Opslaan Callback
+  const handleSaveCustomer = (savedCustomer) => {
+    setCustomers((prev) => {
+      const idx = prev.findIndex((c) => c.id === savedCustomer.id);
+      if (idx >= 0) {
+        const updated = [...prev];
+        updated[idx] = savedCustomer;
+        return updated;
+      }
+      return [savedCustomer, ...prev];
+    });
+    setSelectedCustomerId(savedCustomer.id);
+  };
+
+  // 7. Medewerker Opslaan Callback
+  const handleSaveEmployee = (savedEmployee) => {
+    setEmployees((prev) => {
+      const idx = prev.findIndex((e) => e.id === savedEmployee.id);
+      if (idx >= 0) {
+        const updated = [...prev];
+        updated[idx] = savedEmployee;
+        return updated;
+      }
+      return [savedEmployee, ...prev];
+    });
   };
 
   const selectedCustomer = customers.find((c) => c.id === selectedCustomerId);
@@ -159,7 +238,7 @@ export default function App() {
           </div>
           <button
             onClick={loadInitialData}
-            className="w-full py-2 bg-sdworx-navy hover:bg-sdworx-navy-dark text-white text-xs font-semibold rounded flex items-center justify-center space-x-1.5 transition-colors"
+            className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded flex items-center justify-center space-x-1.5 transition-colors"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             <span>Opnieuw Proberen</span>
@@ -178,15 +257,23 @@ export default function App() {
         onOpenCustomerSearch={() => setIsCustomerSearchOpen(true)}
         onGoHome={() => setSelectedCustomerId(null)}
         activeUser={activeUser}
-        onChangeActiveUser={setActiveUser}
+        onOpenAddCustomer={() => {
+          setCustomerToEdit(null);
+          setIsCustomerManagerOpen(true);
+        }}
+        onOpenAddEmployee={() => {
+          setEmployeeToEdit(null);
+          setIsEmployeeManagerOpen(true);
+        }}
+        onOpenLogin={() => setIsLoginOpen(true)}
       />
 
       {/* Hoofdsectie: Klantdossier of Overzichtsdashboard */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-5">
         {isLoading ? (
           <div className="py-20 text-center text-slate-500 text-xs flex items-center justify-center space-x-2">
-            <RefreshCw className="w-4 h-4 animate-spin text-sdworx-blue" />
-            <span>Klantendossiers laden van SD Worx backend...</span>
+            <RefreshCw className="w-4 h-4 animate-spin text-[#005FB8]" />
+            <span>Klantendossiers en authenticatie laden van SD Worx backend...</span>
           </div>
         ) : selectedCustomer ? (
           <CustomerHub
@@ -228,13 +315,38 @@ export default function App() {
         onSelectCustomer={(id) => setSelectedCustomerId(id)}
       />
 
+      {/* Modal: Login & JWT Auth */}
+      <LoginModal
+        isOpen={isLoginOpen}
+        onClose={() => setIsLoginOpen(false)}
+        onLoginSuccess={handleLoginSuccess}
+      />
+
+      {/* Modal: Customer Manager */}
+      <CustomerManagerModal
+        isOpen={isCustomerManagerOpen}
+        onClose={() => setIsCustomerManagerOpen(false)}
+        customerToEdit={customerToEdit}
+        onSaveCustomer={handleSaveCustomer}
+        authToken={authToken}
+      />
+
+      {/* Modal: Employee Manager */}
+      <EmployeeManagerModal
+        isOpen={isEmployeeManagerOpen}
+        onClose={() => setIsEmployeeManagerOpen(false)}
+        employeeToEdit={employeeToEdit}
+        onSaveEmployee={handleSaveEmployee}
+        authToken={authToken}
+      />
+
       {/* Zakelijke SD Worx Footer */}
       <footer className="border-t border-slate-200 bg-white py-3 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 flex items-center justify-between">
           <span className="font-medium text-slate-600">
             SD Worx Kennisnet & Dossierbeheer
           </span>
-          <span>Interne Werknemersomgeving • v2.4</span>
+          <span>Interne Werknemersomgeving • JWT Auth & SQLite Persistentie Active</span>
         </div>
       </footer>
     </div>
