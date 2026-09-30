@@ -10,21 +10,27 @@ pub struct AuditChain {
 
 impl AuditChain {
     pub fn new() -> Self {
+        Self::from_existing(Vec::new())
+    }
+
+    pub fn from_existing(existing_entries: Vec<AuditEntry>) -> Self {
         let chain = Self {
-            entries: Arc::new(Mutex::new(Vec::new())),
+            entries: Arc::new(Mutex::new(existing_entries.clone())),
         };
 
-        // Initialiseer Genesis Block
-        chain.append(
-            "SYSTEM",
-            "SecuritySupervisor",
-            "INITIALIZE_GENESIS",
-            "SYSTEM_ROOT",
-            "Tectonic Cryptographic Audit Ledger geïnitialiseerd conform SD Worx Beveiligingsbeleid.",
-        );
+        if existing_entries.is_empty() {
+            chain.append(
+                "SYSTEM",
+                "SecuritySupervisor",
+                "INITIALIZE_GENESIS",
+                "SYSTEM_ROOT",
+                "Tectonic Cryptographic Audit Ledger geïnitialiseerd conform SD Worx Beveiligingsbeleid.",
+            );
+        }
 
         chain
     }
+
 
     pub fn append(
         &self,

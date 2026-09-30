@@ -1,3 +1,4 @@
+mod db;
 mod expertise_graph;
 mod mock_data;
 mod models;
@@ -11,11 +12,12 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use db::Database;
 use expertise_graph::ExpertiseGraph;
 use mock_data::{get_mock_customers, get_mock_documents, get_mock_employees};
 use models::{
-    AuditEntry, Customer, DocumentItem, FeedbackSubmission, HandoffRequest,
-    RoutingRecommendation, RoutingRequest,
+    AuditEntry, Customer, DocumentFeedback, DocumentItem, DocumentSourceType, FeedbackSubmission,
+    HandoffRequest, KeyFact, RoutingRecommendation, RoutingRequest, TrustBreakdown,
 };
 use security::{AuditChain, PiiRedactor};
 use serde::{Deserialize, Serialize};
@@ -23,12 +25,11 @@ use std::sync::{Arc, Mutex};
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use trust_engine::TrustEngine;
+use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct AppState {
-    pub customers: Arc<Mutex<Vec<Customer>>>,
-    pub documents: Arc<Mutex<Vec<DocumentItem>>>,
-    pub expertise_graph: ExpertiseGraph,
+    pub db: Arc<Mutex<Database>>,
     pub audit_chain: AuditChain,
 }
 
@@ -42,46 +43,65 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let initial_customers = get_mock_customers();
-    let initial_docs = get_mock_documents();
-    let initial_employees = get_mock_employees();
+    // Map db aanmaken indien niet aanwezig
+    std::fs::create_dir_all("db").ok();
 
-    let audit_chain = AuditChain::new();
-    let expertise_graph = ExpertiseGraph::new(initial_employees);
+    let db_path = "db/tectonic.db";
+    let db = Database::new(db_path).expect("Mislukt om SQLite database te openen");
+
+    // Seeden bij eerste start
+    if db.is_empty().unwrap_or(true) {
+        println!("🌱 SQLite database is leeg. Initialiseren met SD Worx seed dataset...");
+        let initial_customers = get_mock_customers();
+        let initial_docs = get_mock_documents();
+        let initial_employees = get_mock_employees();
+        db.seed(initial_customers, initial_docs, initial_employees)
+            .expect("Mislukt om database te seeden");
+    }
+
+    let existing_audits = db.get_audit_entries().unwrap_or_default();
+    let audit_chain = AuditChain::from_existing(existing_audits);
+
+    // Sync genesis block to DB if newly created
+    for entry in audit_chain.get_entries() {
+        db.insert_audit_entry(&entry).ok();
+    }
 
     let state = AppState {
-        customers: Arc::new(Mutex::new(initial_customers)),
-        documents: Arc::new(Mutex::new(initial_docs)),
-        expertise_graph,
+        db: Arc::new(Mutex::new(db)),
         audit_chain,
     };
 
     let app = Router::new()
         .route("/api/health", get(health_check))
-        .route("/api/customers", get(list_customers))
+        .route("/api/customers", get(list_customers).post(create_customer))
         .route("/api/customers/:id", get(get_customer))
         .route("/api/customers/:id/documents", get(get_customer_documents))
         .route("/api/customers/:id/conflicts", get(get_customer_conflicts))
+        .route("/api/documents", post(create_document))
         .route("/api/documents/:id/feedback", post(submit_document_feedback))
         .route("/api/routing/recommend", post(recommend_experts))
         .route("/api/routing/handoff", post(execute_handoff))
-        .route("/api/employees", get(list_employees))
+        .route("/api/employees", get(list_employees).post(create_employee))
         .route("/api/security/audit-chain", get(get_audit_chain))
         .route("/api/security/verify", post(verify_audit_integrity))
         .layer(CorsLayer::permissive())
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
-    println!("SD Worx Kennisportaal API actief op http://127.0.0.1:8080");
+    println!("🚀 TECTONIC Backend gestart op http://127.0.0.1:8080");
+    println!("💾 SQLite Database actief op: {}", db_path);
+    println!("🔒 Cryptografische Audit Ledger & PII Redactor actief");
     axum::serve(listener, app).await.unwrap();
 }
 
 async fn health_check() -> impl IntoResponse {
-    (StatusCode::OK, "SD Worx Knowledge Hub API Status: ACTIEF")
+    (StatusCode::OK, "TECTONIC Backend Status: ACTIVE & HEALTHY (SQLite Active)")
 }
 
 async fn list_customers(State(state): State<AppState>) -> Json<Vec<Customer>> {
-    let customers = state.customers.lock().unwrap().clone();
+    let db = state.db.lock().unwrap();
+    let customers = db.get_customers().unwrap_or_default();
     Json(customers)
 }
 
@@ -89,10 +109,30 @@ async fn get_customer(
     Path(id): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Json<Customer>, StatusCode> {
-    let customers = state.customers.lock().unwrap();
-    match customers.iter().find(|c| c.id == id) {
-        Some(c) => Ok(Json(c.clone())),
-        None => Err(StatusCode::NOT_FOUND),
+    let db = state.db.lock().unwrap();
+    match db.get_customer_by_id(&id) {
+        Ok(Some(c)) => Ok(Json(c)),
+        _ => Err(StatusCode::NOT_FOUND),
+    }
+}
+
+async fn create_customer(
+    State(state): State<AppState>,
+    Json(customer): Json<Customer>,
+) -> Result<Json<Customer>, StatusCode> {
+    let db = state.db.lock().unwrap();
+    if db.insert_customer(&customer).is_ok() {
+        let entry = state.audit_chain.append(
+            "API_INGESTION",
+            "SystemAdmin",
+            "CREATE_CUSTOMER",
+            &customer.id,
+            &format!("Nieuwe klant geregistreerd in SQLite: {}", customer.name),
+        );
+        db.insert_audit_entry(&entry).ok();
+        Ok(Json(customer))
+    } else {
+        Err(StatusCode::INTERNAL_SERVER_ERROR)
     }
 }
 
@@ -116,7 +156,8 @@ async fn get_customer_documents(
     Query(query): Query<DocQuery>,
     State(state): State<AppState>,
 ) -> Json<CustomerDocumentsResponse> {
-    let all_docs = state.documents.lock().unwrap().clone();
+    let db = state.db.lock().unwrap();
+    let all_docs = db.get_documents().unwrap_or_default();
     let customer_docs: Vec<DocumentItem> = all_docs
         .into_iter()
         .filter(|d| d.customer_id == customer_id)
@@ -141,7 +182,7 @@ async fn get_customer_documents(
     // Audit loggen
     let actor = query.actor.unwrap_or_else(|| "Tom De Smet".to_string());
     let role = query.actor_role.unwrap_or_else(|| "Consultant".to_string());
-    state.audit_chain.append(
+    let entry = state.audit_chain.append(
         &actor,
         &role,
         "VIEW_CUSTOMER_DOCUMENTS",
@@ -153,6 +194,7 @@ async fn get_customer_documents(
             conflicts.len()
         ),
     );
+    db.insert_audit_entry(&entry).ok();
 
     Json(CustomerDocumentsResponse {
         customer_id,
@@ -165,7 +207,8 @@ async fn get_customer_conflicts(
     Path(customer_id): Path<String>,
     State(state): State<AppState>,
 ) -> Json<Vec<crate::models::ConflictAlert>> {
-    let all_docs = state.documents.lock().unwrap().clone();
+    let db = state.db.lock().unwrap();
+    let all_docs = db.get_documents().unwrap_or_default();
     let customer_docs: Vec<DocumentItem> = all_docs
         .into_iter()
         .filter(|d| d.customer_id == customer_id)
@@ -175,35 +218,100 @@ async fn get_customer_conflicts(
     Json(conflicts)
 }
 
+#[derive(Deserialize)]
+pub struct CreateDocumentInput {
+    pub customer_id: String,
+    pub title: String,
+    pub source_type: String,
+    pub author: String,
+    pub author_role: Option<String>,
+    pub summary: String,
+    pub raw_content: String,
+    pub key_facts: Option<Vec<KeyFact>>,
+    pub tags: Option<Vec<String>>,
+}
+
+async fn create_document(
+    State(state): State<AppState>,
+    Json(input): Json<CreateDocumentInput>,
+) -> Result<Json<DocumentItem>, StatusCode> {
+    let db = state.db.lock().unwrap();
+
+    let st = match input.source_type.as_str() {
+        "SignedContract" => DocumentSourceType::SignedContract,
+        "OfficialTemplate" => DocumentSourceType::OfficialTemplate,
+        "CrmNote" => DocumentSourceType::CrmNote,
+        "TicketResolution" => DocumentSourceType::TicketResolution,
+        "TicketComment" => DocumentSourceType::TicketComment,
+        _ => DocumentSourceType::ChatMessage,
+    };
+
+    let doc_id = format!("DOC-{}", Uuid::new_v4().simple().to_string()[..6].to_uppercase());
+    let now_str = chrono::Utc::now().format("%Y-%m-%d").to_string();
+
+    let doc = DocumentItem {
+        id: doc_id.clone(),
+        customer_id: input.customer_id.clone(),
+        title: input.title,
+        source_type: st.clone(),
+        source_label: st.label().to_string(),
+        date: now_str,
+        author: input.author,
+        author_role: input.author_role.unwrap_or_else(|| "System User".to_string()),
+        summary: input.summary,
+        raw_content: input.raw_content,
+        key_facts: input.key_facts.unwrap_or_default(),
+        tags: input.tags.unwrap_or_default(),
+        trust: TrustBreakdown {
+            overall_score: st.base_score(),
+            source_score: st.base_score(),
+            recency_score: 100.0,
+            consensus_score: 80.0,
+            feedback_score: 75.0,
+            is_authoritative: st.base_score() >= 85.0,
+            conflict_flag: false,
+        },
+        feedback: DocumentFeedback::default(),
+    };
+
+    if db.insert_document(&doc).is_ok() {
+        let entry = state.audit_chain.append(
+            "API_INGESTION",
+            "DataIngestor",
+            "CREATE_DOCUMENT",
+            &doc_id,
+            &format!("Nieuw document toegevoegd voor klant {}: '{}'", input.customer_id, doc.title),
+        );
+        db.insert_audit_entry(&entry).ok();
+        Ok(Json(doc))
+    } else {
+        Err(StatusCode::INTERNAL_SERVER_ERROR)
+    }
+}
+
 async fn submit_document_feedback(
     Path(doc_id): Path<String>,
     State(state): State<AppState>,
     Json(feedback): Json<FeedbackSubmission>,
 ) -> Result<Json<DocumentItem>, StatusCode> {
-    let mut docs = state.documents.lock().unwrap();
-    if let Some(doc) = docs.iter_mut().find(|d| d.id == doc_id) {
-        match feedback.feedback_type.as_str() {
-            "VERIFIED" => doc.feedback.verified_count += 1,
-            "OUTDATED" => doc.feedback.outdated_count += 1,
-            "QUESTIONABLE" => doc.feedback.questionable_count += 1,
-            _ => return Err(StatusCode::BAD_REQUEST),
+    let db = state.db.lock().unwrap();
+    match db.update_feedback(&doc_id, &feedback.feedback_type) {
+        Ok(Some(doc)) => {
+            let entry = state.audit_chain.append(
+                &feedback.employee_id,
+                "Consultant",
+                "SUBMIT_DOCUMENT_FEEDBACK",
+                &doc_id,
+                &format!(
+                    "Feedback geregistreerd in SQLite: {} voor document '{}'",
+                    feedback.feedback_type, doc.title
+                ),
+            );
+            db.insert_audit_entry(&entry).ok();
+            Ok(Json(doc))
         }
-
-        // Audit log entry
-        state.audit_chain.append(
-            &feedback.employee_id,
-            "Consultant",
-            "SUBMIT_DOCUMENT_FEEDBACK",
-            &doc_id,
-            &format!(
-                "Feedback geregistreerd: {} voor document '{}'",
-                feedback.feedback_type, doc.title
-            ),
-        );
-
-        Ok(Json(doc.clone()))
-    } else {
-        Err(StatusCode::NOT_FOUND)
+        Ok(None) => Err(StatusCode::NOT_FOUND),
+        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 
@@ -211,10 +319,13 @@ async fn recommend_experts(
     State(state): State<AppState>,
     Json(req): Json<RoutingRequest>,
 ) -> Json<Vec<RoutingRecommendation>> {
-    let recommendations = state.expertise_graph.recommend_experts(&req);
+    let db = state.db.lock().unwrap();
+    let employees = db.get_employees().unwrap_or_default();
+    let expertise_graph = ExpertiseGraph::new(employees);
+    let recommendations = expertise_graph.recommend_experts(&req);
 
     // Audit log entry
-    state.audit_chain.append(
+    let entry = state.audit_chain.append(
         "ROUTING_ENGINE",
         "AlgorithmicRouter",
         "CALCULATE_ROUTING_MATCH",
@@ -228,6 +339,7 @@ async fn recommend_experts(
                 .unwrap_or("Geen")
         ),
     );
+    db.insert_audit_entry(&entry).ok();
 
     Json(recommendations)
 }
@@ -244,33 +356,63 @@ async fn execute_handoff(
     State(state): State<AppState>,
     Json(handoff): Json<HandoffRequest>,
 ) -> Result<Json<HandoffResponse>, StatusCode> {
-    if let Some(emp) = state.expertise_graph.record_handoff(&handoff) {
-        let entry = state.audit_chain.append(
-            &handoff.caller_name,
-            "Consultant",
-            "EXECUTE_WARM_HANDOFF",
-            &handoff.customer_id,
-            &format!(
-                "Klantoproep succesvol doorgeschakeld naar expert {} met {} gekoppelde documenten.",
-                emp.name,
-                handoff.attached_doc_ids.len()
-            ),
-        );
+    let db = state.db.lock().unwrap();
+    match db.record_handoff(
+        &handoff.employee_id,
+        &handoff.customer_id,
+        &handoff.inquiry_summary,
+        &handoff.caller_name,
+    ) {
+        Ok(Some(emp)) => {
+            let entry = state.audit_chain.append(
+                &handoff.caller_name,
+                "Consultant",
+                "EXECUTE_WARM_HANDOFF",
+                &handoff.customer_id,
+                &format!(
+                    "Klantoproep succesvol doorgeschakeld naar expert {} met {} gekoppelde documenten.",
+                    emp.name,
+                    handoff.attached_doc_ids.len()
+                ),
+            );
+            db.insert_audit_entry(&entry).ok();
 
-        Ok(Json(HandoffResponse {
-            success: true,
-            employee: emp.clone(),
-            message: format!("Klant succesvol doorgeschakeld naar {}!", emp.name),
-            audit_hash: entry.hash,
-        }))
-    } else {
-        Err(StatusCode::NOT_FOUND)
+            Ok(Json(HandoffResponse {
+                success: true,
+                employee: emp.clone(),
+                message: format!("Klant succesvol doorgeschakeld naar {}!", emp.name),
+                audit_hash: entry.hash,
+            }))
+        }
+        _ => Err(StatusCode::NOT_FOUND),
     }
 }
 
 async fn list_employees(State(state): State<AppState>) -> Json<Vec<crate::models::Employee>> {
-    let employees = state.expertise_graph.get_all_employees();
+    let db = state.db.lock().unwrap();
+    let mut employees = db.get_employees().unwrap_or_default();
+    employees.sort_by(|a, b| b.completed_cases.cmp(&a.completed_cases));
     Json(employees)
+}
+
+async fn create_employee(
+    State(state): State<AppState>,
+    Json(emp): Json<crate::models::Employee>,
+) -> Result<Json<crate::models::Employee>, StatusCode> {
+    let db = state.db.lock().unwrap();
+    if db.insert_employee(&emp).is_ok() {
+        let entry = state.audit_chain.append(
+            "API_INGESTION",
+            "SystemAdmin",
+            "CREATE_EMPLOYEE",
+            &emp.id,
+            &format!("Nieuwe medewerker toegevoegd aan SQLite: {}", emp.name),
+        );
+        db.insert_audit_entry(&entry).ok();
+        Ok(Json(emp))
+    } else {
+        Err(StatusCode::INTERNAL_SERVER_ERROR)
+    }
 }
 
 #[derive(Serialize)]
