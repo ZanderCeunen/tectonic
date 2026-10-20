@@ -50,11 +50,11 @@ export default function SecurityConsole({ auditEntries, onVerifyIntegrity }) {
             <span>Enterprise Security & Compliance Core</span>
           </div>
           <h2 className="text-2xl font-black tracking-tight mb-2">
-            Zero-Trust Architectuur & Cryptografische Non-Repudiation
+            Zero-Trust Architecture &amp; Cryptographic Non-Repudiation
           </h2>
           <p className="text-sm text-slate-300 leading-relaxed">
-            In een HR- en payrollomgeving is beveiliging en GDPR-compliance essentieel. Tectonic
-            combineert Rust's geheugenveiligheid met automatische PII-redactie en een onvervalsbaar
+            In an HR and payroll environment, security and GDPR compliance are essential. Tectonic
+            combines Rust's memory safety with automatic PII redaction and a tamper-proof
             SHA-256 audit ledger.
           </p>
         </div>
@@ -70,18 +70,18 @@ export default function SecurityConsole({ auditEntries, onVerifyIntegrity }) {
             </h3>
           </div>
           <span className="text-xs bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full border border-emerald-300">
-            GDPR Data Minimalisatie
+            GDPR data minimization
           </span>
         </div>
         <p className="text-xs text-slate-500">
-          Typ of test hieronder willekeurige persoonsgegevens. Rijksregisternummers, IBAN bankrekeningen
-          en brutosalarissen worden live gemaskeerd voor medewerkers zonder expliciete payroll-clearance.
+          Type or test any personal data below. National identification numbers, IBAN bank accounts,
+          and gross salaries are masked live for employees without explicit payroll clearance.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-              Ruw Klantdocument / Notitie:
+              Raw case document / note:
             </label>
             <textarea
               rows={4}

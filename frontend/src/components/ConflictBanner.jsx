@@ -67,18 +67,18 @@ export default function ConflictBanner({ conflicts, customerId, onResolveConflic
           <button
             onClick={() => setOpen(!open)}
             className="min-h-[38px] p-2 text-amber-900 hover:bg-amber-100 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500"
-            title={open ? 'Details inklappen' : 'Details bekijken'}
+            title={open ? 'Collapse details' : 'View details'}
           >
             {open ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
         </div>
       </div>
 
-      {/* Uitgebreide details */}
+      {/* Expanded details */}
       {open && (
         <div className="pt-3 border-t border-amber-200 text-xs space-y-3">
           <p className="text-slate-800 leading-relaxed">
-            <strong className="text-slate-900">Juridische voorrangsregel:</strong> {conflict.resolution_action}
+            <strong className="text-slate-900">Legal precedence rule:</strong> {conflict.resolution_action}
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {conflict.conflicting_docs?.map((docRef, idx) => (
@@ -92,10 +92,10 @@ export default function ConflictBanner({ conflicts, customerId, onResolveConflic
               >
                 <div className="flex items-center justify-between font-semibold">
                   <span>{docRef.source_label}</span>
-                  <span className="font-mono text-xs">{docRef.trust_score}% Betrouwbaarheid</span>
+                  <span className="font-mono text-xs">{docRef.trust_score}% Trust score</span>
                 </div>
                 <div className="mt-1.5 text-xs">
-                  Vermeldt: <strong className="font-mono font-bold text-sm">{docRef.stated_value}</strong>
+                  States: <strong className="font-mono font-bold text-sm">{docRef.stated_value}</strong>
                 </div>
                 <div className="text-xs opacity-75 truncate mt-0.5">{docRef.doc_title}</div>
               </div>
@@ -104,19 +104,19 @@ export default function ConflictBanner({ conflicts, customerId, onResolveConflic
         </div>
       )}
 
-      {/* Oplossingspaneel */}
+      {/* Resolution panel */}
       {showResolver && (
         <div className="pt-4 border-t border-amber-200 bg-white p-5 rounded-lg border border-amber-200 space-y-4 shadow-sm">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-bold text-slate-900 flex items-center space-x-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span>Geldende norm vastleggen &amp; dossier harmoniseren</span>
+              <span>Set the valid standard &amp; harmonize the case</span>
             </h2>
           </div>
 
           <div className="space-y-2">
             <label className="block text-xs font-semibold text-slate-700">
-              Kies de rechtsgeldige waarde voor <span className="font-mono text-[#005FB8]">{conflict.topic}</span>:
+              Choose the legally valid value for <span className="font-mono text-[#005FB8]">{conflict.topic}</span>:
             </label>
             <div className="flex flex-wrap gap-2">
               {conflict.conflicting_docs?.map((docRef, idx) => (
@@ -139,7 +139,7 @@ export default function ConflictBanner({ conflicts, customerId, onResolveConflic
 
           <div className="space-y-1.5">
             <label htmlFor="conflict-resolution-note" className="block text-xs font-semibold text-slate-700">
-              Toelichting voor de audittrail (optioneel)
+              Explanation for the audit trail (optional)
             </label>
             <input
               id="conflict-resolution-note"
@@ -156,7 +156,7 @@ export default function ConflictBanner({ conflicts, customerId, onResolveConflic
               onClick={() => setShowResolver(false)}
               className="min-h-[40px] px-4 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors"
             >
-              Annuleren
+              Cancel
             </button>
             <button
               type="button"
@@ -167,12 +167,12 @@ export default function ConflictBanner({ conflicts, customerId, onResolveConflic
               {resolvedSuccess ? (
                 <>
                   <Check className="w-4 h-4" />
-                  <span>Resolutie succesvol toegepast!</span>
+                  <span>Resolution applied successfully!</span>
                 </>
               ) : (
                 <>
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Harmoniseer en werk dossier bij</span>
+                  <span>Harmonize and update case</span>
                 </>
               )}
             </button>

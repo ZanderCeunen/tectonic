@@ -259,6 +259,7 @@ export default function HomeDashboard({
                         <div className="min-w-0">
                           <dt className="text-xs text-slate-400 leading-tight">Location</dt>
                           <dd className="text-slate-700 truncate">{c.location}</dd>
+                        </div>
                       </div>
                     )}
 
