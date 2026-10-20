@@ -394,18 +394,20 @@ pub async fn microsoft_callback(
 fn safe_frontend_redirect(state: &AppState, fragment: &str) -> Redirect {
     let clean_fragment: String = fragment
         .chars()
-        .filter(|c| c.is_ascii_alphanumeric() || *c == '=' || *c == '&' || *c == '_' || *c == '-')
-        .take(2048)
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '=' || *c == '&' || *c == '_' || *c == '-' || *c == '.')
+        .take(4096)
         .collect();
     let url = state.microsoft.frontend_redirect(&clean_fragment);
-    let is_safe = url.starts_with("http://localhost:3000#")
+    let configured_origin = state.microsoft.frontend_url.trim_end_matches('/');
+    let is_safe = url.starts_with(&format!("{configured_origin}#"))
+        || url.starts_with("http://localhost:3000#")
         || url.starts_with("http://127.0.0.1:3000#")
         || url.starts_with("http://localhost:5173#")
         || url.starts_with("/#");
     if is_safe {
         Redirect::to(&url)
     } else {
-        Redirect::to("http://localhost:3000/#ms_error=invalid_redirect")
+        Redirect::to(&format!("{configured_origin}#ms_error=invalid_redirect"))
     }
 }
 
