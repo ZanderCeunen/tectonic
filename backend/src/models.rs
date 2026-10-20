@@ -47,6 +47,21 @@ pub struct UserAccount {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateUserRequest {
+    pub username: String,
+    pub name: String,
+    pub email: String,
+    pub password: String,
+    pub employee_id: Option<String>,
+    #[serde(default)]
+    pub role: Option<UserRole>,
+    #[serde(default)]
+    pub clearance_level: Option<String>,
+}
+
+pub type CreateUserInput = CreateUserRequest;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoginRequest {
     pub username: String,
     pub password: String,
@@ -309,17 +324,6 @@ pub struct ResolveConflictInput {
     pub resolution_note: String,
     #[serde(default)]
     pub resolved_by: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateUserInput {
-    pub username: String,
-    pub name: String,
-    pub email: String,
-    pub password: String,
-    pub role: UserRole,
-    pub clearance_level: String,
-    pub employee_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

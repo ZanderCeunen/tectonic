@@ -1,7 +1,7 @@
 use crate::auth::AuthUser;
 use crate::models::{
-    within_len, AssignmentUpdate, AuditEntry, CreateUserInput, CustomerAssignment, UserAccount,
-    BCRYPT_COST, MAX_USERNAME,
+    within_len, AssignmentUpdate, AuditEntry, CreateUserInput, CreateUserRequest, CustomerAssignment, UserAccount,
+    UserRole, BCRYPT_COST, MAX_USERNAME,
 };
 use crate::rbac;
 use crate::AppState;
@@ -44,7 +44,7 @@ pub async fn list_users(
 pub async fn create_user(
     auth: AuthUser,
     State(state): State<AppState>,
-    Json(input): Json<CreateUserInput>,
+    Json(input): Json<CreateUserRequest>,
 ) -> Result<Json<UserAccount>, StatusCode> {
     rbac::require(rbac::can_manage_users(&auth))?;
     if !within_len(&input.username, MAX_USERNAME)
@@ -59,6 +59,9 @@ pub async fn create_user(
     let password_hash = bcrypt::hash(&input.password, BCRYPT_COST)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
+    let role = input.role.unwrap_or(UserRole::Consultant);
+    let clearance_level = input.clearance_level.unwrap_or_else(|| "Standard".to_string());
+
     let user = UserAccount {
         id: format!(
             "USR-{}",
@@ -68,8 +71,8 @@ pub async fn create_user(
         name: input.name,
         email: input.email,
         password_hash,
-        role: input.role,
-        clearance_level: input.clearance_level,
+        role,
+        clearance_level,
         employee_id: input.employee_id,
     };
 
@@ -81,8 +84,9 @@ pub async fn create_user(
     {
         return Err(StatusCode::CONFLICT);
     }
-    db.insert_user(&user)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if db.insert_user(&user).is_err() {
+        return Err(StatusCode::CONFLICT);
+    }
     let entry = state.audit_chain.append(
         &auth.username,
         auth.role_label(),
