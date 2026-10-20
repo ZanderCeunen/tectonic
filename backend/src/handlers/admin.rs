@@ -74,6 +74,13 @@ pub async fn create_user(
     };
 
     let db = state.db.lock().unwrap();
+    if db
+        .get_user_by_username(&input.username)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .is_some()
+    {
+        return Err(StatusCode::CONFLICT);
+    }
     db.insert_user(&user)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let entry = state.audit_chain.append(

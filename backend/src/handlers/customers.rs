@@ -105,6 +105,7 @@ pub async fn update_customer(
     validate_customer(&customer)?;
     customer.id = id;
     let db = state.db.lock().unwrap();
+    rbac::require_customer_access(&db, &auth, &customer.id)?;
     if db
         .get_customer_by_id(&customer.id)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -151,7 +152,17 @@ pub async fn conflict_summary(
             .get_documents_by_customer_id(&customer.id)
             .unwrap_or_default();
         let (_, conflicts) = TrustEngine::evaluate_all_documents(docs, &customer.id);
-        all.extend(conflicts);
+        for mut c in conflicts {
+            if !rbac::can_unmask(&auth) {
+                c.consensus_value = crate::security::PiiRedactor::redact_text(&c.consensus_value, true);
+                c.explanation = crate::security::PiiRedactor::redact_text(&c.explanation, true);
+                c.resolution_action = crate::security::PiiRedactor::redact_text(&c.resolution_action, true);
+                for d in &mut c.conflicting_docs {
+                    d.stated_value = crate::security::PiiRedactor::redact_text(&d.stated_value, true);
+                }
+            }
+            all.push(c);
+        }
     }
     Ok(Json(all))
 }

@@ -193,7 +193,7 @@ impl Database {
     // --- USER MANAGEMENT ---
     pub fn insert_user(&self, u: &UserAccount) -> Result<()> {
         self.conn.execute(
-            "INSERT OR REPLACE INTO users (id, username, name, email, password_hash, role, clearance_level, employee_id)
+            "INSERT INTO users (id, username, name, email, password_hash, role, clearance_level, employee_id)
             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![
                 u.id,
@@ -207,6 +207,31 @@ impl Database {
             ],
         )?;
         Ok(())
+    }
+
+    pub fn get_user_by_id(&self, id: &str) -> Result<Option<UserAccount>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, username, name, email, password_hash, role, clearance_level, employee_id FROM users WHERE id = ?1",
+        )?;
+        let mut rows = stmt.query_map(params![id], |row: &Row| {
+            let role_str: String = row.get(5)?;
+            Ok(UserAccount {
+                id: row.get(0)?,
+                username: row.get(1)?,
+                name: row.get(2)?,
+                email: row.get(3)?,
+                password_hash: row.get(4)?,
+                role: UserRole::from_str(&role_str),
+                clearance_level: row.get(6)?,
+                employee_id: row.get(7)?,
+            })
+        })?;
+
+        if let Some(r) = rows.next() {
+            Ok(Some(r?))
+        } else {
+            Ok(None)
+        }
     }
 
     pub fn get_user_by_username(&self, username: &str) -> Result<Option<UserAccount>> {
@@ -279,13 +304,19 @@ impl Database {
             if !ms_email.is_empty() {
                 e.email = ms_email.to_string();
             }
-            e.role = u.role.clone();
-            e.clearance_level = u.clearance_level.clone();
-            self.insert_user(&e)?;
+            // Zelf-toewijzing van Admin-rechten via extern profiel blokkeren
+            if u.role != UserRole::Admin || e.role == UserRole::Admin {
+                e.role = u.role.clone();
+                e.clearance_level = u.clearance_level.clone();
+            }
+            self.conn.execute(
+                "UPDATE users SET name=?2, email=?3, role=?4, clearance_level=?5 WHERE id=?1",
+                params![e.id, e.name, e.email, e.role.as_str(), e.clearance_level],
+            )?;
             return Ok(e);
         }
 
-        // Nieuw account: username vrijwareren (UNIQUE constraint; nooit een ander account vervangen).
+        // Nieuw account: username vrijwaren (UNIQUE constraint; nooit een ander account vervangen).
         let mut candidate = u.username.clone();
         if let Some(taken) = self.get_user_by_username(&candidate)? {
             let from_email = ms_email.replace('@', ".");
@@ -883,7 +914,50 @@ impl Database {
         employee_id: &str,
     ) -> Result<Option<DocumentItem>> {
         let f_type = feedback_type.to_uppercase();
-        
+        if !["VERIFIED", "OUTDATED", "QUESTIONABLE"].contains(&f_type.as_str()) {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+
+        // Check if user already voted to prevent business logic bypass and vote manipulation
+        let prev_vote: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT vote_type FROM document_user_votes WHERE document_id = ?1 AND employee_id = ?2",
+                params![doc_id, employee_id],
+                |row| row.get(0),
+            )
+            .ok();
+
+        if let Some(ref old_vote) = prev_vote {
+            if old_vote == &f_type {
+                // Already voted this type, idempotent return
+                return self.get_document_by_id(doc_id);
+            }
+            // Decrement previous vote count
+            match old_vote.as_str() {
+                "VERIFIED" => {
+                    self.conn.execute(
+                        "UPDATE documents SET verified_count = MAX(0, verified_count - 1) WHERE id = ?1",
+                        params![doc_id],
+                    )?;
+                }
+                "OUTDATED" => {
+                    self.conn.execute(
+                        "UPDATE documents SET outdated_count = MAX(0, outdated_count - 1) WHERE id = ?1",
+                        params![doc_id],
+                    )?;
+                }
+                "QUESTIONABLE" => {
+                    self.conn.execute(
+                        "UPDATE documents SET questionable_count = MAX(0, questionable_count - 1) WHERE id = ?1",
+                        params![doc_id],
+                    )?;
+                }
+                _ => {}
+            }
+        }
+
+        // Increment new vote count
         match f_type.as_str() {
             "VERIFIED" => {
                 self.conn.execute(
@@ -922,27 +996,31 @@ impl Database {
         resolution_note: &str,
         resolved_by: &str,
     ) -> Result<DocumentItem> {
+        // Enforce customer existence
+        if self.get_customer_by_id(customer_id)?.is_none() {
+            return Err(rusqlite::Error::QueryReturnedNoRows);
+        }
+
         let field_clean = field.trim().to_lowercase();
-        let docs = self.get_documents()?;
+        let docs = self.get_documents_by_customer_id(customer_id)?;
         for mut doc in docs {
-            if doc.customer_id == customer_id {
-                let mut modified = false;
-                for fact in &mut doc.key_facts {
-                    let fact_field = fact.field.trim().to_lowercase();
-                    let fact_label = fact.label.trim().to_lowercase();
-                    if fact_field == field_clean
-                        || fact_label == field_clean
-                        || field_clean.contains(&fact_field)
-                        || fact_field.contains(&field_clean)
-                    {
-                        fact.value = chosen_value.to_string();
-                        fact.is_conflicting = false;
-                        modified = true;
-                    }
+            // NEVER mutate or tamper with historic signed contracts!
+            if doc.source_type == DocumentSourceType::SignedContract {
+                continue;
+            }
+            let mut modified = false;
+            for fact in &mut doc.key_facts {
+                let fact_field = fact.field.trim().to_lowercase();
+                let fact_label = fact.label.trim().to_lowercase();
+                // Strict equality check prevents arbitrary fact tampering
+                if fact_field == field_clean || fact_label == field_clean {
+                    fact.value = chosen_value.to_string();
+                    fact.is_conflicting = false;
+                    modified = true;
                 }
-                if modified {
-                    self.update_document(&doc)?;
-                }
+            }
+            if modified {
+                self.update_document(&doc)?;
             }
         }
 
@@ -1127,8 +1205,8 @@ impl Database {
         &self,
         emp_id: &str,
         customer_id: &str,
-        inquiry_summary: &str,
-        caller_name: &str,
+        _inquiry_summary: &str,
+        _caller_name: &str,
     ) -> Result<Option<Employee>> {
         let emps = self.get_employees()?;
         if let Some(mut emp) = emps.into_iter().find(|e| e.id == emp_id) {
@@ -1138,9 +1216,10 @@ impl Database {
                 .entry(customer_id.to_string())
                 .or_insert(20.0);
             *current = (*current + 3.5).min(100.0);
+            // Geen vertrouwelijke klantvraag of persoonsgegevens opslaan in publiek zichtbaar medewerkersprofiel
             emp.recent_activity = format!(
-                "Doorgeschakeld met klantvraag: '{}' (Beller: {})",
-                inquiry_summary, caller_name
+                "Doorgeschakelde klantvraag behandeld (Dossier #{})",
+                emp.completed_cases
             );
 
             self.update_employee(&emp)?;

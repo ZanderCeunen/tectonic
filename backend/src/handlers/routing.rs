@@ -11,7 +11,7 @@ use axum::{
 use serde::Serialize;
 
 pub async fn list_employees(
-    _auth: AuthUser,
+    auth: AuthUser,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<crate::models::Employee>>, StatusCode> {
     let db = state.db.lock().unwrap();
@@ -19,6 +19,23 @@ pub async fn list_employees(
         .get_employees()
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     employees.sort_by(|a, b| b.completed_cases.cmp(&a.completed_cases));
+
+    if !rbac::can_list_all_customers(&auth) {
+        let allowed_customers: std::collections::HashSet<String> = db
+            .get_customers_for_user(&auth.id)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|c| c.id)
+            .collect();
+
+        for emp in &mut employees {
+            emp.customer_familiarity
+                .retain(|cid, _| allowed_customers.contains(cid));
+            emp.recent_activity =
+                crate::security::PiiRedactor::redact_text(&emp.recent_activity, true);
+        }
+    }
+
     Ok(Json(employees))
 }
 
@@ -28,7 +45,7 @@ pub async fn create_employee(
     Json(mut emp): Json<crate::models::Employee>,
 ) -> Result<Json<crate::models::Employee>, StatusCode> {
     rbac::require(rbac::can_manage_employees(&auth))?;
-    if !within_len(&emp.name, 120) {
+    if !within_len(&emp.name, 120) || !within_len(&emp.title, 120) || !within_len(&emp.department, 120) {
         return Err(StatusCode::BAD_REQUEST);
     }
     if emp.id.is_empty() {
@@ -58,6 +75,9 @@ pub async fn update_employee(
     Json(mut emp): Json<crate::models::Employee>,
 ) -> Result<Json<crate::models::Employee>, StatusCode> {
     rbac::require(rbac::can_manage_employees(&auth))?;
+    if !within_len(&emp.name, 120) || !within_len(&emp.title, 120) || !within_len(&emp.department, 120) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
     emp.id = id;
     let db = state.db.lock().unwrap();
     if !db
@@ -102,7 +122,23 @@ pub async fn recommend_experts(
         .get_employees()
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let expertise_graph = ExpertiseGraph::new(employees);
-    let recommendations = expertise_graph.recommend_experts(&req);
+    let mut recommendations = expertise_graph.recommend_experts(&req);
+
+    if !rbac::can_list_all_customers(&auth) {
+        let allowed_customers: std::collections::HashSet<String> = db
+            .get_customers_for_user(&auth.id)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|c| c.id)
+            .collect();
+        for rec in &mut recommendations {
+            rec.employee
+                .customer_familiarity
+                .retain(|cid, _| allowed_customers.contains(cid));
+            rec.employee.recent_activity =
+                crate::security::PiiRedactor::redact_text(&rec.employee.recent_activity, true);
+        }
+    }
 
     let target_cust = req.customer_id.as_deref().unwrap_or("general");
     let entry = state.audit_chain.append(

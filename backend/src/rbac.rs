@@ -54,6 +54,14 @@ pub fn can_download_file(auth: &AuthUser, sensitivity: &str) -> bool {
     can_unmask(auth) || sensitivity == "SafeToDownload"
 }
 
+pub fn can_resolve_conflicts(auth: &AuthUser) -> bool {
+    is_admin(auth) || can_unmask(auth)
+}
+
+pub fn can_ingest_authoritative_doc(auth: &AuthUser) -> bool {
+    is_admin(auth) || can_unmask(auth)
+}
+
 pub fn require(allowed: bool) -> Result<(), StatusCode> {
     if allowed {
         Ok(())
