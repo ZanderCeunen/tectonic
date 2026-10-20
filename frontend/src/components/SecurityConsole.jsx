@@ -93,7 +93,7 @@ export default function SecurityConsole({ auditEntries, onVerifyIntegrity }) {
 
           <div>
             <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-              Gesaneerde Weergave (Standaard Consultant):
+              Sanitized view (standard consultant):
             </label>
             <div className="w-full h-[106px] text-xs font-mono p-3 bg-slate-900 text-emerald-400 rounded-xl overflow-y-auto border border-slate-800 leading-relaxed whitespace-pre-wrap">
               {redactPii(testText)}
@@ -108,7 +108,7 @@ export default function SecurityConsole({ auditEntries, onVerifyIntegrity }) {
           <div className="flex items-center space-x-2">
             <Database className="w-5 h-5 text-sdworx-600" />
             <h3 className="text-base font-bold text-slate-900">
-              Cryptografische Hash Chain (Onweerlegbaar Audit Ledger)
+              Cryptographic hash chain (irrefutable audit ledger)
             </h3>
           </div>
 
@@ -118,7 +118,7 @@ export default function SecurityConsole({ auditEntries, onVerifyIntegrity }) {
             className="inline-flex items-center space-x-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors self-start sm:self-auto"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isVerifying ? 'animate-spin' : ''}`} />
-            <span>Verifieer Keten Integriteit</span>
+            <span>Verify chain integrity</span>
           </button>
         </div>
 

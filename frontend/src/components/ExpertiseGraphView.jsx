@@ -29,20 +29,20 @@ export default function ExpertiseGraphView({ employees, customers, selectedCusto
       <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
         <div className="p-4 border-b border-slate-100 flex items-center justify-between">
           <span className="text-xs font-semibold text-slate-700">
-            Dossierkennis voor {selectedCustomer?.name} ({selectedCustomer?.joint_committee.split(' - ')[0]})
+            Case knowledge for {selectedCustomer?.name} ({selectedCustomer?.joint_committee.split(' - ')[0]})
           </span>
-          <span className="text-[11px] text-slate-400">Gebaseerd op behandelde dossiers</span>
+          <span className="text-[11px] text-slate-400">Based on handled cases</span>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 text-slate-500 border-b border-slate-200 font-medium text-[11px]">
               <tr>
-                <th className="py-2.5 px-4">Medewerker</th>
-                <th className="py-2.5 px-4">Functie & Afdeling</th>
-                <th className="py-2.5 px-4">Affiniteit Klant</th>
-                <th className="py-2.5 px-4">Behandelde Dossiers</th>
-                <th className="py-2.5 px-4">Voornaamste Vakgebieden</th>
+                <th className="py-2.5 px-4">Employee</th>
+                <th className="py-2.5 px-4">Job title &amp; Department</th>
+                <th className="py-2.5 px-4">Customer affinity</th>
+                <th className="py-2.5 px-4">Handled cases</th>
+                <th className="py-2.5 px-4">Main areas of expertise</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
