@@ -3,6 +3,7 @@ use crate::models::{
     DocumentSensitivity, DocumentSourceType, Employee, KeyFact, TrustBreakdown, UserAccount,
     UserRole, MAX_CONTENT, MAX_TITLE,
 };
+use crate::trust_engine::TrustEngine;
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, Result, Row};
 use std::collections::HashMap;
@@ -995,6 +996,7 @@ impl Database {
         chosen_value: &str,
         resolution_note: &str,
         resolved_by: &str,
+        resolver_role: &str,
     ) -> Result<DocumentItem> {
         // Enforce customer existence
         if self.get_customer_by_id(customer_id)?.is_none() {
@@ -1026,22 +1028,22 @@ impl Database {
 
         let now_str = chrono::Utc::now().format("%Y-%m-%d").to_string();
         let doc_id = format!("RES-{}", uuid::Uuid::new_v4().simple().to_string()[..6].to_uppercase());
-        let res_doc = DocumentItem {
+        let mut res_doc = DocumentItem {
             id: doc_id,
             customer_id: customer_id.to_string(),
             title: format!("Conflict Resolution Note: {}", field),
-            source_type: DocumentSourceType::OfficialTemplate,
-            source_label: "Official SD Worx Template".to_string(),
+            source_type: DocumentSourceType::TicketResolution,
+            source_label: DocumentSourceType::TicketResolution.label().to_string(),
             date: now_str,
             author: resolved_by.to_string(),
-            author_role: "Payroll Consultant".to_string(),
+            author_role: resolver_role.to_string(),
             summary: format!(
-                "Official conflict resolution recorded. Parameter '{}' standardized to '{}'. Note: {}",
+                "Conflict resolution recorded. Parameter '{}' standardized to '{}'. Note: {}",
                 field, chosen_value, resolution_note
             ),
             raw_content: format!(
-                "Formal dispute resolution registered by {}. Standardized value: '{}'. Details: {}",
-                resolved_by, chosen_value, resolution_note
+                "Dispute resolution registered by {} ({}). Standardized value: '{}'. Details: {}",
+                resolved_by, resolver_role, chosen_value, resolution_note
             ),
             unmasked_raw_content: None,
             file_path: None,
@@ -1054,25 +1056,11 @@ impl Database {
                     value: chosen_value.to_string(),
                     is_conflicting: false,
                 },
-                KeyFact {
-                    field: field.to_string(),
-                    label: field.to_string(),
-                    value: chosen_value.to_string(),
-                    is_conflicting: false,
-                },
             ],
             tags: vec!["Conflict Resolution".to_string(), "Standardized".to_string()],
-            trust: TrustBreakdown {
-                overall_score: 98.0,
-                source_score: 95.0,
-                recency_score: 100.0,
-                consensus_score: 100.0,
-                feedback_score: 100.0,
-                is_authoritative: true,
-                conflict_flag: false,
-            },
+            trust: TrustBreakdown::default(),
             feedback: DocumentFeedback {
-                verified_count: 5,
+                verified_count: 1,
                 outdated_count: 0,
                 questionable_count: 0,
             },
@@ -1082,6 +1070,7 @@ impl Database {
             external_id: None,
         };
 
+        res_doc.trust = TrustEngine::compute_trust(&res_doc, 85.0, false);
         self.insert_document(&res_doc)?;
         Ok(res_doc)
     }

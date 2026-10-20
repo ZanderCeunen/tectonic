@@ -386,12 +386,43 @@ pub async fn resolve_conflict_endpoint(
     let db = state.db.lock().unwrap();
     rbac::require_customer_access(&db, &auth, &input.customer_id)?;
 
+    // 1. Verify active conflict exists for this customer and field
+    let customer_docs = db
+        .get_documents_by_customer_id(&input.customer_id)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let (_, conflicts) = TrustEngine::evaluate_all_documents(customer_docs, &input.customer_id);
+
+    let field_clean = input.field.trim().to_lowercase();
+    let matching_conflict = conflicts.iter().find(|c| {
+        c.field.trim().to_lowercase() == field_clean
+            || c.topic.trim().to_lowercase() == field_clean
+    });
+
+    let chosen_clean = input.chosen_value.trim().to_lowercase();
+    if let Some(conflict) = matching_conflict {
+        // Verify chosen_value is one of the eligible values from the conflict
+        let mut eligible_values: Vec<String> = conflict
+            .conflicting_docs
+            .iter()
+            .map(|d| d.stated_value.trim().to_lowercase())
+            .collect();
+        eligible_values.push(conflict.consensus_value.trim().to_lowercase());
+
+        if !eligible_values.iter().any(|v| v == &chosen_clean) && !rbac::is_admin(&auth) {
+            return Err(StatusCode::BAD_REQUEST);
+        }
+    } else if !rbac::is_admin(&auth) {
+        // No active conflict found for this field to resolve
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
     match db.resolve_conflict(
         &input.customer_id,
         &input.field,
         &input.chosen_value,
         &input.resolution_note,
         &auth.username,
+        auth.role_label(),
     ) {
         Ok(res_doc) => {
             let entry = state.audit_chain.append(
