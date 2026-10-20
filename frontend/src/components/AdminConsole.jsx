@@ -670,14 +670,14 @@ export default function AdminConsole({
         </div>
       )}
 
-      {/* TAB 4: CRYPTOGRAFISCH AUDITLOGBOEK */}
+      {/* TAB 4: CRYPTOGRAPHIC AUDIT LOG */}
       {activeTab === 'audit' && (() => {
         const getActionBadge = (action) => {
           if (action === 'LOGIN_SUCCESS') {
             return (
               <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-emerald-100 text-emerald-900 border border-emerald-300">
                 <LogIn className="w-3.5 h-3.5 text-emerald-700" />
-                <span>Aanmelding geslaagd</span>
+                <span>Sign-in successful</span>
               </span>
             );
           }
@@ -685,7 +685,7 @@ export default function AdminConsole({
             return (
               <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-rose-100 text-rose-900 border border-rose-300">
                 <AlertCircle className="w-3.5 h-3.5 text-rose-700" />
-                <span>Aanmeldpoging mislukt</span>
+                <span>Sign-in attempt failed</span>
               </span>
             );
           }
@@ -693,7 +693,7 @@ export default function AdminConsole({
             return (
               <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-amber-100 text-amber-900 border border-amber-300">
                 <AlertCircle className="w-3.5 h-3.5 text-amber-700" />
-                <span>Aanmeldlimiet overschreden</span>
+                <span>Sign-in limit exceeded</span>
               </span>
             );
           }
@@ -701,7 +701,7 @@ export default function AdminConsole({
             return (
               <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-300">
                 <LogOut className="w-3.5 h-3.5 text-slate-600" />
-                <span>Afgemeld</span>
+                <span>Signed out</span>
               </span>
             );
           }
@@ -709,7 +709,7 @@ export default function AdminConsole({
             return (
               <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-blue-100 text-blue-900 border border-blue-300">
                 <Download className="w-3.5 h-3.5 text-[#005FB8]" />
-                <span>Bestand gedownload</span>
+                <span>File downloaded</span>
               </span>
             );
           }
@@ -717,7 +717,7 @@ export default function AdminConsole({
             return (
               <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-purple-100 text-purple-900 border border-purple-300">
                 <Sparkles className="w-3.5 h-3.5 text-purple-700" />
-                <span>Conflict opgelost</span>
+                <span>Conflict resolved</span>
               </span>
             );
           }
@@ -725,7 +725,7 @@ export default function AdminConsole({
             return (
               <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-cyan-100 text-cyan-900 border border-cyan-300">
                 <Database className="w-3.5 h-3.5 text-cyan-700" />
-                <span>Documentactie</span>
+                <span>Document action</span>
               </span>
             );
           }
@@ -793,20 +793,20 @@ export default function AdminConsole({
 
         return (
           <div className="space-y-5">
-            {/* Kopsectie met integriteitsstatus & verificatie */}
+            {/* Header section with integrity status & verification */}
             <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <div className="flex items-center space-x-2">
                   <Database className="w-5 h-5 text-emerald-600" />
                   <h2 className="text-base font-bold text-slate-900">
-                    Cryptografisch SHA-256 Auditlogboek
+                    Cryptographic SHA-256 Audit Log
                   </h2>
                   <span className="px-2 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-900 border border-emerald-300">
-                    Onweerlegbaar
+                    Tamper-evident
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">
-                  Elke aanmelding, mislukte inlogpoging, documentdownload en juridische resolutie wordt chronologisch en cryptografisch vastgelegd in een SHA-256 hash-chain.
+                  Every sign-in, failed login attempt, document download and legal resolution is recorded chronologically and cryptographically in a SHA-256 hash chain.
                 </p>
               </div>
 
@@ -818,12 +818,12 @@ export default function AdminConsole({
                   className="min-h-[44px] px-5 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-sm font-semibold rounded-lg transition-colors flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-60"
                 >
                   <RefreshCw className={`w-4 h-4 ${isVerifying ? 'animate-spin' : ''}`} />
-                  <span>Valideer ketenintegriteit</span>
+                  <span>Validate chain integrity</span>
                 </button>
               </div>
             </div>
 
-            {/* Verificatiemelding */}
+            {/* Verification message */}
             {verifyStatus && (
               <div
                 role="status"
@@ -834,15 +834,15 @@ export default function AdminConsole({
                 }`}
               >
                 <CheckCircle2 className="w-5 h-5 shrink-0" />
-                <span>{verifyStatus.status} (Alle eerdere blokhashes kloppen wiskundig).</span>
+                <span>{verifyStatus.status} (All previous block hashes match mathematically).</span>
               </div>
             )}
 
-            {/* Filter- en zoekbalk zonder placeholders */}
+            {/* Filter and search bar without placeholders */}
             <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs space-y-4">
               <div>
                 <label htmlFor="audit-filter-search" className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Doorzoek het auditlogboek (gebruikersnaam, rol, IP-adres, actie of toelichting)
+                  Search the audit log (username, role, IP address, action or details)
                 </label>
                 <input
                   id="audit-filter-search"
@@ -853,16 +853,16 @@ export default function AdminConsole({
                 />
               </div>
 
-              {/* Categoriefilters & Aantal selectie */}
+              {/* Category filters & count selection */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1 border-t border-slate-100">
                 <div className="flex flex-wrap items-center gap-1.5">
                   {[
-                    { id: 'ALL', label: 'Alle gebeurtenissen' },
-                    { id: 'LOGINS', label: 'Aanmeldingen & Logins' },
-                    { id: 'DOCUMENTS', label: 'Dossiers & Documenten' },
-                    { id: 'CONFLICTS', label: 'Conflictoplossingen' },
+                    { id: 'ALL', label: 'All events' },
+                    { id: 'LOGINS', label: 'Sign-ins & logins' },
+                    { id: 'DOCUMENTS', label: 'Cases & documents' },
+                    { id: 'CONFLICTS', label: 'Conflict resolutions' },
                     { id: 'ROUTING', label: 'Expert Routing' },
-                    { id: 'ADMIN', label: 'Beheerder' },
+                    { id: 'ADMIN', label: 'Admin' },
                   ].map((cat) => (
                     <button
                       key={cat.id}
@@ -881,7 +881,7 @@ export default function AdminConsole({
 
                 <div className="flex items-center space-x-2 shrink-0">
                   <label htmlFor="audit-limit-select" className="text-xs text-slate-600 font-medium">
-                    Weergave:
+                    Show:
                   </label>
                   <select
                     id="audit-limit-select"
@@ -893,25 +893,25 @@ export default function AdminConsole({
                     }}
                     className="min-h-[38px] px-2.5 py-1 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
                   >
-                    <option value={25}>Laatste 25</option>
-                    <option value={50}>Laatste 50</option>
-                    <option value={100}>Laatste 100</option>
-                    <option value={200}>Laatste 200</option>
+                    <option value={25}>Latest 25</option>
+                    <option value={50}>Latest 50</option>
+                    <option value={100}>Latest 100</option>
+                    <option value={200}>Latest 200</option>
                   </select>
                 </div>
               </div>
             </div>
 
-            {/* Audit Logs Lijst */}
+            {/* Audit log list */}
             <div className="space-y-3">
               <div className="flex items-center justify-between text-xs text-slate-500 px-1 font-semibold">
-                <span>Geregistreerde Audit Transacties ({filteredEntries.length} van {auditChain.total_entries || auditChain.entries?.length || 0})</span>
-                <span>SHA-256 Verankerd</span>
+                <span>Registered audit transactions ({filteredEntries.length} of {auditChain.total_entries || auditChain.entries?.length || 0})</span>
+                <span>SHA-256 anchored</span>
               </div>
 
               {filteredEntries.length === 0 ? (
                 <div className="text-center py-12 bg-white rounded-xl border border-slate-200 text-sm text-slate-500">
-                  Geen audit entries gevonden die voldoen aan de zoekcriteria.
+                  No audit entries found that match the search criteria.
                 </div>
               ) : (
                 filteredEntries.map((entry, idx) => {
@@ -923,11 +923,11 @@ export default function AdminConsole({
                       key={entry.index ?? idx}
                       className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs space-y-3 hover:border-slate-300 transition-colors"
                     >
-                      {/* Bovenste rij: Block index, Actiebadge, Tijdstempel & Actor */}
+                      {/* Top row: block index, action badge, timestamp & actor */}
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
                         <div className="flex items-center space-x-2.5 flex-wrap gap-y-1">
                           <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
-                            Blok #{entry.index}
+                            Block #{entry.index}
                           </span>
                           {getActionBadge(entry.action)}
                           <span className="text-slate-400">•</span>
@@ -944,15 +944,15 @@ export default function AdminConsole({
                         </div>
                       </div>
 
-                      {/* Details tekst */}
+                      {/* Details text */}
                       <div className="text-sm text-slate-800 leading-relaxed">
                         {entry.details}
                       </div>
 
-                      {/* Doelbron & Cryptografische Hash toggle */}
+                      {/* Target source & cryptographic hash toggle */}
                       <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
                         <div className="text-slate-500 font-mono">
-                          Bron: <strong className="text-slate-700">{entry.resource}</strong>
+                          Source: <strong className="text-slate-700">{entry.resource}</strong>
                         </div>
 
                         <button
@@ -960,16 +960,16 @@ export default function AdminConsole({
                           onClick={() => setExpandedHashIndex(isHashOpen ? null : entry.index)}
                           className="text-xs font-semibold text-[#005FB8] hover:underline flex items-center space-x-1 focus:outline-none focus:ring-2 focus:ring-[#005FB8] rounded px-1.5 py-0.5"
                         >
-                          <span>{isHashOpen ? 'Verberg SHA-256 hashes' : 'Toon SHA-256 hashes'}</span>
+                          <span>{isHashOpen ? 'Hide SHA-256 hashes' : 'Show SHA-256 hashes'}</span>
                           {isHashOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                         </button>
                       </div>
 
-                      {/* Uitgeklapte Cryptografische Details */}
+                      {/* Expanded cryptographic details */}
                       {isHashOpen && (
                         <div className="mt-3 p-3.5 bg-slate-50 rounded-lg border border-slate-200 font-mono text-xs space-y-2">
                           <div className="flex items-center justify-between text-slate-500">
-                            <span>Vorige Blok Hash (Parent):</span>
+                            <span>Previous Block Hash (Parent):</span>
                           </div>
                           <div className="text-slate-600 break-all bg-white p-2 rounded border border-slate-200 select-all">
                             {entry.prev_hash}

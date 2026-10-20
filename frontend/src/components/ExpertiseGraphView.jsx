@@ -4,7 +4,7 @@ import { Users, Briefcase, FileText, CheckCircle2 } from 'lucide-react';
 export default function ExpertiseGraphView({ employees, customers, selectedCustomerId }) {
   const selectedCustomer = customers.find((c) => c.id === selectedCustomerId);
 
-  // Rangschik op affiniteit met actieve klant
+  // Sort by affinity with the active customer
   const sortedEmployees = [...employees].sort((a, b) => {
     const scoreA = a.customer_familiarity?.[selectedCustomerId] || 0;
     const scoreB = b.customer_familiarity?.[selectedCustomerId] || 0;
@@ -16,12 +16,12 @@ export default function ExpertiseGraphView({ employees, customers, selectedCusto
       {/* Intro Header */}
       <div className="bg-white rounded-lg p-5 border border-slate-200">
         <h2 className="text-base font-bold text-slate-900">
-          Interne Kennisverdeling & Dossiertoewijzing
+          Internal Knowledge Distribution &amp; Case Assignment
         </h2>
         <p className="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">
-          Competenties en klantkennis worden automatisch bijgehouden op basis van voltooide dossiers,
-          tickets en documentverwerking. Hierdoor is direct inzichtelijk wie het meest vertrouwd is
-          met een klant of sociaal-juridisch vakgebied.
+          Skills and customer knowledge are automatically tracked based on completed cases,
+          tickets and document processing. This makes it immediately clear who is most familiar
+          with a customer or social-legal domain.
         </p>
       </div>
 

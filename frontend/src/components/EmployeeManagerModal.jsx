@@ -128,7 +128,7 @@ export default function EmployeeManagerModal({ isOpen, onClose, employeeToEdit, 
           <button
             onClick={onClose}
             className="text-blue-100 hover:text-white p-2 rounded-lg hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-white"
-            aria-label="Sluit formulier"
+            aria-label="Close form"
           >
             <X className="w-5 h-5" />
           </button>

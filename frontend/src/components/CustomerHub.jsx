@@ -40,17 +40,17 @@ export default function CustomerHub({
 
   return (
     <div className="space-y-6">
-      {/* 1. Dossier Kopsectie */}
+      {/* 1. Case header section */}
       <section className="bg-white rounded-xl p-5 sm:p-6 border border-slate-200 shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-2">
-            {/* Terug naar alle dossiers */}
+            {/* Back to all cases */}
             <button
               onClick={onBackToHome}
               className="text-xs font-semibold text-slate-500 hover:text-[#005FB8] inline-flex items-center space-x-1.5 transition-colors focus:outline-none focus:ring-2 focus:ring-[#005FB8] rounded px-1 py-0.5"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Terug naar mijn dossiers</span>
+              <span>Back to my cases</span>
             </button>
 
             <div className="flex flex-wrap items-center gap-3">
@@ -64,15 +64,15 @@ export default function CustomerHub({
                 onClick={onOpenCustomerSearch}
                 className="text-xs text-[#005FB8] hover:underline font-semibold focus:outline-none focus:ring-2 focus:ring-[#005FB8] rounded px-1 py-0.5"
               >
-                (Wissel van dossier)
+                (Switch case)
               </button>
             </div>
 
-            {/* Klantgegevens & Toegewezen beheerder */}
+            {/* Customer details & assigned case manager */}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-600 pt-1">
               <span className="flex items-center space-x-1.5 font-medium text-slate-800">
                 <User className="w-4 h-4 text-slate-400" />
-                <span>{customer?.primary_contact || 'Contactpersoon onbekend'}</span>
+                <span>{customer?.primary_contact || 'Contact person unknown'}</span>
               </span>
 
               {customer?.contact_phone && (
@@ -103,37 +103,37 @@ export default function CustomerHub({
               <span className="text-slate-700 font-medium">{customer?.joint_committee}</span>
               <span className="text-slate-300">•</span>
               <span className="text-[#005FB8] font-medium">
-                Dossierbeheerder: {customer?.sdworx_account_manager || 'Sarah Vermeulen'}
+                Case manager: {customer?.sdworx_account_manager || 'Sarah Vermeulen'}
               </span>
             </div>
           </div>
 
-          {/* Primaire Actie: AI Hulp & Expert Routering voor dit dossier */}
+          {/* Primary action: Help desk & expert routing for this case */}
           <div className="shrink-0">
             <button
               onClick={onOpenAiHelp}
               className="min-h-[44px] px-5 py-2.5 bg-[#F58220] hover:bg-[#e07116] active:bg-[#c96210] text-white text-sm font-semibold rounded-lg transition-colors flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-[#F58220] focus:ring-offset-2 shadow-xs"
-              title="Vraag de AI om direct de juiste specialist voor dit dossier aan te duiden"
+              title="Ask the help desk to find the right specialist for this case"
             >
               <Sparkles className="w-4 h-4 text-white" />
-              <span>Hulp?</span>
+              <span>Help desk</span>
             </button>
           </div>
         </div>
       </section>
 
-      {/* 2. Conflicten & Tegenstrijdigheden Banner */}
+      {/* 2. Conflicts & contradictions banner */}
       <ConflictBanner
         conflicts={conflicts}
         customerId={customer?.id}
         onResolveConflict={onResolveConflict}
       />
 
-      {/* 3. Documenten Zoeken & Filteren (volledig zonder placeholders) */}
+      {/* 3. Document search & filtering (fully without placeholders) */}
       <section className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs space-y-4">
         <div>
           <label htmlFor="doc-search" className="block text-sm font-medium text-slate-700 mb-1.5">
-            Zoek document op titel, samenvatting of brontype
+            Search documents by title, summary, or source type
           </label>
           <input
             id="doc-search"
@@ -144,7 +144,7 @@ export default function CustomerHub({
           />
         </div>
 
-        {/* Filterknoppen per categorie */}
+        {/* Filter buttons per category */}
         <div className="flex items-center space-x-1.5 overflow-x-auto pb-1">
           {allTags.map((tag) => (
             <button
@@ -162,11 +162,11 @@ export default function CustomerHub({
         </div>
       </section>
 
-      {/* 4. Documentenlijst gerangschikt op betrouwbaarheidsscore */}
+      {/* 4. Document list ranked by trust score */}
       <section className="space-y-4">
         <div className="flex items-center justify-between text-xs text-slate-500 px-1">
-          <span className="font-semibold text-slate-700">Brondocumenten (Gerangschikt op Betrouwbaarheidsscore)</span>
-          <span>{filteredDocs.length} {filteredDocs.length === 1 ? 'document gevonden' : 'documenten gevonden'}</span>
+          <span className="font-semibold text-slate-700">Source documents (sorted by trust score)</span>
+          <span>{filteredDocs.length} {filteredDocs.length === 1 ? 'document found' : 'documents found'}</span>
         </div>
 
         {filteredDocs.map((doc) => (
@@ -180,7 +180,7 @@ export default function CustomerHub({
 
         {filteredDocs.length === 0 && (
           <div className="text-center py-12 bg-white rounded-xl border border-slate-200 text-slate-600 text-sm">
-            Er zijn geen documenten gevonden die voldoen aan de zoekcriteria.
+            No documents match the search criteria.
           </div>
         )}
       </section>

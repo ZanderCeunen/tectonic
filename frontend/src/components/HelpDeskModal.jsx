@@ -364,7 +364,7 @@ export default function AiHelpModal({
 
                   {msg.framework && (
                     <p className="text-[11px] text-slate-500 font-medium">
-                      Kader: {msg.framework}
+                      Framework: {msg.framework}
                     </p>
                   )}
 
@@ -377,14 +377,14 @@ export default function AiHelpModal({
                         </span>{' '}
                         <span>· {msg.expert.title}</span>
                         {msg.expert.extension && (
-                          <span className="text-slate-500"> (toestel {msg.expert.extension})</span>
+                          <span className="text-slate-500"> (extension {msg.expert.extension})</span>
                         )}
                       </div>
 
                       {calledExpertId === msg.expert.id ? (
                         <span className="inline-flex items-center space-x-1 text-emerald-700 font-semibold text-xs py-1">
                           <Check className="w-3.5 h-3.5" />
-                          <span>Doorgeschakeld</span>
+                          <span>Transferred</span>
                         </span>
                       ) : (
                         <button
@@ -392,7 +392,7 @@ export default function AiHelpModal({
                           disabled={isCalling}
                           className="min-h-[44px] px-3.5 py-2 bg-[#F58220] hover:bg-[#E07110] text-white font-semibold rounded-lg text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-[#F58220]"
                         >
-                          {isCalling ? 'Verbinden...' : 'Doorschakelen'}
+                          {isCalling ? 'Connecting...' : 'Transfer'}
                         </button>
                       )}
                     </div>
@@ -402,18 +402,18 @@ export default function AiHelpModal({
             </div>
           ))}
 
-          {/* Eenvoudige denkstatus */}
+          {/* Simple thinking status */}
           {isThinking && (
             <div className="text-xs text-slate-500 py-2 flex items-center space-x-2">
               <span className="w-1.5 h-1.5 bg-[#F58220] rounded-full animate-pulse" />
-              <span>AI zoekt antwoord en geschikte expert...</span>
+              <span>Looking for an answer and the right expert...</span>
             </div>
           )}
 
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Inputbalk: Heel simpel 'Ask help' */}
+        {/* Input bar: very simple 'Ask for help' */}
         <div className="p-3 sm:p-4 border-t border-slate-200 bg-white shrink-0">
           <form
             onSubmit={(e) => {
@@ -426,7 +426,7 @@ export default function AiHelpModal({
               htmlFor="ai-clean-query"
               className="block text-xs font-semibold text-slate-700"
             >
-              Vraag hulp
+              Ask for help
             </label>
 
             <div className="flex items-center space-x-2">
@@ -445,7 +445,7 @@ export default function AiHelpModal({
                 disabled={isThinking || !inputQuery.trim()}
                 className="min-h-[44px] px-4 py-2 bg-[#F58220] hover:bg-[#E07110] disabled:bg-slate-200 disabled:text-slate-400 text-white font-semibold text-xs rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[#F58220] shrink-0"
               >
-                Vraag
+                Ask
               </button>
             </div>
           </form>

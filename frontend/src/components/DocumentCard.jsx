@@ -99,7 +99,7 @@ export default function DocumentCard({ doc, activeUser, onFeedback }) {
       }`}
     >
       <div className="p-5 sm:p-6 space-y-3.5">
-        {/* Bovenbalk: Brontype, Datum, Auteur & Betrouwbaarheidsscore */}
+        {/* Top bar: source type, date, author & trust score */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
           <div className="flex items-center space-x-2 flex-wrap gap-y-1">
             <span className={`px-2.5 py-1 rounded-md text-xs border ${getSourceBadge(doc.source_type)}`}>

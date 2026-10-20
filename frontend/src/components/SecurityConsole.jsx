@@ -13,12 +13,12 @@ import {
 
 export default function SecurityConsole({ auditEntries, onVerifyIntegrity }) {
   const [testText, setTestText] = useState(
-    'Dossier Marc Vanhove met Belgisch RRN 85.04.12-123.45 en IBAN BE68 5390 0754 7034. Huidig maandloon bedraagt € 3.850,00 bruto per maand.'
+    'Case Marc Vanhove with Belgian RRN 85.04.12-123.45 and IBAN BE68 5390 0754 7034. Current monthly salary is € 3.850,00 gross per month.'
   );
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationResult, setVerificationResult] = useState({
     verified: true,
-    message: 'Cryptografische integriteit van alle audit logs geverifieerd (SHA-256 keten intact).',
+    message: 'Cryptographic integrity of all audit logs verified (SHA-256 chain intact).',
   });
 
   // Client-side PII masking demonstrator

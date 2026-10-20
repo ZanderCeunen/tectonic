@@ -93,16 +93,16 @@ export default function CustomerSearchModal({
             <button
               onClick={onClose}
               className="text-slate-400 hover:text-slate-700 p-2 rounded-lg hover:bg-slate-200/50 transition-colors focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
-              aria-label="Sluit zoekvenster"
+              aria-label="Close search window"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Zoekinvoer zonder placeholder */}
+          {/* Search input without placeholder */}
           <div className="space-y-1.5">
             <label htmlFor="search-modal-query" className="block text-xs font-semibold text-slate-700">
-              Zoekterm (Bedrijf, KBO, Contact of Telefoon)
+              Search term (Company, KBO, Contact, or Phone)
             </label>
             <div className="relative">
               <input
@@ -125,11 +125,11 @@ export default function CustomerSearchModal({
             </div>
           </div>
 
-          {/* Extra filtervelden met duidelijke labels boven velden */}
+          {/* Extra filter fields with clear labels above fields */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
             <div className="space-y-1">
               <label htmlFor="filter-pc" className="block text-xs font-medium text-slate-700">
-                Paritair Comité (PC)
+                Joint Committee (PC)
               </label>
               <input
                 id="filter-pc"
@@ -142,7 +142,7 @@ export default function CustomerSearchModal({
 
             <div className="space-y-1">
               <label htmlFor="filter-manager" className="block text-xs font-medium text-slate-700">
-                Dossierbeheerder
+                Case manager
               </label>
               <input
                 id="filter-manager"
@@ -155,7 +155,7 @@ export default function CustomerSearchModal({
 
             <div className="space-y-1">
               <label htmlFor="filter-location" className="block text-xs font-medium text-slate-700">
-                Locatie / Stad
+                Location / City
               </label>
               <input
                 id="filter-location"
@@ -175,7 +175,7 @@ export default function CustomerSearchModal({
                 className="text-xs font-semibold text-slate-600 hover:text-slate-900 flex items-center space-x-1 py-1 px-2 rounded hover:bg-slate-200/50"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                <span>Filters herstellen</span>
+                <span>Reset filters</span>
               </button>
             </div>
           )}
@@ -184,7 +184,7 @@ export default function CustomerSearchModal({
         {/* Resultatenlijst */}
         <div className="p-6 overflow-y-auto flex-1 space-y-3">
           <div className="text-xs font-semibold text-slate-500">
-            {filteredCustomers.length} {filteredCustomers.length === 1 ? 'dossier gevonden' : 'dossiers gevonden'}
+            {filteredCustomers.length} {filteredCustomers.length === 1 ? 'case found' : 'cases found'}
           </div>
 
           {filteredCustomers.map((c) => {
@@ -217,7 +217,7 @@ export default function CustomerSearchModal({
                     </span>
                     {isCurrent && (
                       <span className="text-xs font-semibold text-[#005FB8] bg-blue-100 px-2 py-0.5 rounded">
-                        Huidig geselecteerd
+                        Currently selected
                       </span>
                     )}
                   </div>
@@ -229,12 +229,12 @@ export default function CustomerSearchModal({
                     <span>•</span>
                     <span>{c.location}</span>
                     <span>•</span>
-                    <span className="text-[#005FB8]">Beheerder: {c.sdworx_account_manager}</span>
+                    <span className="text-[#005FB8]">Case manager: {c.sdworx_account_manager}</span>
                   </div>
                 </div>
 
                 <div className="shrink-0 flex items-center text-xs font-semibold text-[#005FB8]">
-                  <span>Open dossier</span>
+                  <span>Open case</span>
                   <ChevronRight className="w-4 h-4 ml-1" />
                 </div>
               </div>
@@ -243,7 +243,7 @@ export default function CustomerSearchModal({
 
           {filteredCustomers.length === 0 && (
             <div className="text-center py-12 text-sm text-slate-500">
-              Geen klantendossiers gevonden die voldoen aan de zoekparameters.
+              No cases match the search criteria.
             </div>
           )}
         </div>
