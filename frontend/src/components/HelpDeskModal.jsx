@@ -23,8 +23,6 @@ export default function AiHelpModal({
   insightSources,
   onRefreshInsights,
 }) {
-  if (!isOpen) return null;
-
   const [messages, setMessages] = useState([]);
   const [inputQuery, setInputQuery] = useState('');
   const [isThinking, setIsThinking] = useState(false);
@@ -52,14 +50,16 @@ export default function AiHelpModal({
     }
   }, []);
 
-  // Quick suggestion pills for instant colleague routing
-  const samplePrompts = [
-    'A1 application for expat secondment to France',
-    'Bad-weather allowance and mobility allowance in PC 124',
-    'Conditions for flexi-jobs and Dimona FLI in PC 302',
-    'Cafeteria plan with bike leasing and end-of-year bonus',
-    'Structural teleworking and home-office allowance in PC 200',
-  ];
+  // Close the popup with Escape
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  if (!isOpen) return null;
 
   // Background colleague matching algorithm
   const findBestColleague = (queryText) => {
@@ -319,6 +319,7 @@ export default function AiHelpModal({
           framework: result.framework,
           conflictNotice: result.conflictNotice,
           linkedFindings,
+          expert: result.primaryExpert,
           primaryExpert: result.primaryExpert,
           secondaryExpert: result.secondaryExpert,
         };
@@ -350,21 +351,21 @@ export default function AiHelpModal({
   return (
     <div
       role="dialog"
-      aria-modal="true"
+      aria-modal="false"
       aria-labelledby="connect-modal-title"
-      className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4"
+      className="fixed bottom-4 right-4 left-4 sm:left-auto z-50 flex justify-end"
     >
-      <div className="bg-white rounded-xl max-w-2xl w-full border border-slate-200 shadow-xl overflow-hidden flex flex-col h-[85vh] max-h-[720px]">
-        {/* Header: Very quiet and minimalist */}
-        <header className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between shrink-0 bg-white">
+      <div className="bg-white rounded-xl w-full sm:max-w-md border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[70vh]">
+        {/* Header: compact bar */}
+        <header className="px-4 py-3 border-b border-slate-200 flex items-center justify-between shrink-0 bg-white">
           <div className="flex items-center space-x-2">
             <span className="w-2.5 h-2.5 rounded-full bg-[#F58220]" />
             <h2 id="ai-help-title" className="text-sm font-bold text-slate-900">
-              Help desk
+              Ask for help
             </h2>
             {customer && (
-              <span className="text-xs text-slate-500 font-medium">
-                · {customer.name} ({customer.joint_committee?.split(' - ')[0] || 'PC 200'})
+              <span className="text-xs text-slate-500 font-medium truncate max-w-[140px]">
+                · {customer.name}
               </span>
             )}
           </div>
@@ -389,24 +390,19 @@ export default function AiHelpModal({
           </div>
         </header>
 
-        {/* Chat window (clean and free of clutter) */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
-          {/* Empty state: very simple */}
+        {/* Chat window */}
+        <div className="flex-1 overflow-y-auto p-3.5 space-y-4">
+          {/* Empty state: compact */}
           {messages.length === 0 && (
-            <div className="h-full flex flex-col justify-center items-center text-center max-w-md mx-auto py-8 space-y-5">
-              <div className="space-y-1">
-                <h3 className="text-base font-semibold text-slate-900">
-                  How can I help?
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Ask a social-law question or raise a case issue. We link the right case data
-                  and connect you with the right specialist.
-                </p>
-              </div>
+            <div className="space-y-3 py-2">
+              <p className="text-xs text-slate-500">
+                Ask a social-law question or raise a case issue. We link the right case data and
+                connect you with the right specialist.
+              </p>
 
               {/* Latest case updates (background report) */}
               {insight && (insight.findings?.length > 0 || insight.action_items?.length > 0) && (
-                <div className="w-full text-left bg-slate-50 border border-slate-200 rounded-lg p-3.5 space-y-2">
+                <div className="text-left bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1.5">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-semibold text-slate-800">Latest case updates</p>
                     {onRefreshInsights && (
@@ -418,9 +414,6 @@ export default function AiHelpModal({
                       </button>
                     )}
                   </div>
-                  {insight.headline && (
-                    <p className="text-[11px] text-slate-600 leading-relaxed">{insight.headline}</p>
-                  )}
                   {(insight.findings || []).slice(0, 3).map((f, idx) => (
                     <p key={idx} className="text-[11px] text-slate-600 leading-relaxed flex items-start space-x-1.5">
                       <AlertTriangle
@@ -448,23 +441,11 @@ export default function AiHelpModal({
               )}
 
               {insightSources && insightSources.origin === 'none' && (
-                <p className="text-[11px] text-slate-400 max-w-xs">
+                <p className="text-[11px] text-slate-400">
                   Case updates are compiled from your case documents. Sign in with Microsoft 365
                   to also include your calendar and email.
                 </p>
               )}
-
-              <div className="w-full space-y-1.5 pt-2">
-                {samplePrompts.slice(0, 3).map((prompt, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => handleSend(prompt)}
-                    className="w-full text-left px-3.5 py-2.5 text-xs text-slate-600 bg-slate-50 hover:bg-slate-100 hover:text-slate-900 rounded-lg border border-slate-200 transition-colors"
-                  >
-                    {prompt}
-                  </button>
-                ))}
-              </div>
             </div>
           )}
 
@@ -554,16 +535,29 @@ export default function AiHelpModal({
                     </div>
                   )}
 
-                  {/* Optional second specialist */}
+                  {/* Alternative specialist: also callable */}
                   {msg.secondaryExpert && (
-                    <p className="text-[11px] text-slate-500 pt-1">
-                      Alternative:{' '}
-                      <strong className="text-slate-700 font-medium">
-                        {msg.secondaryExpert.name}
-                      </strong>{' '}
-                      ({msg.secondaryExpert.title} · extension{' '}
-                      {msg.secondaryExpert.extension || '4100'})
-                    </p>
+                    <div className="pt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                      <span>Alternative:</span>
+                      {calledExpertId === msg.secondaryExpert.id ? (
+                        <span className="inline-flex items-center space-x-1 text-emerald-700 font-semibold">
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Transferred</span>
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleHandoff(msg.secondaryExpert)}
+                          disabled={isCalling}
+                          className="min-h-[32px] px-3 py-1.5 bg-[#F58220] hover:bg-[#e07116] disabled:bg-slate-200 disabled:text-slate-400 text-white font-semibold rounded-lg text-[11px] transition-colors focus:outline-none focus:ring-2 focus:ring-[#F58220] inline-flex items-center space-x-1"
+                        >
+                          <PhoneCall className="w-3 h-3" />
+                          <span>{isCalling ? 'Connecting…' : `Call ${msg.secondaryExpert.name.split(' ')[0]}`}</span>
+                        </button>
+                      )}
+                      <span className="text-slate-400">
+                        {msg.secondaryExpert.title} · ext. {msg.secondaryExpert.extension || '4100'}
+                      </span>
+                    </div>
                   )}
                 </div>
               )}
@@ -581,22 +575,14 @@ export default function AiHelpModal({
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input bar: very simple 'Ask for help' */}
-        <div className="p-3 sm:p-4 border-t border-slate-200 bg-white shrink-0">
+        {/* Input bar */}
+        <div className="p-3 border-t border-slate-200 bg-white shrink-0">
           <form
             onSubmit={(e) => {
               e.preventDefault();
               handleSend();
             }}
-            className="space-y-1.5"
           >
-            <label
-              htmlFor="connect-query-input"
-              className="block text-xs font-semibold text-slate-700"
-            >
-              Ask for help
-            </label>
-
             <div className="flex items-center space-x-2">
               <input
                 id="connect-query-input"
@@ -605,16 +591,17 @@ export default function AiHelpModal({
                 value={inputQuery}
                 onChange={(e) => setInputQuery(e.target.value)}
                 disabled={isThinking}
-                className="flex-1 text-xs sm:text-sm px-3.5 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F58220] focus:border-[#F58220] disabled:bg-slate-50"
+                placeholder="Your question…"
+                aria-label="Ask for help"
+                className="flex-1 text-sm px-3.5 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F58220] focus:border-[#F58220] disabled:bg-slate-50"
               />
 
               <button
                 type="submit"
                 disabled={isThinking || !inputQuery.trim()}
-                className="min-h-[44px] px-4 py-2 bg-[#F58220] hover:bg-[#e07116] disabled:bg-slate-200 disabled:text-slate-400 text-white font-semibold text-xs rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[#F58220] shrink-0"
+                className="min-h-[44px] px-4 py-2 bg-[#F58220] hover:bg-[#e07116] disabled:bg-slate-200 disabled:text-slate-400 text-white font-semibold text-sm rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[#F58220] shrink-0"
               >
                 Ask
-                Connect
               </button>
             </div>
           </form>
