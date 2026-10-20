@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import HomeDashboard from './components/HomeDashboard';
 import CustomerHub from './components/CustomerHub';
-import SmartRouterModal from './components/SmartRouterModal';
 import CustomerSearchModal from './components/CustomerSearchModal';
 import LoginScreen from './components/LoginScreen';
 import AIInsightPanel from './components/AIInsightPanel';
@@ -28,7 +27,6 @@ export default function App() {
   const [isAdminView, setIsAdminView] = useState(false);
 
   // Modals state
-  const [isRouterOpen, setIsRouterOpen] = useState(false);
   const [isAiHelpOpen, setIsAiHelpOpen] = useState(false);
   const [isCustomerSearchOpen, setIsCustomerSearchOpen] = useState(false);
   const [isCustomerManagerOpen, setIsCustomerManagerOpen] = useState(false);
@@ -467,7 +465,6 @@ export default function App() {
             conflicts={conflicts}
             activeUser={activeUser}
             onSelectCustomer={(id) => setSelectedCustomerId(id)}
-            onOpenRouter={() => setIsRouterOpen(true)}
             onOpenAiHelp={() => setIsAiHelpOpen(true)}
           />
         )}
@@ -478,22 +475,12 @@ export default function App() {
         isOpen={isAiHelpOpen}
         onClose={() => setIsAiHelpOpen(false)}
         employees={employees}
-        customer={selectedCustomer}
-        activeUser={activeUser}
-        onExecuteHandoff={handleExecuteHandoff}
-        authToken={authToken}
-      />
-
-      {/* Modal: Smart Routing & Call Transfer (with embedded graph) */}
-      <SmartRouterModal
-        isOpen={isRouterOpen}
-        onClose={() => setIsRouterOpen(false)}
-        customer={selectedCustomer}
         customers={customers}
-        employees={employees}
+        customer={selectedCustomer}
         conflicts={conflicts}
         activeUser={activeUser}
         onExecuteHandoff={handleExecuteHandoff}
+        authToken={authToken}
       />
 
       {/* Modal: Customer Search & Filter */}
@@ -533,7 +520,7 @@ export default function App() {
         onRefresh={runBackgroundInsight}
         onOpenRouter={() => {
           setIsInsightOpen(false);
-          setIsRouterOpen(true);
+          setIsAiHelpOpen(true);
         }}
       />
 
