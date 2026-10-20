@@ -65,27 +65,33 @@ impl LoginLimiter {
         let now = Instant::now();
         {
             let mut ip_map = self.ip_failures.lock().unwrap();
-            let times = ip_map.entry(ip.to_string()).or_default();
-            Self::prune(times, now);
-            times.push(now);
-            if ip_map.len() > 10_000 {
+            if ip_map.len() > 5_000 {
                 ip_map.retain(|_, v| {
                     Self::prune(v, now);
                     !v.is_empty()
                 });
+                if ip_map.len() > 10_000 {
+                    ip_map.clear();
+                }
             }
+            let times = ip_map.entry(ip.to_string()).or_default();
+            Self::prune(times, now);
+            times.push(now);
         }
         {
             let mut acc_map = self.account_failures.lock().unwrap();
-            let times = acc_map.entry(username.to_string()).or_default();
-            Self::prune(times, now);
-            times.push(now);
-            if acc_map.len() > 10_000 {
+            if acc_map.len() > 5_000 {
                 acc_map.retain(|_, v| {
                     Self::prune(v, now);
                     !v.is_empty()
                 });
+                if acc_map.len() > 10_000 {
+                    acc_map.clear();
+                }
             }
+            let times = acc_map.entry(username.to_string()).or_default();
+            Self::prune(times, now);
+            times.push(now);
         }
     }
 
@@ -324,15 +330,22 @@ pub async fn microsoft_login(State(state): State<AppState>) -> Redirect {
     {
         let mut states = state.oauth_states.lock().unwrap();
         states.retain(|_, at| at.elapsed() < OAUTH_STATE_TTL);
+        // Cap maximum in-memory states to prevent memory exhaustion DoS (CWE-400)
+        if states.len() >= 500 {
+            if let Some(oldest_key) = states.iter().min_by_key(|(_, at)| **at).map(|(k, _)| k.clone()) {
+                states.remove(&oldest_key);
+            }
+        }
         states.insert(st.clone(), Instant::now());
     }
     if state.microsoft.is_configured() {
         let url = state.microsoft.authorize_url(&st);
-        if url.starts_with("https://login.microsoftonline.com/") {
-            Redirect::to(&url)
-        } else {
-            safe_frontend_redirect(&state, "ms_error=invalid_endpoint")
+        if let Ok(parsed) = reqwest::Url::parse(&url) {
+            if parsed.scheme() == "https" && parsed.host_str() == Some("login.microsoftonline.com") {
+                return Redirect::to(url.as_str());
+            }
         }
+        safe_frontend_redirect(&state, "ms_error=invalid_endpoint")
     } else {
         // Geen tenant geconfigureerd → doorloop exact hetzelfde pad met een demo-profiel.
         complete_ms_login(&state, MsProfile::demo(), Vec::new(), None, "MS_LOGIN_DEMO")
@@ -397,18 +410,35 @@ fn safe_frontend_redirect(state: &AppState, fragment: &str) -> Redirect {
         .filter(|c| c.is_ascii_alphanumeric() || *c == '=' || *c == '&' || *c == '_' || *c == '-' || *c == '.')
         .take(4096)
         .collect();
-    let url = state.microsoft.frontend_redirect(&clean_fragment);
-    let configured_origin = state.microsoft.frontend_url.trim_end_matches('/');
-    let is_safe = url.starts_with(&format!("{configured_origin}#"))
-        || url.starts_with("http://localhost:3000#")
-        || url.starts_with("http://127.0.0.1:3000#")
-        || url.starts_with("http://localhost:5173#")
-        || url.starts_with("/#");
-    if is_safe {
-        Redirect::to(&url)
-    } else {
-        Redirect::to(&format!("{configured_origin}#ms_error=invalid_redirect"))
+
+    let configured_url = state.microsoft.frontend_url.trim_end_matches('/');
+
+    // Validate using Url::parse to prevent open redirects (CWE-601)
+    if let Ok(parsed) = reqwest::Url::parse(configured_url) {
+        let scheme_ok = parsed.scheme() == "https"
+            || (parsed.scheme() == "http" && (parsed.host_str() == Some("localhost") || parsed.host_str() == Some("127.0.0.1")));
+
+        let host_allowed = if let Some(host) = parsed.host_str() {
+            let is_local = host == "localhost" || host == "127.0.0.1";
+            let is_allowed_origin = std::env::var("ALLOWED_ORIGINS")
+                .unwrap_or_default()
+                .split(',')
+                .filter_map(|s| reqwest::Url::parse(s.trim()).ok())
+                .any(|u| u.host_str() == Some(host));
+
+            is_local || is_allowed_origin || host.ends_with(".tailscale.net") || host.ends_with(".ts.net")
+        } else {
+            false
+        };
+
+        if scheme_ok && host_allowed {
+            let target = format!("{}#{}", configured_url, clean_fragment);
+            return Redirect::to(&target);
+        }
     }
+
+    // Default safe static fallback redirect (never user controlled)
+    Redirect::to("/#ms_error=invalid_redirect")
 }
 
 fn ms_error(state: &AppState, code: &str) -> Redirect {

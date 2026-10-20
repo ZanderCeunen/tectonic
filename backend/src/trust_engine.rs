@@ -14,14 +14,16 @@ impl TrustEngine {
         has_conflict: bool,
     ) -> TrustBreakdown {
         let mut s_source = doc.source_type.base_score();
-        // Als een document beweert een getekend contract of officieel sjabloon te zijn zonder bestandsbijlage
-        // of uit ongeverifieerde gebruikersbron, verlaag de authenticiteitsscore
-        if doc.facts_source == "user_supplied"
+        // Rigorous data authenticity verification (CWE-345):
+        // 1. A signed contract without an actual physical file attachment cannot be trusted as authoritative
+        if doc.source_type == crate::models::DocumentSourceType::SignedContract && doc.file_path.is_none() {
+            s_source = 45.0;
+        } else if doc.facts_source == "user_supplied"
             && (doc.source_type == crate::models::DocumentSourceType::SignedContract
                 || doc.source_type == crate::models::DocumentSourceType::OfficialTemplate)
-            && doc.file_path.is_none()
         {
-            s_source = 70.0;
+            // User-supplied documents receive a reduced baseline until verified
+            s_source = if doc.file_path.is_some() { 75.0 } else { 55.0 };
         }
 
         let s_recency = Self::compute_recency(&doc.date, &doc.source_type);
@@ -41,7 +43,12 @@ impl TrustEngine {
         }
 
         let overall_score = (overall * 10.0).round() / 10.0;
-        let is_authoritative = overall_score >= 85.0 && s_source >= 85.0;
+        let is_authoritative = overall_score >= 85.0
+            && s_source >= 85.0
+            && !has_conflict
+            && (doc.source_type == crate::models::DocumentSourceType::SignedContract
+                || doc.source_type == crate::models::DocumentSourceType::OfficialTemplate)
+            && (doc.file_path.is_some() || doc.facts_source != "user_supplied");
 
         TrustBreakdown {
             overall_score,

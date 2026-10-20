@@ -20,17 +20,25 @@ pub async fn list_employees(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     employees.sort_by(|a, b| b.completed_cases.cmp(&a.completed_cases));
 
-    if !rbac::can_list_all_customers(&auth) {
-        let allowed_customers: std::collections::HashSet<String> = db
-            .get_customers_for_user(&auth.id)
+    let filter_customers = !rbac::can_list_all_customers(&auth);
+    let redact_pii = !rbac::can_unmask(&auth);
+
+    let allowed_customers: std::collections::HashSet<String> = if filter_customers {
+        db.get_customers_for_user(&auth.id)
             .unwrap_or_default()
             .into_iter()
             .map(|c| c.id)
-            .collect();
+            .collect()
+    } else {
+        std::collections::HashSet::new()
+    };
 
-        for emp in &mut employees {
+    for emp in &mut employees {
+        if filter_customers {
             emp.customer_familiarity
                 .retain(|cid, _| allowed_customers.contains(cid));
+        }
+        if redact_pii {
             emp.recent_activity =
                 crate::security::PiiRedactor::redact_text(&emp.recent_activity, true);
         }
@@ -124,17 +132,26 @@ pub async fn recommend_experts(
     let expertise_graph = ExpertiseGraph::new(employees);
     let mut recommendations = expertise_graph.recommend_experts(&req);
 
-    if !rbac::can_list_all_customers(&auth) {
-        let allowed_customers: std::collections::HashSet<String> = db
-            .get_customers_for_user(&auth.id)
+    let filter_customers = !rbac::can_list_all_customers(&auth);
+    let redact_pii = !rbac::can_unmask(&auth);
+
+    let allowed_customers: std::collections::HashSet<String> = if filter_customers {
+        db.get_customers_for_user(&auth.id)
             .unwrap_or_default()
             .into_iter()
             .map(|c| c.id)
-            .collect();
-        for rec in &mut recommendations {
+            .collect()
+    } else {
+        std::collections::HashSet::new()
+    };
+
+    for rec in &mut recommendations {
+        if filter_customers {
             rec.employee
                 .customer_familiarity
                 .retain(|cid, _| allowed_customers.contains(cid));
+        }
+        if redact_pii {
             rec.employee.recent_activity =
                 crate::security::PiiRedactor::redact_text(&rec.employee.recent_activity, true);
         }

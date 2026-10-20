@@ -191,8 +191,33 @@ impl Database {
         Ok(())
     }
 
+    // --- INPUT VALIDATION HELPERS (CWE-20) ---
+    fn validate_id(id: &str) -> Result<()> {
+        if id.trim().is_empty()
+            || id.len() > 64
+            || !id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.')
+        {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        Ok(())
+    }
+
+    fn validate_str(s: &str, min: usize, max: usize) -> Result<()> {
+        let count = s.trim().chars().count();
+        if count < min || count > max {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        Ok(())
+    }
+
     // --- USER MANAGEMENT ---
     pub fn insert_user(&self, u: &UserAccount) -> Result<()> {
+        Self::validate_id(&u.id)?;
+        Self::validate_str(&u.username, 1, crate::models::MAX_USERNAME)?;
+        Self::validate_str(&u.name, 1, 120)?;
+        if u.email.len() > 200 || u.password_hash.len() > 200 {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
         self.conn.execute(
             "INSERT INTO users (id, username, name, email, password_hash, role, clearance_level, employee_id)
             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
@@ -361,7 +386,15 @@ impl Database {
 
     // --- CUSTOMER MANAGEMENT ---
     fn validate_customer_fields(c: &Customer) -> Result<()> {
-        if c.name.is_empty() || c.name.len() > MAX_TITLE {
+        Self::validate_id(&c.id)?;
+        Self::validate_str(&c.name, 1, MAX_TITLE)?;
+        Self::validate_str(&c.enterprise_number, 1, 64)?;
+        if c.industry.len() > 200
+            || c.location.len() > 200
+            || c.primary_contact.len() > 200
+            || c.contact_email.len() > 200
+            || c.employee_count > 1_000_000
+        {
             return Err(rusqlite::Error::InvalidQuery);
         }
         Ok(())
@@ -497,6 +530,8 @@ impl Database {
 
     // --- CUSTOMER ASSIGNMENTS ---
     pub fn assign_customer(&self, user_id: &str, customer_id: &str) -> Result<()> {
+        Self::validate_id(user_id)?;
+        Self::validate_id(customer_id)?;
         self.conn.execute(
             "INSERT OR IGNORE INTO customer_assignments (user_id, customer_id) VALUES (?1, ?2)",
             params![user_id, customer_id],
@@ -505,6 +540,8 @@ impl Database {
     }
 
     pub fn unassign_customer(&self, user_id: &str, customer_id: &str) -> Result<()> {
+        Self::validate_id(user_id)?;
+        Self::validate_id(customer_id)?;
         self.conn.execute(
             "DELETE FROM customer_assignments WHERE user_id = ?1 AND customer_id = ?2",
             params![user_id, customer_id],

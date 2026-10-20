@@ -162,7 +162,7 @@ pub async fn get_audit_chain(
     let offset = query.offset.unwrap_or(0);
     let is_valid = state.audit_chain.verify_integrity();
     let all = state.audit_chain.get_entries();
-    let total_entries = all.len();
+    let total_entries = state.audit_chain.total_entries();
     // Nieuw → oud tonen (meest recente acties eerst).
     let entries = all
         .into_iter()

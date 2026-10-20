@@ -225,7 +225,10 @@ async fn app_only_sources(state: &AppState, auth: &AuthUser) -> InsightSources {
         });
         match found {
             Some(p) => vec![p],
-            None => users.iter().take(1).collect(),
+            None => {
+                let mut w = vec!["Geen overeenkomende mailbox gevonden in de tenant voor uw gebruikersaccount.".to_string()];
+                return insight_engine::empty_sources(w);
+            }
         }
     };
 

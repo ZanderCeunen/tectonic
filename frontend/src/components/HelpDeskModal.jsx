@@ -300,16 +300,6 @@ export default function AiHelpModal({
         // Fallback uses the calculated primary
       }
 
-      // Link relevant case findings from the background report to the question
-      const qLower = q.toLowerCase();
-      const queryTokens = qLower.split(/[^a-z0-9]+/).filter((t) => t.length >= 3);
-      const linkedFindings = (insight?.findings || [])
-        .filter((f) => {
-          const haystack = `${f.title || ''} ${f.detail || ''} ${f.customer_name || ''}`.toLowerCase();
-          return queryTokens.some((t) => haystack.includes(t));
-        })
-        .slice(0, 3);
-
       setTimeout(() => {
         const result = generateColleagueProposal(q, primary, secondary);
         const aiMsg = {
@@ -318,7 +308,6 @@ export default function AiHelpModal({
           text: result.proposalText,
           framework: result.framework,
           conflictNotice: result.conflictNotice,
-          linkedFindings,
           expert: result.primaryExpert,
           primaryExpert: result.primaryExpert,
           secondaryExpert: result.secondaryExpert,
@@ -351,11 +340,11 @@ export default function AiHelpModal({
   return (
     <div
       role="dialog"
-      aria-modal="false"
-      aria-labelledby="connect-modal-title"
-      className="fixed bottom-4 right-4 left-4 sm:left-auto z-50 flex justify-end"
+      aria-modal="true"
+      aria-labelledby="ai-help-title"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm"
     >
-      <div className="bg-white rounded-xl w-full sm:max-w-md border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[70vh]">
+      <div className="bg-white rounded-xl w-full max-w-2xl border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[85vh] mx-4">
         {/* Header: compact bar */}
         <header className="px-4 py-3 border-b border-slate-200 flex items-center justify-between shrink-0 bg-white">
           <div className="flex items-center space-x-2">
@@ -392,60 +381,12 @@ export default function AiHelpModal({
 
         {/* Chat window */}
         <div className="flex-1 overflow-y-auto p-3.5 space-y-4">
-          {/* Empty state: compact */}
+          {/* Empty state: minimal */}
           {messages.length === 0 && (
-            <div className="space-y-3 py-2">
-              <p className="text-xs text-slate-500">
-                Ask a social-law question or raise a case issue. We link the right case data and
-                connect you with the right specialist.
+            <div className="flex flex-col items-center justify-center h-full text-center py-8">
+              <p className="text-sm text-slate-600">
+                Ask a question and we'll connect you with the right specialist
               </p>
-
-              {/* Latest case updates (background report) */}
-              {insight && (insight.findings?.length > 0 || insight.action_items?.length > 0) && (
-                <div className="text-left bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold text-slate-800">Latest case updates</p>
-                    {onRefreshInsights && (
-                      <button
-                        onClick={onRefreshInsights}
-                        className="text-[11px] text-[#005FB8] hover:underline focus:outline-none focus:ring-2 focus:ring-[#005FB8] rounded px-1"
-                      >
-                        Refresh
-                      </button>
-                    )}
-                  </div>
-                  {(insight.findings || []).slice(0, 3).map((f, idx) => (
-                    <p key={idx} className="text-[11px] text-slate-600 leading-relaxed flex items-start space-x-1.5">
-                      <AlertTriangle
-                        className={`w-3 h-3 shrink-0 mt-0.5 ${
-                          f.severity === 'high'
-                            ? 'text-red-500'
-                            : f.severity === 'medium'
-                            ? 'text-amber-500'
-                            : 'text-slate-400'
-                        }`}
-                      />
-                      <span>
-                        {f.title}
-                        {f.customer_name ? ` · ${f.customer_name}` : ''}
-                      </span>
-                    </p>
-                  ))}
-                  {(insight.action_items || []).length > 0 && (
-                    <p className="text-[11px] text-slate-500 pt-1 border-t border-slate-200">
-                      {insight.action_items.length} action item
-                      {insight.action_items.length === 1 ? '' : 's'} to review with a specialist.
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {insightSources && insightSources.origin === 'none' && (
-                <p className="text-[11px] text-slate-400">
-                  Case updates are compiled from your case documents. Sign in with Microsoft 365
-                  to also include your calendar and email.
-                </p>
-              )}
             </div>
           )}
 
@@ -477,32 +418,6 @@ export default function AiHelpModal({
                     <p className="text-[11px] text-slate-500 font-medium">
                       Framework: {msg.framework}
                     </p>
-                  )}
-
-                  {/* Case data linked to this question */}
-                  {msg.linkedFindings?.length > 0 && (
-                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1.5">
-                      <p className="text-[11px] font-semibold text-slate-700">
-                        Linked case data
-                      </p>
-                      {msg.linkedFindings.map((f, idx) => (
-                        <p key={idx} className="text-[11px] text-slate-600 leading-relaxed">
-                          <span
-                            className={`font-semibold ${
-                              f.severity === 'high'
-                                ? 'text-red-700'
-                                : f.severity === 'medium'
-                                ? 'text-amber-700'
-                                : 'text-slate-700'
-                            }`}
-                          >
-                            {f.title}
-                          </span>
-                          {f.customer_name ? <span> · {f.customer_name}</span> : null}
-                          {f.detail ? <span className="text-slate-500"> — {f.detail}</span> : null}
-                        </p>
-                      ))}
-                    </div>
                   )}
 
                   {/* Clean specialist snippet */}
