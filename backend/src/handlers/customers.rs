@@ -29,15 +29,42 @@ pub async fn list_customers(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<Customer>>, StatusCode> {
     let db = state.db.lock().unwrap();
-    let (limit, offset) = page_bounds(&query);
-    let list = if rbac::can_list_all_customers(&auth) {
-        db.get_customers()
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-    } else {
-        db.get_customers_for_user(&auth.id)
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+    let all_customers = db.get_customers().unwrap_or_default();
+
+    // Admin users can see all customers
+    if rbac::can_list_all_customers(&auth) {
+        let (limit, offset) = page_bounds(&query);
+        let page = all_customers.into_iter().skip(offset).take(limit).collect();
+        return Ok(Json(page));
+    }
+
+    // Non-admin users only see customers they have access to
+    let user = match db.get_user_by_username(&auth.username) {
+        Ok(Some(u)) => u,
+        _ => return Ok(Json(Vec::new())),
     };
-    let page = list.into_iter().skip(offset).take(limit).collect();
+
+    let mut accessible: Vec<Customer> = Vec::new();
+    if let Some(ref employee_id) = user.employee_id {
+        if let Ok(Some(employee)) = db.get_employee_by_id(employee_id) {
+            for c in &all_customers {
+                if employee.customer_familiarity.contains_key(&c.id) {
+                    accessible.push(c.clone());
+                }
+            }
+        }
+    }
+
+    if let Ok(assigned) = db.get_customers_for_user(&auth.id) {
+        for c in assigned {
+            if !accessible.iter().any(|a| a.id == c.id) {
+                accessible.push(c);
+            }
+        }
+    }
+
+    let (limit, offset) = page_bounds(&query);
+    let page = accessible.into_iter().skip(offset).take(limit).collect();
     Ok(Json(page))
 }
 

@@ -1190,6 +1190,50 @@ impl Database {
         Ok(list)
     }
 
+    pub fn get_employee_by_id(&self, id: &str) -> Result<Option<Employee>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, name, title, department, extension, direct_phone, avatar_url, availability, completed_cases, customer_familiarity_json, domain_expertise_json, recent_activity FROM employees WHERE id = ?1",
+        )?;
+
+        let mut rows = stmt.query_map(params![id], |row: &Row| {
+            let avail_str: String = row.get(7)?;
+            let availability = match avail_str.as_str() {
+                "Available" => AvailabilityStatus::Available,
+                "InCall" => AvailabilityStatus::InCall,
+                "Busy" => AvailabilityStatus::Busy,
+                _ => AvailabilityStatus::Away,
+            };
+
+            let comp_cases: i64 = row.get(8)?;
+            let cust_json: String = row.get(9)?;
+            let cust_fam: HashMap<String, f64> = serde_json::from_str(&cust_json).unwrap_or_default();
+
+            let dom_json: String = row.get(10)?;
+            let dom_exp: HashMap<String, f64> = serde_json::from_str(&dom_json).unwrap_or_default();
+
+            Ok(Employee {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                title: row.get(2)?,
+                department: row.get(3)?,
+                extension: row.get(4)?,
+                direct_phone: row.get(5)?,
+                avatar_url: row.get(6)?,
+                availability,
+                completed_cases: comp_cases as usize,
+                customer_familiarity: cust_fam,
+                domain_expertise: dom_exp,
+                recent_activity: row.get(11)?,
+            })
+        })?;
+
+        if let Some(r) = rows.next() {
+            Ok(Some(r?))
+        } else {
+            Ok(None)
+        }
+    }
+
     pub fn record_handoff(
         &self,
         emp_id: &str,
