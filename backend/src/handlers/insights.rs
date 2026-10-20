@@ -17,6 +17,31 @@ pub struct AnalyzeRequest {
     pub focus: Option<String>,
 }
 
+/// Haalt de exacte Graph-foutcode/-melding uit een foutresponse-body,
+/// zodat diagnoses als `MailboxNotEnabledForRESTAPI` of `ErrorAccessDenied`
+/// zichtbaar worden in de warnings (bv. "no mailbox" vs "consent mist").
+fn graph_error_detail(body: &str) -> String {
+    if let Ok(v) = serde_json::from_str::<serde_json::Value>(body) {
+        let code = v
+            .pointer("/error/code")
+            .and_then(|c| c.as_str())
+            .unwrap_or("onbekende fout");
+        let msg = v
+            .pointer("/error/message")
+            .and_then(|m| m.as_str())
+            .unwrap_or("");
+        if msg.is_empty() {
+            return code.to_string();
+        }
+        return format!("{code}: {msg}");
+    }
+    let trimmed = body.trim();
+    if trimmed.is_empty() {
+        return "geen responsebody".to_string();
+    }
+    trimmed.chars().take(160).collect()
+}
+
 /// Bronnen ophalen: Microsoft Graph (agenda + mail) met token van de huidige
 /// Microsoft-sessie. Zonder token/tenant zijn er GEEN bronnen: de analyse
 /// beperkt zich tot de echte dossierdata (geen demodata).
@@ -110,10 +135,15 @@ async fn collect_sources(state: &AppState, auth: &AuthUser) -> InsightSources {
                 cal_v = v;
             }
         }
-        Ok(r) => warnings.push(format!(
-            "Agenda ophalen via Graph mislukt (HTTP {}) — agenda overgeslagen.",
-            r.status().as_u16()
-        )),
+        Ok(r) => {
+            let status = r.status().as_u16();
+            let body = r.text().await.unwrap_or_default();
+            warnings.push(format!(
+                "Agenda ophalen via Graph mislukt (HTTP {}) — {}. Agenda overgeslagen.",
+                status,
+                graph_error_detail(&body)
+            ));
+        }
         Err(_) => warnings.push("Microsoft Graph agenda onbereikbaar.".to_string()),
     }
     match mail_res {
@@ -122,10 +152,15 @@ async fn collect_sources(state: &AppState, auth: &AuthUser) -> InsightSources {
                 mail_v = v;
             }
         }
-        Ok(r) => warnings.push(format!(
-            "Mail ophalen via Graph mislukt (HTTP {}) — mail overgeslagen.",
-            r.status().as_u16()
-        )),
+        Ok(r) => {
+            let status = r.status().as_u16();
+            let body = r.text().await.unwrap_or_default();
+            warnings.push(format!(
+                "Mail ophalen via Graph mislukt (HTTP {}) — {}. Mail overgeslagen.",
+                status,
+                graph_error_detail(&body)
+            ));
+        }
         Err(_) => warnings.push("Microsoft Graph mail onbereikbaar.".to_string()),
     }
 
@@ -244,10 +279,14 @@ async fn app_only_sources(state: &AppState, auth: &AuthUser) -> InsightSources {
                     }
                 }
             }
-            Ok(r) => warnings.push(format!(
-                "Agenda van {who} mislukt (HTTP {}).",
-                r.status().as_u16()
-            )),
+            Ok(r) => {
+                let status = r.status().as_u16();
+                let body = r.text().await.unwrap_or_default();
+                warnings.push(format!(
+                    "Agenda van {who} mislukt (HTTP {status}) — {}.",
+                    graph_error_detail(&body)
+                ));
+            }
             Err(_) => warnings.push(format!("Agenda van {who} onbereikbaar.")),
         }
         match m {
@@ -260,8 +299,14 @@ async fn app_only_sources(state: &AppState, auth: &AuthUser) -> InsightSources {
                     }
                 }
             }
-            Ok(r) => warnings
-                .push(format!("Mail van {who} mislukt (HTTP {}).", r.status().as_u16())),
+            Ok(r) => {
+                let status = r.status().as_u16();
+                let body = r.text().await.unwrap_or_default();
+                warnings.push(format!(
+                    "Mail van {who} mislukt (HTTP {status}) — {}.",
+                    graph_error_detail(&body)
+                ));
+            }
             Err(_) => warnings.push(format!("Mail van {who} onbereikbaar.")),
         }
     }
