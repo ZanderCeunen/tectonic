@@ -8,6 +8,7 @@ import LoginScreen from './components/LoginScreen';
 import CustomerManagerModal from './components/CustomerManagerModal';
 import EmployeeManagerModal from './components/EmployeeManagerModal';
 import AdminConsole from './components/AdminConsole';
+import AiHelpModal from './components/AiHelpModal';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 export default function App() {
@@ -27,6 +28,7 @@ export default function App() {
 
   // Modals state
   const [isRouterOpen, setIsRouterOpen] = useState(false);
+  const [isAiHelpOpen, setIsAiHelpOpen] = useState(false);
   const [isCustomerSearchOpen, setIsCustomerSearchOpen] = useState(false);
   const [isCustomerManagerOpen, setIsCustomerManagerOpen] = useState(false);
   const [isEmployeeManagerOpen, setIsEmployeeManagerOpen] = useState(false);
@@ -394,9 +396,21 @@ export default function App() {
             activeUser={activeUser}
             onSelectCustomer={(id) => setSelectedCustomerId(id)}
             onOpenRouter={() => setIsRouterOpen(true)}
+            onOpenAiHelp={() => setIsAiHelpOpen(true)}
           />
         )}
       </main>
+
+      {/* Modal: AI Assistent / Hulp Nodig */}
+      <AiHelpModal
+        isOpen={isAiHelpOpen}
+        onClose={() => setIsAiHelpOpen(false)}
+        employees={employees}
+        customer={selectedCustomer}
+        activeUser={activeUser}
+        onExecuteHandoff={handleExecuteHandoff}
+        authToken={authToken}
+      />
 
       {/* Modal: Smart Routing & Call Transfer (with embedded graph) */}
       <SmartRouterModal

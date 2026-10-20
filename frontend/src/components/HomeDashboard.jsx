@@ -8,6 +8,7 @@ import {
   SlidersHorizontal,
   ChevronRight,
   RotateCcw,
+  Sparkles,
 } from 'lucide-react';
 
 export default function HomeDashboard({
@@ -16,6 +17,7 @@ export default function HomeDashboard({
   activeUser,
   onSelectCustomer,
   onOpenRouter,
+  onOpenAiHelp,
 }) {
   const [filterQuery, setFilterQuery] = useState('');
   const [showOnlyConflicted, setShowOnlyConflicted] = useState(false);
@@ -74,12 +76,12 @@ export default function HomeDashboard({
           </p>
         </div>
 
-        <div className="flex items-center space-x-3 shrink-0">
+        <div className="flex items-center space-x-2.5 shrink-0">
           {/* Conflict Filter Toggle Knop */}
           {activeConflictsCount > 0 && (
             <button
               onClick={() => setShowOnlyConflicted(!showOnlyConflicted)}
-              className={`min-h-[44px] px-4 py-2 rounded-lg text-sm font-semibold border transition-colors flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-[#005FB8] ${
+              className={`min-h-[44px] px-3.5 py-2 rounded-lg text-sm font-semibold border transition-colors flex items-center space-x-1.5 focus:outline-none focus:ring-2 focus:ring-[#005FB8] ${
                 showOnlyConflicted
                   ? 'bg-amber-600 text-white border-amber-600'
                   : 'bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100'
@@ -90,13 +92,25 @@ export default function HomeDashboard({
             </button>
           )}
 
+          {/* Oranje Hulp? Knop met AI assistent */}
+          <button
+            type="button"
+            onClick={onOpenAiHelp}
+            className="min-h-[44px] px-4 py-2 bg-[#F58220] hover:bg-[#e07116] active:bg-[#c96210] text-white text-sm font-semibold rounded-lg transition-colors flex items-center space-x-1.5 focus:outline-none focus:ring-2 focus:ring-[#F58220] focus:ring-offset-2 shadow-xs"
+            title="Vraag de AI om direct de juiste specialist aan te duiden"
+          >
+            <Sparkles className="w-4 h-4 text-white" />
+            <span>Hulp?</span>
+          </button>
+
           {/* Primaire Actie van het scherm: Routeer naar Expert */}
           <button
             onClick={onOpenRouter}
-            className="min-h-[44px] px-5 py-2 bg-[#005FB8] hover:bg-[#004b93] active:bg-[#003c75] text-white text-sm font-medium rounded-lg transition-colors flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-[#005FB8] focus:ring-offset-2"
+            className="min-h-[44px] px-4 py-2 bg-[#005FB8] hover:bg-[#004b93] active:bg-[#003c75] text-white text-sm font-medium rounded-lg transition-colors flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-[#005FB8] focus:ring-offset-2"
           >
             <PhoneForwarded className="w-4 h-4" />
-            <span>Routeer naar expert</span>
+            <span className="hidden sm:inline">Routeer naar expert</span>
+            <span className="sm:hidden">Expert</span>
           </button>
         </div>
       </section>
