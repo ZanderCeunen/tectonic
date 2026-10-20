@@ -227,6 +227,74 @@ impl Database {
         }
     }
 
+    pub fn get_user_by_email(&self, email: &str) -> Result<Option<UserAccount>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, username, name, email, password_hash, role, clearance_level, employee_id FROM users WHERE LOWER(email) = LOWER(?1)",
+        )?;
+        let mut rows = stmt.query_map(params![email], |row: &Row| {
+            let role_str: String = row.get(5)?;
+            Ok(UserAccount {
+                id: row.get(0)?,
+                username: row.get(1)?,
+                name: row.get(2)?,
+                email: row.get(3)?,
+                password_hash: row.get(4)?,
+                role: UserRole::from_str(&role_str),
+                clearance_level: row.get(6)?,
+                employee_id: row.get(7)?,
+            })
+        })?;
+        if let Some(r) = rows.next() {
+            Ok(Some(r?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Koppelt een Microsoft-identiteit aan een bestaand portaalaccount (op e-mail of
+    /// username==UPN-deel) en synchroniseert naam/rol/clearance. Zo niet gevonden wordt
+    /// er een nieuw account aangemaakt (geen wachtwoord → enkel Microsoft login mogelijk).
+    /// Behoudt id, username en password_hash van het bestaande account zodat de
+    /// klassieke beheerderslogin parallel blijft werken.
+    pub fn upsert_external_user(&self, u: &UserAccount, ms_email: &str) -> Result<UserAccount> {
+        let existing = match self.get_user_by_email(ms_email)? {
+            Some(e) => Some(e),
+            None => match self.get_user_by_username(&u.username)? {
+                Some(e) if e.email.is_empty() || e.email.eq_ignore_ascii_case(ms_email) => Some(e),
+                _ => None,
+            },
+        };
+
+        if let Some(mut e) = existing {
+            if !u.name.trim().is_empty() {
+                e.name = u.name.clone();
+            }
+            if !ms_email.is_empty() {
+                e.email = ms_email.to_string();
+            }
+            e.role = u.role.clone();
+            e.clearance_level = u.clearance_level.clone();
+            self.insert_user(&e)?;
+            return Ok(e);
+        }
+
+        // Nieuw account: username vrijwareren (UNIQUE constraint; nooit een ander account vervangen).
+        let mut candidate = u.username.clone();
+        if let Some(taken) = self.get_user_by_username(&candidate)? {
+            let from_email = ms_email.replace('@', ".");
+            candidate = if self.get_user_by_username(&from_email)?.is_none() {
+                from_email
+            } else {
+                format!("ms.{}", &uuid::Uuid::new_v4().simple().to_string()[..8])
+            };
+            let _ = taken;
+        }
+        let mut nu = u.clone();
+        nu.username = candidate;
+        self.insert_user(&nu)?;
+        Ok(nu)
+    }
+
     pub fn get_users(&self) -> Result<Vec<UserAccount>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, username, name, email, password_hash, role, clearance_level, employee_id FROM users",
