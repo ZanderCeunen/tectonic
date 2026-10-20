@@ -206,6 +206,10 @@ pub fn get_mock_documents() -> Vec<DocumentItem> {
                 outdated_count: 0,
                 questionable_count: 0,
             },
+            sensitivity: Default::default(),
+            facts_source: "user_supplied".to_string(),
+            external_provider: None,
+            external_id: None,
         },
         DocumentItem {
             id: "DOC-002".to_string(),
@@ -251,6 +255,10 @@ pub fn get_mock_documents() -> Vec<DocumentItem> {
                 outdated_count: 0,
                 questionable_count: 0,
             },
+            sensitivity: Default::default(),
+            facts_source: "user_supplied".to_string(),
+            external_provider: None,
+            external_id: None,
         },
         DocumentItem {
             id: "DOC-003".to_string(),
@@ -296,6 +304,10 @@ pub fn get_mock_documents() -> Vec<DocumentItem> {
                 outdated_count: 0,
                 questionable_count: 0,
             },
+            sensitivity: Default::default(),
+            facts_source: "user_supplied".to_string(),
+            external_provider: None,
+            external_id: None,
         },
         DocumentItem {
             id: "DOC-004".to_string(),
@@ -335,6 +347,10 @@ pub fn get_mock_documents() -> Vec<DocumentItem> {
                 outdated_count: 4,
                 questionable_count: 3,
             },
+            sensitivity: Default::default(),
+            facts_source: "user_supplied".to_string(),
+            external_provider: None,
+            external_id: None,
         },
         DocumentItem {
             id: "DOC-005".to_string(),
@@ -374,6 +390,10 @@ pub fn get_mock_documents() -> Vec<DocumentItem> {
                 outdated_count: 0,
                 questionable_count: 1,
             },
+            sensitivity: Default::default(),
+            facts_source: "user_supplied".to_string(),
+            external_provider: None,
+            external_id: None,
         },
 
         // CUST-002: BioHealth Solutions NV
@@ -427,6 +447,10 @@ pub fn get_mock_documents() -> Vec<DocumentItem> {
                 outdated_count: 0,
                 questionable_count: 0,
             },
+            sensitivity: Default::default(),
+            facts_source: "user_supplied".to_string(),
+            external_provider: None,
+            external_id: None,
         },
 
         // CUST-003: Nexus Digital CommV
@@ -480,6 +504,10 @@ pub fn get_mock_documents() -> Vec<DocumentItem> {
                 outdated_count: 0,
                 questionable_count: 0,
             },
+            sensitivity: Default::default(),
+            facts_source: "user_supplied".to_string(),
+            external_provider: None,
+            external_id: None,
         },
 
         // CUST-004: Vanderstraeten Bouwgroep NV
@@ -533,6 +561,10 @@ pub fn get_mock_documents() -> Vec<DocumentItem> {
                 outdated_count: 0,
                 questionable_count: 0,
             },
+            sensitivity: Default::default(),
+            facts_source: "user_supplied".to_string(),
+            external_provider: None,
+            external_id: None,
         },
 
         // CUST-005: Grand Palace Hotel & Catering BV
@@ -586,6 +618,10 @@ pub fn get_mock_documents() -> Vec<DocumentItem> {
                 outdated_count: 0,
                 questionable_count: 0,
             },
+            sensitivity: Default::default(),
+            facts_source: "user_supplied".to_string(),
+            external_provider: None,
+            external_id: None,
         },
 
         // CUST-006: Flanders Food Processing NV
@@ -639,6 +675,10 @@ pub fn get_mock_documents() -> Vec<DocumentItem> {
                 outdated_count: 0,
                 questionable_count: 0,
             },
+            sensitivity: Default::default(),
+            facts_source: "user_supplied".to_string(),
+            external_provider: None,
+            external_id: None,
         },
 
         // CUST-007: Metaalconstructies De Smet & Zonen BV
@@ -692,6 +732,10 @@ pub fn get_mock_documents() -> Vec<DocumentItem> {
                 outdated_count: 0,
                 questionable_count: 0,
             },
+            sensitivity: Default::default(),
+            facts_source: "user_supplied".to_string(),
+            external_provider: None,
+            external_id: None,
         },
 
         // CUST-008: Zorgcampus Sint-Elisabeth VZW
@@ -745,6 +789,10 @@ pub fn get_mock_documents() -> Vec<DocumentItem> {
                 outdated_count: 0,
                 questionable_count: 0,
             },
+            sensitivity: Default::default(),
+            facts_source: "user_supplied".to_string(),
+            external_provider: None,
+            external_id: None,
         },
     ]
 }
@@ -892,13 +940,19 @@ pub fn get_mock_employees() -> Vec<Employee> {
 }
 
 pub fn get_mock_users() -> Vec<crate::models::UserAccount> {
-    use crate::models::{UserAccount, UserRole};
+    use crate::models::{UserAccount, UserRole, BCRYPT_COST};
 
-    let admin_pass = std::env::var("TECTONIC_ADMIN_PASSWORD").unwrap_or_else(|_| "Admin123!".to_string());
-    let consultant_pass = std::env::var("TECTONIC_CONSULTANT_PASSWORD").unwrap_or_else(|_| "Payroll123!".to_string());
+    let admin_pass = match std::env::var("TECTONIC_ADMIN_PASSWORD") {
+        Ok(p) if !p.trim().is_empty() => p,
+        _ => {
+            eprintln!("⚠️ TECTONIC_ADMIN_PASSWORD not set. Skipping default user seed; Admin must create the first user.");
+            return Vec::new();
+        }
+    };
+    let consultant_pass = std::env::var("TECTONIC_CONSULTANT_PASSWORD").unwrap_or_else(|_| admin_pass.clone());
 
-    let admin_hash = bcrypt::hash(&admin_pass, 4).unwrap_or_default();
-    let consultant_hash = bcrypt::hash(&consultant_pass, 4).unwrap_or_default();
+    let admin_hash = bcrypt::hash(&admin_pass, BCRYPT_COST).unwrap_or_default();
+    let consultant_hash = bcrypt::hash(&consultant_pass, BCRYPT_COST).unwrap_or_default();
 
     vec![
         UserAccount {
@@ -946,10 +1000,41 @@ pub fn get_mock_users() -> Vec<crate::models::UserAccount> {
             username: "kevin.peeters".to_string(),
             name: "Kevin Peeters".to_string(),
             email: "kevin.peeters@sdworx.com".to_string(),
-            password_hash: consultant_hash,
+            password_hash: consultant_hash.clone(),
             role: UserRole::Consultant,
             clearance_level: "Standard".to_string(),
             employee_id: Some("EMP-004".to_string()),
         },
+        UserAccount {
+            id: "USR-006".to_string(),
+            username: "auditor".to_string(),
+            name: "Compliance Auditor".to_string(),
+            email: "auditor@sdworx.com".to_string(),
+            password_hash: consultant_hash,
+            role: UserRole::Auditor,
+            clearance_level: "Standard".to_string(),
+            employee_id: None,
+        },
+    ]
+}
+
+pub fn get_mock_assignments() -> Vec<(String, String)> {
+    vec![
+        // Sarah Vermeulen (USR-003) -> CUST-001, CUST-002, CUST-006, CUST-008
+        ("USR-003".to_string(), "CUST-001".to_string()),
+        ("USR-003".to_string(), "CUST-002".to_string()),
+        ("USR-003".to_string(), "CUST-006".to_string()),
+        ("USR-003".to_string(), "CUST-008".to_string()),
+        // Emma Wouters (USR-004) -> CUST-001, CUST-002, CUST-007
+        ("USR-004".to_string(), "CUST-001".to_string()),
+        ("USR-004".to_string(), "CUST-002".to_string()),
+        ("USR-004".to_string(), "CUST-007".to_string()),
+        // Tom De Smet (USR-002) -> CUST-001, CUST-003, CUST-004
+        ("USR-002".to_string(), "CUST-001".to_string()),
+        ("USR-002".to_string(), "CUST-003".to_string()),
+        ("USR-002".to_string(), "CUST-004".to_string()),
+        // Kevin Peeters (USR-005) -> CUST-001, CUST-005
+        ("USR-005".to_string(), "CUST-001".to_string()),
+        ("USR-005".to_string(), "CUST-005".to_string()),
     ]
 }

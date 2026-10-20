@@ -8,15 +8,14 @@ import {
   Check,
   Flag,
   Lock,
-  Eye,
-  EyeOff,
-  CheckCircle2,
+  Download,
+  ShieldCheck,
 } from 'lucide-react';
 
 export default function DocumentCard({ doc, activeUser, onFeedback }) {
   const [expanded, setExpanded] = useState(false);
-  const [showUnmasked, setShowUnmasked] = useState(false);
   const [userVote, setUserVote] = useState(null);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [localFeedback, setLocalFeedback] = useState({
     verified_count: doc.feedback?.verified_count || 0,
     outdated_count: doc.feedback?.outdated_count || 0,
@@ -37,7 +36,10 @@ export default function DocumentCard({ doc, activeUser, onFeedback }) {
   }, [doc.id, activeUser]);
 
   const trustScore = doc.trust?.overall_score || 50;
-  const hasPayrollClearance = activeUser?.role === 'Senior Payroll Officer' || activeUser?.role === 'Admin';
+  const isSeniorClearance =
+    activeUser?.role === 'SeniorPayrollOfficer' ||
+    activeUser?.role === 'LegalAdvisor' ||
+    activeUser?.clearance_level === 'Senior';
 
   const handleVote = (type) => {
     setUserVote(type);
@@ -49,6 +51,33 @@ export default function DocumentCard({ doc, activeUser, onFeedback }) {
     localStorage.setItem(`doc_vote_${doc.id}_${activeUser?.name || 'default'}`, type);
     if (onFeedback) {
       onFeedback(doc.id, type);
+    }
+  };
+
+  const handleDownloadFile = async () => {
+    setIsDownloading(true);
+    try {
+      const token = localStorage.getItem('tectonic_jwt') || '';
+      const res = await fetch(`/api/documents/${doc.id}/file`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        alert('File download not permitted or file not found.');
+        return;
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = doc.file_name || 'document.bin';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (e) {
+      console.error('Download error:', e);
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -131,28 +160,27 @@ export default function DocumentCard({ doc, activeUser, onFeedback }) {
           ))}
         </div>
 
-        {/* Collapsible Source Document Viewer */}
+        {/* Collapsible Source Document Viewer (Safe by default) */}
         {expanded && (
           <div className="my-3 pt-3 border-t border-slate-200 space-y-2.5 animate-in fade-in duration-100">
             <div className="bg-slate-50 rounded-lg border border-slate-200 p-3.5 font-mono text-xs text-slate-800 relative">
               <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-200 text-[11px] text-slate-500 font-sans">
                 <span className="flex items-center space-x-1.5 font-medium text-slate-700">
                   <FileText className="w-3.5 h-3.5 text-[#005FB8]" />
-                  <span>Document Excerpt & Source Text (GDPR Redacted)</span>
+                  <span>Document Text</span>
                 </span>
-                {hasPayrollClearance && (
-                  <button
-                    onClick={() => setShowUnmasked(!showUnmasked)}
-                    className="text-[#005FB8] hover:underline text-[11px] font-medium"
-                  >
-                    {showUnmasked ? 'Mask confidential figures' : 'Show unmasked (Senior Payroll Access)'}
-                  </button>
-                )}
+                <span
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                    isSeniorClearance
+                      ? 'bg-blue-100 text-blue-900 border border-blue-200'
+                      : 'bg-emerald-100 text-emerald-900 border border-emerald-200'
+                  }`}
+                >
+                  {isSeniorClearance ? 'Senior Legal Unmask Active' : 'GDPR Redacted Safe View'}
+                </span>
               </div>
               <p className="whitespace-pre-wrap leading-relaxed text-slate-800 bg-white p-3 rounded border border-slate-200">
-                {showUnmasked && hasPayrollClearance
-                  ? doc.unmasked_raw_content || doc.raw_content
-                  : doc.raw_content}
+                {doc.raw_content}
               </p>
             </div>
           </div>
@@ -160,21 +188,35 @@ export default function DocumentCard({ doc, activeUser, onFeedback }) {
 
         {/* Action Footer */}
         <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2.5">
-          {/* Button: View Document Excerpt */}
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors flex items-center space-x-1.5 ${
-              expanded
-                ? 'bg-slate-800 text-white border-slate-800'
-                : 'bg-white hover:bg-slate-100 text-slate-800 border-slate-300'
-            }`}
-          >
-            <FileText className="w-3.5 h-3.5 text-[#005FB8]" />
-            <span>{expanded ? 'Hide document text' : 'View document excerpt'}</span>
-            {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-          </button>
+          {/* Button: View Document Excerpt & Download File (if authorized) */}
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors flex items-center space-x-1.5 ${
+                expanded
+                  ? 'bg-slate-800 text-white border-slate-800'
+                  : 'bg-white hover:bg-slate-100 text-slate-800 border-slate-300'
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5 text-[#005FB8]" />
+              <span>{expanded ? 'Hide document text' : 'View document text'}</span>
+              {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            </button>
 
-          {/* Validation Buttons: Verify or Flag Outdated with Spam Prevention */}
+            {doc.file_name && (
+              <button
+                onClick={handleDownloadFile}
+                disabled={isDownloading}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 flex items-center space-x-1.5 transition-colors"
+                title={`Download original file: ${doc.file_name}`}
+              >
+                <Download className="w-3.5 h-3.5 text-slate-500" />
+                <span>{isDownloading ? 'Downloading...' : 'Download File'}</span>
+              </button>
+            )}
+          </div>
+
+          {/* Validation Buttons: Verify or Flag Outdated with User Feedback */}
           <div className="flex items-center space-x-2">
             <button
               onClick={() => handleVote('VERIFIED')}

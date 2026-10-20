@@ -1,6 +1,7 @@
 use crate::models::{
-    AuditEntry, AvailabilityStatus, Customer, DocumentFeedback, DocumentItem, DocumentSourceType,
-    Employee, KeyFact, TrustBreakdown, UserAccount, UserRole,
+    AuditEntry, AvailabilityStatus, Customer, CustomerAssignment, DocumentFeedback, DocumentItem,
+    DocumentSensitivity, DocumentSourceType, Employee, KeyFact, TrustBreakdown, UserAccount,
+    UserRole, MAX_CONTENT, MAX_TITLE,
 };
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, Result, Row};
@@ -107,8 +108,28 @@ impl Database {
                 prev_hash TEXT NOT NULL,
                 hash TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS customer_assignments (
+                user_id TEXT NOT NULL,
+                customer_id TEXT NOT NULL,
+                PRIMARY KEY (user_id, customer_id)
+            );
             ",
         )?;
+        self.migrate_schema()?;
+        Ok(())
+    }
+
+    fn migrate_schema(&self) -> Result<()> {
+        let extra_cols = [
+            "ALTER TABLE documents ADD COLUMN sensitivity TEXT NOT NULL DEFAULT 'ContainsPii'",
+            "ALTER TABLE documents ADD COLUMN facts_source TEXT NOT NULL DEFAULT 'user_supplied'",
+            "ALTER TABLE documents ADD COLUMN external_provider TEXT",
+            "ALTER TABLE documents ADD COLUMN external_id TEXT",
+        ];
+        for sql in extra_cols {
+            let _ = self.conn.execute(sql, []);
+        }
         Ok(())
     }
 
@@ -125,21 +146,38 @@ impl Database {
         docs: Vec<DocumentItem>,
         emps: Vec<Employee>,
         users: Vec<UserAccount>,
+        assignments: Vec<(String, String)>,
     ) -> Result<()> {
-        for u in users {
-            self.insert_user(&u)?;
+        let user_count: i64 = self
+            .conn
+            .query_row("SELECT COUNT(*) FROM users", [], |row| row.get(0))?;
+        if user_count == 0 {
+            for u in users {
+                self.insert_user(&u)?;
+            }
         }
 
-        for c in customers {
-            self.insert_customer(&c)?;
+        if self.is_empty()? {
+            for c in customers {
+                self.insert_customer(&c)?;
+            }
+            for d in docs {
+                self.insert_document(&d)?;
+            }
+            for e in emps {
+                self.insert_employee(&e)?;
+            }
         }
 
-        for d in docs {
-            self.insert_document(&d)?;
-        }
-
-        for e in emps {
-            self.insert_employee(&e)?;
+        let assign_count: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM customer_assignments",
+            [],
+            |row| row.get(0),
+        )?;
+        if assign_count == 0 {
+            for (user_id, customer_id) in assignments {
+                self.assign_customer(&user_id, &customer_id)?;
+            }
         }
 
         Ok(())
@@ -215,9 +253,17 @@ impl Database {
     }
 
     // --- CUSTOMER MANAGEMENT ---
+    fn validate_customer_fields(c: &Customer) -> Result<()> {
+        if c.name.is_empty() || c.name.len() > MAX_TITLE {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        Ok(())
+    }
+
     pub fn insert_customer(&self, c: &Customer) -> Result<()> {
+        Self::validate_customer_fields(c)?;
         self.conn.execute(
-            "INSERT OR REPLACE INTO customers 
+            "INSERT INTO customers 
             (id, name, enterprise_number, customer_code, industry, joint_committee, joint_committee_code, primary_contact, contact_email, contact_phone, sdworx_account_manager, sdworx_team, employee_count, location, payroll_frequency, active_dossier_status)
             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
             params![
@@ -239,6 +285,40 @@ impl Database {
                 c.active_dossier_status
             ],
         )?;
+        Ok(())
+    }
+
+    pub fn update_customer(&self, c: &Customer) -> Result<()> {
+        Self::validate_customer_fields(c)?;
+        let changed = self.conn.execute(
+            "UPDATE customers SET
+            name=?2, enterprise_number=?3, customer_code=?4, industry=?5, joint_committee=?6,
+            joint_committee_code=?7, primary_contact=?8, contact_email=?9, contact_phone=?10,
+            sdworx_account_manager=?11, sdworx_team=?12, employee_count=?13, location=?14,
+            payroll_frequency=?15, active_dossier_status=?16
+            WHERE id=?1",
+            params![
+                c.id,
+                c.name,
+                c.enterprise_number,
+                c.customer_code,
+                c.industry,
+                c.joint_committee,
+                c.joint_committee_code,
+                c.primary_contact,
+                c.contact_email,
+                c.contact_phone,
+                c.sdworx_account_manager,
+                c.sdworx_team,
+                c.employee_count as i64,
+                c.location,
+                c.payroll_frequency,
+                c.active_dossier_status
+            ],
+        )?;
+        if changed == 0 {
+            return Err(rusqlite::Error::QueryReturnedNoRows);
+        }
         Ok(())
     }
 
@@ -308,8 +388,149 @@ impl Database {
         }
     }
 
+    // --- CUSTOMER ASSIGNMENTS ---
+    pub fn assign_customer(&self, user_id: &str, customer_id: &str) -> Result<()> {
+        self.conn.execute(
+            "INSERT OR IGNORE INTO customer_assignments (user_id, customer_id) VALUES (?1, ?2)",
+            params![user_id, customer_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn unassign_customer(&self, user_id: &str, customer_id: &str) -> Result<()> {
+        self.conn.execute(
+            "DELETE FROM customer_assignments WHERE user_id = ?1 AND customer_id = ?2",
+            params![user_id, customer_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn user_has_assignment(&self, user_id: &str, customer_id: &str) -> Result<bool> {
+        let count: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM customer_assignments WHERE user_id = ?1 AND customer_id = ?2",
+            params![user_id, customer_id],
+            |row| row.get(0),
+        )?;
+        Ok(count > 0)
+    }
+
+    pub fn get_customers_for_user(&self, user_id: &str) -> Result<Vec<Customer>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT c.id, c.name, c.enterprise_number, c.customer_code, c.industry, c.joint_committee, c.joint_committee_code, c.primary_contact, c.contact_email, c.contact_phone, c.sdworx_account_manager, c.sdworx_team, c.employee_count, c.location, c.payroll_frequency, c.active_dossier_status 
+             FROM customers c
+             INNER JOIN customer_assignments a ON a.customer_id = c.id
+             WHERE a.user_id = ?1",
+        )?;
+        let rows = stmt.query_map(params![user_id], |row: &Row| {
+            let emp_count: i64 = row.get(12)?;
+            Ok(Customer {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                enterprise_number: row.get(2)?,
+                customer_code: row.get(3)?,
+                industry: row.get(4)?,
+                joint_committee: row.get(5)?,
+                joint_committee_code: row.get(6)?,
+                primary_contact: row.get(7)?,
+                contact_email: row.get(8)?,
+                contact_phone: row.get(9)?,
+                sdworx_account_manager: row.get(10)?,
+                sdworx_team: row.get(11)?,
+                employee_count: emp_count as usize,
+                location: row.get(13)?,
+                payroll_frequency: row.get(14)?,
+                active_dossier_status: row.get(15)?,
+            })
+        })?;
+        let mut list = Vec::new();
+        for r in rows {
+            list.push(r?);
+        }
+        Ok(list)
+    }
+
+    pub fn list_assignments(&self) -> Result<Vec<CustomerAssignment>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT user_id, customer_id FROM customer_assignments ORDER BY user_id, customer_id",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(CustomerAssignment {
+                user_id: row.get(0)?,
+                customer_id: row.get(1)?,
+            })
+        })?;
+        let mut list = Vec::new();
+        for r in rows {
+            list.push(r?);
+        }
+        Ok(list)
+    }
+
     // --- DOCUMENT MANAGEMENT ---
+    const DOC_SELECT: &'static str = "SELECT id, customer_id, title, source_type, source_label, date, author, author_role, summary, raw_content, unmasked_raw_content, file_path, file_name, file_size, key_facts_json, tags_json, verified_count, outdated_count, questionable_count, sensitivity, facts_source, external_provider, external_id FROM documents";
+
+    fn map_document_row(row: &Row) -> rusqlite::Result<DocumentItem> {
+        let st_str: String = row.get(3)?;
+        let source_type = match st_str.as_str() {
+            "SignedContract" => DocumentSourceType::SignedContract,
+            "OfficialTemplate" => DocumentSourceType::OfficialTemplate,
+            "CrmNote" => DocumentSourceType::CrmNote,
+            "TicketResolution" => DocumentSourceType::TicketResolution,
+            "TicketComment" => DocumentSourceType::TicketComment,
+            _ => DocumentSourceType::ChatMessage,
+        };
+
+        let unmasked: Option<String> = row.get(10)?;
+        let file_path: Option<String> = row.get(11)?;
+        let file_name: Option<String> = row.get(12)?;
+        let file_size_i: Option<i64> = row.get(13)?;
+        let file_size = file_size_i.map(|s| s as usize);
+        let kf_json: String = row.get(14)?;
+        let key_facts: Vec<KeyFact> = serde_json::from_str(&kf_json).unwrap_or_default();
+        let tags_json: String = row.get(15)?;
+        let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
+        let v_cnt: i64 = row.get(16)?;
+        let o_cnt: i64 = row.get(17)?;
+        let q_cnt: i64 = row.get(18)?;
+        let sensitivity_str: String = row.get::<_, Option<String>>(19)?.unwrap_or_else(|| "ContainsPii".to_string());
+        let facts_source: String = row.get::<_, Option<String>>(20)?.unwrap_or_else(|| "user_supplied".to_string());
+        let external_provider: Option<String> = row.get(21)?;
+        let external_id: Option<String> = row.get(22)?;
+
+        Ok(DocumentItem {
+            id: row.get(0)?,
+            customer_id: row.get(1)?,
+            title: row.get(2)?,
+            source_type,
+            source_label: row.get(4)?,
+            date: row.get(5)?,
+            author: row.get(6)?,
+            author_role: row.get(7)?,
+            summary: row.get(8)?,
+            raw_content: row.get(9)?,
+            unmasked_raw_content: unmasked,
+            file_path,
+            file_name,
+            file_size,
+            key_facts,
+            tags,
+            trust: TrustBreakdown::default(),
+            feedback: DocumentFeedback {
+                verified_count: v_cnt as u32,
+                outdated_count: o_cnt as u32,
+                questionable_count: q_cnt as u32,
+            },
+            sensitivity: DocumentSensitivity::from_str(&sensitivity_str),
+            facts_source,
+            external_provider,
+            external_id,
+        })
+    }
+
     pub fn insert_document(&self, d: &DocumentItem) -> Result<()> {
+        if d.title.len() > MAX_TITLE || d.raw_content.len() > MAX_CONTENT {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
         let source_type_str = match d.source_type {
             DocumentSourceType::SignedContract => "SignedContract",
             DocumentSourceType::OfficialTemplate => "OfficialTemplate",
@@ -322,11 +543,16 @@ impl Database {
         let key_facts_json = serde_json::to_string(&d.key_facts).unwrap_or_default();
         let tags_json = serde_json::to_string(&d.tags).unwrap_or_default();
         let f_size: Option<i64> = d.file_size.map(|s| s as i64);
+        let facts_source = if d.facts_source.is_empty() {
+            "user_supplied"
+        } else {
+            d.facts_source.as_str()
+        };
 
         self.conn.execute(
-            "INSERT OR REPLACE INTO documents 
-            (id, customer_id, title, source_type, source_label, date, author, author_role, summary, raw_content, unmasked_raw_content, file_path, file_name, file_size, key_facts_json, tags_json, verified_count, outdated_count, questionable_count)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)",
+            "INSERT INTO documents 
+            (id, customer_id, title, source_type, source_label, date, author, author_role, summary, raw_content, unmasked_raw_content, file_path, file_name, file_size, key_facts_json, tags_json, verified_count, outdated_count, questionable_count, sensitivity, facts_source, external_provider, external_id)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23)",
             params![
                 d.id,
                 d.customer_id,
@@ -347,15 +573,79 @@ impl Database {
                 d.feedback.verified_count as i64,
                 d.feedback.outdated_count as i64,
                 d.feedback.questionable_count as i64,
+                d.sensitivity.as_str(),
+                facts_source,
+                d.external_provider,
+                d.external_id,
             ],
         )?;
         Ok(())
     }
 
-    pub fn get_documents(&self) -> Result<Vec<DocumentItem>> {
-        let mut stmt = self.conn.prepare(
-            "SELECT id, customer_id, title, source_type, source_label, date, author, author_role, summary, raw_content, unmasked_raw_content, file_path, file_name, file_size, key_facts_json, tags_json, verified_count, outdated_count, questionable_count FROM documents",
+    pub fn update_document(&self, d: &DocumentItem) -> Result<()> {
+        if d.title.len() > MAX_TITLE || d.raw_content.len() > MAX_CONTENT {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        let source_type_str = match d.source_type {
+            DocumentSourceType::SignedContract => "SignedContract",
+            DocumentSourceType::OfficialTemplate => "OfficialTemplate",
+            DocumentSourceType::CrmNote => "CrmNote",
+            DocumentSourceType::TicketResolution => "TicketResolution",
+            DocumentSourceType::TicketComment => "TicketComment",
+            DocumentSourceType::ChatMessage => "ChatMessage",
+        };
+
+        let key_facts_json = serde_json::to_string(&d.key_facts).unwrap_or_default();
+        let tags_json = serde_json::to_string(&d.tags).unwrap_or_default();
+        let f_size: Option<i64> = d.file_size.map(|s| s as i64);
+        let facts_source = if d.facts_source.is_empty() {
+            "user_supplied"
+        } else {
+            d.facts_source.as_str()
+        };
+
+        let changed = self.conn.execute(
+            "UPDATE documents SET
+            customer_id=?2, title=?3, source_type=?4, source_label=?5, date=?6, author=?7,
+            author_role=?8, summary=?9, raw_content=?10, unmasked_raw_content=?11, file_path=?12,
+            file_name=?13, file_size=?14, key_facts_json=?15, tags_json=?16, verified_count=?17,
+            outdated_count=?18, questionable_count=?19, sensitivity=?20, facts_source=?21,
+            external_provider=?22, external_id=?23
+            WHERE id=?1",
+            params![
+                d.id,
+                d.customer_id,
+                d.title,
+                source_type_str,
+                d.source_label,
+                d.date,
+                d.author,
+                d.author_role,
+                d.summary,
+                d.raw_content,
+                d.unmasked_raw_content,
+                d.file_path,
+                d.file_name,
+                f_size,
+                key_facts_json,
+                tags_json,
+                d.feedback.verified_count as i64,
+                d.feedback.outdated_count as i64,
+                d.feedback.questionable_count as i64,
+                d.sensitivity.as_str(),
+                facts_source,
+                d.external_provider,
+                d.external_id,
+            ],
         )?;
+        if changed == 0 {
+            return Err(rusqlite::Error::QueryReturnedNoRows);
+        }
+        Ok(())
+    }
+
+    pub fn get_documents(&self) -> Result<Vec<DocumentItem>> {
+        let mut stmt = self.conn.prepare(Self::DOC_SELECT)?;
 
         let rows = stmt.query_map([], |row: &Row| {
             let st_str: String = row.get(3)?;
@@ -415,6 +705,10 @@ impl Database {
                     outdated_count: o_cnt as u32,
                     questionable_count: q_cnt as u32,
                 },
+                sensitivity: DocumentSensitivity::default(),
+                facts_source: "user_supplied".to_string(),
+                external_provider: None,
+                external_id: None,
             })
         })?;
 
@@ -488,6 +782,10 @@ impl Database {
                     outdated_count: o_cnt as u32,
                     questionable_count: q_cnt as u32,
                 },
+                sensitivity: DocumentSensitivity::default(),
+                facts_source: "user_supplied".to_string(),
+                external_provider: None,
+                external_id: None,
             })
         })?;
 
@@ -568,7 +866,7 @@ impl Database {
                     }
                 }
                 if modified {
-                    self.insert_document(&doc)?;
+                    self.update_document(&doc)?;
                 }
             }
         }
@@ -625,6 +923,10 @@ impl Database {
                 outdated_count: 0,
                 questionable_count: 0,
             },
+            sensitivity: DocumentSensitivity::ContainsPii,
+            facts_source: "official_resolution".to_string(),
+            external_provider: None,
+            external_id: None,
         };
 
         self.insert_document(&res_doc)?;
@@ -644,7 +946,7 @@ impl Database {
         let dom_json = serde_json::to_string(&e.domain_expertise).unwrap_or_default();
 
         self.conn.execute(
-            "INSERT OR REPLACE INTO employees 
+            "INSERT INTO employees 
             (id, name, title, department, extension, direct_phone, avatar_url, availability, completed_cases, customer_familiarity_json, domain_expertise_json, recent_activity)
             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
             params![
@@ -662,6 +964,43 @@ impl Database {
                 e.recent_activity
             ],
         )?;
+        Ok(())
+    }
+
+    pub fn update_employee(&self, e: &Employee) -> Result<()> {
+        let avail_str = match e.availability {
+            AvailabilityStatus::Available => "Available",
+            AvailabilityStatus::InCall => "InCall",
+            AvailabilityStatus::Busy => "Busy",
+            AvailabilityStatus::Away => "Away",
+        };
+
+        let cust_json = serde_json::to_string(&e.customer_familiarity).unwrap_or_default();
+        let dom_json = serde_json::to_string(&e.domain_expertise).unwrap_or_default();
+
+        let changed = self.conn.execute(
+            "UPDATE employees SET
+            name=?2, title=?3, department=?4, extension=?5, direct_phone=?6, avatar_url=?7,
+            availability=?8, completed_cases=?9, customer_familiarity_json=?10, domain_expertise_json=?11, recent_activity=?12
+            WHERE id=?1",
+            params![
+                e.id,
+                e.name,
+                e.title,
+                e.department,
+                e.extension,
+                e.direct_phone,
+                e.avatar_url,
+                avail_str,
+                e.completed_cases as i64,
+                cust_json,
+                dom_json,
+                e.recent_activity
+            ],
+        )?;
+        if changed == 0 {
+            return Err(rusqlite::Error::QueryReturnedNoRows);
+        }
         Ok(())
     }
 
@@ -729,7 +1068,7 @@ impl Database {
                 inquiry_summary, caller_name
             );
 
-            self.insert_employee(&emp)?;
+            self.update_employee(&emp)?;
             Ok(Some(emp))
         } else {
             Ok(None)

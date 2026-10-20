@@ -87,14 +87,38 @@ pub struct Customer {
     pub active_dossier_status: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub enum DocumentSourceType {
     SignedContract,
     OfficialTemplate,
     CrmNote,
     TicketResolution,
     TicketComment,
+    #[default]
     ChatMessage,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub enum DocumentSensitivity {
+    #[default]
+    ContainsPii,
+    SafeToDownload,
+}
+
+impl DocumentSensitivity {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            DocumentSensitivity::ContainsPii => "ContainsPii",
+            DocumentSensitivity::SafeToDownload => "SafeToDownload",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "SafeToDownload" => DocumentSensitivity::SafeToDownload,
+            _ => DocumentSensitivity::ContainsPii,
+        }
+    }
 }
 
 impl DocumentSourceType {
@@ -147,7 +171,7 @@ pub struct KeyFact {
     pub is_conflicting: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct DocumentItem {
     pub id: String,
     pub customer_id: String,
@@ -159,7 +183,9 @@ pub struct DocumentItem {
     pub author_role: String,
     pub summary: String,
     pub raw_content: String,
+    #[serde(skip_serializing)]
     pub unmasked_raw_content: Option<String>,
+    #[serde(skip_serializing)]
     pub file_path: Option<String>,
     pub file_name: Option<String>,
     pub file_size: Option<usize>,
@@ -167,6 +193,14 @@ pub struct DocumentItem {
     pub tags: Vec<String>,
     pub trust: TrustBreakdown,
     pub feedback: DocumentFeedback,
+    #[serde(default)]
+    pub sensitivity: DocumentSensitivity,
+    #[serde(default)]
+    pub facts_source: String,
+    #[serde(default)]
+    pub external_provider: Option<String>,
+    #[serde(default)]
+    pub external_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -263,6 +297,7 @@ pub struct AuditEntry {
 pub struct FeedbackSubmission {
     pub document_id: String,
     pub feedback_type: String,
+    #[serde(default)]
     pub employee_id: String,
 }
 
@@ -272,5 +307,50 @@ pub struct ResolveConflictInput {
     pub field: String,
     pub chosen_value: String,
     pub resolution_note: String,
+    #[serde(default)]
     pub resolved_by: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateUserInput {
+    pub username: String,
+    pub name: String,
+    pub email: String,
+    pub password: String,
+    pub role: UserRole,
+    pub clearance_level: String,
+    pub employee_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomerAssignment {
+    pub user_id: String,
+    pub customer_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AssignmentUpdate {
+    pub user_id: String,
+    pub customer_id: String,
+}
+
+pub const MAX_USERNAME: usize = 64;
+pub const MAX_TITLE: usize = 200;
+pub const MAX_SUMMARY: usize = 4000;
+pub const MAX_CONTENT: usize = 100_000;
+pub const MAX_FILENAME: usize = 200;
+pub const MAX_NOTE: usize = 4000;
+pub const MAX_INQUIRY: usize = 2000;
+pub const BCRYPT_COST: u32 = 12;
+
+pub fn sanitize_log(input: &str) -> String {
+    input
+        .chars()
+        .filter(|c| *c != '\n' && *c != '\r' && *c != '\0')
+        .take(500)
+        .collect()
+}
+
+pub fn within_len(value: &str, max: usize) -> bool {
+    !value.is_empty() && value.chars().count() <= max
 }

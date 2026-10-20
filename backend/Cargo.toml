@@ -19,3 +19,4 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 base64 = "0.22"
 jsonwebtoken = "9.3"
 bcrypt = "0.15"
+dotenv = "0.15"

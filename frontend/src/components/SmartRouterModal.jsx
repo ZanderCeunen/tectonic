@@ -1,17 +1,20 @@
 import React, { useState, useMemo } from 'react';
-import { X, Check, Phone, PhoneCall, Search, Sparkles, HelpCircle } from 'lucide-react';
+import { X, Check, Phone, PhoneCall, Search, Sparkles, HelpCircle, Network, Users } from 'lucide-react';
+import ExpertiseGraphView from './ExpertiseGraphView';
 
 export default function SmartRouterModal({
   isOpen,
   onClose,
   customer,
-  employees,
-  conflicts,
+  customers = [],
+  employees = [],
+  conflicts = [],
   activeUser,
   onExecuteHandoff,
 }) {
   if (!isOpen) return null;
 
+  const [activeTab, setActiveTab] = useState('match'); // 'match' | 'graph'
   const [searchQuery, setSearchQuery] = useState('');
   const [isCalling, setIsCalling] = useState(false);
   const [callSuccess, setCallSuccess] = useState(null);
@@ -150,7 +153,7 @@ export default function SmartRouterModal({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl max-w-xl w-full border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div className={`bg-white rounded-xl w-full border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 ${activeTab === 'graph' ? 'max-w-3xl' : 'max-w-xl'}`}>
         {/* Header */}
         <div className="bg-[#005FB8] text-white px-5 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
@@ -159,7 +162,7 @@ export default function SmartRouterModal({
             </div>
             <div>
               <h3 className="text-sm font-bold text-white flex items-center space-x-1.5">
-                <span>Expert Router & Internal Call</span>
+                <span>Expert Router & Case Assistant</span>
               </h3>
               <p className="text-[11px] text-blue-100">
                 {customer ? `${customer.name} (${customer.joint_committee?.split(' - ')[0] || 'Customer Case'})` : 'SD Worx Internal Colleagues'}
@@ -174,8 +177,39 @@ export default function SmartRouterModal({
           </button>
         </div>
 
+        {/* View Switcher Tabs */}
+        <div className="bg-slate-50 px-5 py-2 border-b border-slate-200 flex items-center justify-between">
+          <div className="flex items-center space-x-1">
+            <button
+              onClick={() => setActiveTab('match')}
+              className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors flex items-center space-x-1.5 ${
+                activeTab === 'match'
+                  ? 'bg-white text-[#005FB8] shadow-2xs border border-slate-200'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <PhoneCall className="w-3.5 h-3.5" />
+              <span>Ranked Experts</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('graph')}
+              className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors flex items-center space-x-1.5 ${
+                activeTab === 'graph'
+                  ? 'bg-white text-[#005FB8] shadow-2xs border border-slate-200'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Network className="w-3.5 h-3.5" />
+              <span>Expertise Matrix</span>
+            </button>
+          </div>
+          <span className="text-[11px] text-slate-500">
+            {availableEmployees.length} Colleagues Available
+          </span>
+        </div>
+
         {/* Modal Content */}
-        <div className="p-5 space-y-4">
+        <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
           {callSuccess ? (
             <div className="py-6 text-center space-y-3">
               <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto border border-emerald-200">
@@ -200,6 +234,12 @@ export default function SmartRouterModal({
                 </button>
               </div>
             </div>
+          ) : activeTab === 'graph' ? (
+            <ExpertiseGraphView
+              employees={employees}
+              customers={customers.length > 0 ? customers : customer ? [customer] : []}
+              selectedCustomerId={customer?.id || 'CUST-001'}
+            />
           ) : (
             <>
               {/* Question & Keyword Search Input */}
@@ -214,62 +254,59 @@ export default function SmartRouterModal({
                     placeholder="Type a topic or question (e.g. Expat, Construction PC 124, Flexi-jobs, IFIC, Overtime...)"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#005FB8] focus:bg-white transition-all shadow-2xs font-medium"
+                    className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#005FB8] focus:bg-white transition-all shadow-2xs font-medium"
                     autoFocus
                   />
                   {searchQuery && (
                     <button
                       onClick={() => setSearchQuery('')}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs px-1.5 py-0.5 rounded"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                     >
-                      ✕
+                      <X className="w-3.5 h-3.5" />
                     </button>
                   )}
                 </div>
               </div>
 
-              {/* Matched Experts List */}
-              <div className="space-y-2 pt-1">
-                <div className="flex items-center justify-between text-xs font-semibold text-slate-600 px-0.5">
-                  <span className="flex items-center space-x-1">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                    <span>Recommended Colleagues ({rankedMatches.length})</span>
-                  </span>
-                  <span className="text-[11px] text-slate-400">Ranked by case record & expertise</span>
+              {/* Ranked Matches List */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-[11px] text-slate-500 font-semibold px-0.5">
+                  <span>Colleague & Specialization</span>
+                  <span>Match Score</span>
                 </div>
 
-                <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl max-h-72 overflow-y-auto shadow-2xs bg-white">
+                <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
                   {rankedMatches.map((expert, idx) => {
                     const isTop = idx === 0;
                     return (
                       <div
                         key={expert.id}
-                        className={`p-3.5 flex items-start justify-between gap-3 transition-colors ${
-                          isTop ? 'bg-blue-50/50 hover:bg-blue-50/80' : 'hover:bg-slate-50'
+                        className={`p-3 rounded-xl border transition-all flex items-center justify-between ${
+                          isTop
+                            ? 'bg-blue-50/50 border-[#005FB8] shadow-2xs'
+                            : 'bg-white border-slate-200 hover:border-slate-300'
                         }`}
                       >
-                        <div className="flex items-start space-x-3 min-w-0">
+                        <div className="flex items-start space-x-3 min-w-0 flex-1">
                           <img
-                            src={expert.avatar_url}
+                            src={expert.avatar_url || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150'}
                             alt={expert.name}
-                            className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0 mt-0.5"
+                            className="w-9 h-9 rounded-full object-cover shrink-0 border border-slate-200 mt-0.5"
                           />
-                          <div className="min-w-0 space-y-0.5">
-                            <div className="flex items-center space-x-2 flex-wrap">
+
+                          <div className="min-w-0 flex-1 space-y-0.5">
+                            <div className="flex items-center space-x-1.5 flex-wrap">
                               <span className="text-xs font-bold text-slate-900 truncate">
                                 {expert.name}
                               </span>
-                              <span
-                                className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
-                                  isTop
-                                    ? 'bg-emerald-600 text-white'
-                                    : 'bg-slate-100 text-slate-700'
-                                }`}
-                              >
+                              {isTop && (
+                                <span className="inline-flex items-center space-x-0.5 px-1.5 py-0.2 rounded text-[10px] font-bold bg-[#005FB8] text-white">
+                                  <Sparkles className="w-2.5 h-2.5" />
+                                  <span>Best Match</span>
+                                </span>
+                              )}
+                              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-700">
                                 {expert.overallMatch}% Match
-                              </span>
-                              <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-blue-100 text-[#005FB8]">
-                                {expert.completed_cases} cases resolved
                               </span>
                             </div>
 

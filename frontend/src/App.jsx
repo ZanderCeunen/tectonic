@@ -8,9 +8,13 @@ import LoginModal from './components/LoginModal';
 import LoginScreen from './components/LoginScreen';
 import CustomerManagerModal from './components/CustomerManagerModal';
 import EmployeeManagerModal from './components/EmployeeManagerModal';
+import AdminConsole from './components/AdminConsole';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 export default function App() {
+  const [authToken, setAuthToken] = useState(localStorage.getItem('tectonic_jwt') || '');
+  const [activeUser, setActiveUser] = useState(null);
+
   const [customers, setCustomers] = useState([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
   const [documents, setDocuments] = useState([]);
@@ -19,8 +23,8 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [backendError, setBackendError] = useState(null);
 
-  const [authToken, setAuthToken] = useState(localStorage.getItem('tectonic_jwt') || '');
-  const [activeUser, setActiveUser] = useState(null);
+  // Surface view mode: User surface vs Admin Control Surface
+  const [isAdminView, setIsAdminView] = useState(false);
 
   // Modals state
   const [isRouterOpen, setIsRouterOpen] = useState(false);
@@ -32,55 +36,73 @@ export default function App() {
   const [customerToEdit, setCustomerToEdit] = useState(null);
   const [employeeToEdit, setEmployeeToEdit] = useState(null);
 
-  // 1. Load initial data from the Rust Backend
+  // Logout handler
+  const handleLogout = () => {
+    localStorage.removeItem('tectonic_jwt');
+    setAuthToken('');
+    setActiveUser(null);
+    setCustomers([]);
+    setDocuments([]);
+    setConflicts([]);
+    setSelectedCustomerId(null);
+    setIsAdminView(false);
+  };
+
+  // 1. Load user profile and initial assigned data
   const loadInitialData = async () => {
+    if (!authToken) {
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setBackendError(null);
+
     try {
-      const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
+      const authHeader = { Authorization: `Bearer ${authToken}` };
 
-      // Fetch customers from SQLite database
-      const custRes = await fetch('/api/customers', { headers });
-      if (!custRes.ok) throw new Error(`Backend error fetching customers: ${custRes.status}`);
-      const custData = await custRes.json();
-      setCustomers(custData);
+      // Step A: Fetch current user profile
+      const meRes = await fetch('/api/auth/me', { headers: authHeader });
+      if (!meRes.ok) {
+        if (meRes.status === 401) {
+          handleLogout();
+          return;
+        }
+        throw new Error(`Profile check failed (${meRes.status})`);
+      }
+      const meUser = await meRes.json();
+      setActiveUser({
+        id: meUser.id,
+        name: meUser.name,
+        role: typeof meUser.role === 'string' ? meUser.role : 'Consultant',
+        clearance_level: meUser.clearance_level || 'Standard',
+        username: meUser.username,
+        avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+      });
 
-      // Fetch employees from SQLite database
-      const empRes = await fetch('/api/employees', { headers });
-      if (!empRes.ok) throw new Error(`Backend error fetching employees: ${empRes.status}`);
-      const empData = await empRes.json();
-      setEmployees(empData);
+      // Step B: Fetch assigned customer cases
+      const custRes = await fetch('/api/customers', { headers: authHeader });
+      if (custRes.ok) {
+        const custData = await custRes.json();
+        setCustomers(custData || []);
+      }
 
-      // Fetch active conflicts across customers
+      // Step C: Fetch employees for routing
+      const empRes = await fetch('/api/employees', { headers: authHeader });
+      if (empRes.ok) {
+        const empData = await empRes.json();
+        setEmployees(empData || []);
+      }
+
+      // Step D: Fetch active conflict summary across assigned dossiers
       try {
-        const confRes = await fetch('/api/customers/CUST-001/conflicts', { headers });
+        const confRes = await fetch('/api/conflicts/summary', { headers: authHeader });
         if (confRes.ok) {
           const confData = await confRes.json();
           setConflicts(confData || []);
         }
       } catch (e) {
-        // Ignore if no conflicts
-      }
-
-      // Check active JWT session if present
-      if (authToken) {
-        try {
-          const meRes = await fetch('/api/auth/me', {
-            headers: { Authorization: `Bearer ${authToken}` },
-          });
-          if (meRes.ok) {
-            const meUser = await meRes.json();
-            setActiveUser({
-              id: meUser.id,
-              name: meUser.name,
-              role: typeof meUser.role === 'string' ? meUser.role : 'Consultant',
-              clearance_level: meUser.clearance_level || 'Standard',
-              avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-            });
-          }
-        } catch (e) {
-          // Token invalid
-        }
+        // Fallback gracefully if summary endpoint unavailable
       }
 
       setIsLoading(false);
@@ -95,9 +117,9 @@ export default function App() {
     loadInitialData();
   }, [authToken]);
 
-  // 2. Load documents and conflicts for the selected customer
+  // 2. Load documents and conflicts for the selected customer dossier
   const loadCustomerDocuments = async (customerId) => {
-    if (!customerId) {
+    if (!customerId || !authToken) {
       setDocuments([]);
       setConflicts([]);
       return;
@@ -105,12 +127,19 @@ export default function App() {
 
     try {
       const docRes = await fetch(`/api/customers/${customerId}/documents`, {
-        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+        headers: { Authorization: `Bearer ${authToken}` },
       });
-      if (!docRes.ok) throw new Error(`Backend error fetching documents: ${docRes.status}`);
-      const docData = await docRes.json();
-      setDocuments(docData.documents || []);
-      setConflicts(docData.conflicts || []);
+      if (docRes.ok) {
+        const docData = await docRes.json();
+        setDocuments(docData.documents || []);
+        setConflicts(docData.conflicts || []);
+      } else if (docRes.status === 401) {
+        handleLogout();
+      } else if (docRes.status === 404) {
+        // IDOR / assignment isolation: user is not assigned to this case
+        setSelectedCustomerId(null);
+        alert('Case not found or you are not authorized to view this customer dossier.');
+      }
     } catch (err) {
       console.error('Error fetching documents:', err);
     }
@@ -124,17 +153,18 @@ export default function App() {
 
   // 3. Document feedback interaction via Backend
   const handleFeedback = async (docId, type) => {
+    if (!authToken) return;
     try {
       const res = await fetch(`/api/documents/${docId}/feedback`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+          Authorization: `Bearer ${authToken}`,
         },
         body: JSON.stringify({
           document_id: docId,
           feedback_type: type,
-          employee_id: activeUser ? activeUser.name : 'Tom De Smet',
+          employee_id: activeUser ? activeUser.name : '',
         }),
       });
 
@@ -150,68 +180,50 @@ export default function App() {
 
   // 4. Resolve Conflict Handler
   const handleResolveConflict = async (conflictData) => {
+    if (!authToken) return;
     try {
       const custId = conflictData.customer_id || selectedCustomerId;
       const fld = conflictData.field || conflictData.topic || 'work_schedule';
       const val = conflictData.chosen_value || conflictData.resolved_value;
-
-      // Optimistically clear the active conflict and standardize key facts
-      setConflicts([]);
-      setDocuments((prevDocs) =>
-        prevDocs.map((doc) => ({
-          ...doc,
-          key_facts: doc.key_facts?.map((fact) =>
-            fact.field.toLowerCase() === fld.toLowerCase() || fact.label.toLowerCase() === fld.toLowerCase()
-              ? { ...fact, value: val, is_conflicting: false }
-              : fact
-          ),
-          trust: {
-            ...doc.trust,
-            conflict_flag: false,
-            consensus_score: 95.0,
-            overall_score: Math.min(98, Math.max(doc.trust?.overall_score || 50, 90)),
-          },
-        }))
-      );
+      const note = conflictData.resolution_note || 'Resolved via Tectonic Portal.';
 
       const res = await fetch('/api/conflicts/resolve', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+          Authorization: `Bearer ${authToken}`,
         },
         body: JSON.stringify({
           customer_id: custId,
           field: fld,
           chosen_value: val,
-          resolution_note: conflictData.resolution_note || conflictData.resolution_notes || 'Resolved by consultant',
-          resolved_by: activeUser ? activeUser.name : 'Tom De Smet',
+          resolution_note: note,
+          resolved_by: activeUser ? activeUser.name : '',
         }),
       });
 
       if (res.ok) {
-        if (custId) {
-          await loadCustomerDocuments(custId);
+        if (selectedCustomerId) {
+          await loadCustomerDocuments(selectedCustomerId);
         }
-      } else {
-        console.error('Failed to resolve conflict on backend, status:', res.status);
       }
     } catch (e) {
       console.error('Error resolving conflict:', e);
     }
   };
 
-  // 5. Customer handoff via Backend
+  // 5. Customer handoff via Backend (with Authorization header)
   const handleExecuteHandoff = async (handoffData) => {
+    if (!authToken) return;
     try {
       const res = await fetch('/api/routing/handoff', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+          Authorization: `Bearer ${authToken}`,
         },
         body: JSON.stringify({
-          customer_id: selectedCustomerId,
+          customer_id: selectedCustomerId || handoffData.customer_id || 'CUST-001',
           employee_id: handoffData.employee_id,
           caller_name: handoffData.caller_name,
           inquiry_summary: handoffData.inquiry_summary,
@@ -220,10 +232,13 @@ export default function App() {
       });
 
       if (res.ok) {
-        const empRes = await fetch('/api/employees');
+        // Refetch employees with Authorization header!
+        const empRes = await fetch('/api/employees', {
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
         if (empRes.ok) {
           const empData = await empRes.json();
-          setEmployees(empData);
+          setEmployees(empData || []);
         }
       }
     } catch (e) {
@@ -231,22 +246,18 @@ export default function App() {
     }
   };
 
-  // 6. Login & Logout Callbacks
+  // 6. Login Success Callback
   const handleLoginSuccess = (user, token) => {
+    localStorage.setItem('tectonic_jwt', token);
     setAuthToken(token);
     setActiveUser({
       id: user.id,
       name: user.name,
       role: typeof user.role === 'string' ? user.role : 'Consultant',
       clearance_level: user.clearance_level || 'Standard',
+      username: user.username,
       avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
     });
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('tectonic_jwt');
-    setAuthToken('');
-    setActiveUser(null);
   };
 
   // 7. Customer Save Callback
@@ -289,7 +300,7 @@ export default function App() {
           <div>
             <h2 className="text-base font-bold text-slate-900">Backend API Connection Required</h2>
             <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-              The TECTONIC Dashboard frontend connects to SQLite through the Rust Backend. Ensure the backend is running on <code className="font-mono bg-slate-100 px-1 py-0.5 rounded">http://127.0.0.1:8080</code>.
+              The TECTONIC Dashboard connects to SQLite through the Rust Backend on <code className="font-mono bg-slate-100 px-1 py-0.5 rounded">http://127.0.0.1:8080</code>.
             </p>
           </div>
           <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-[11px] font-mono text-slate-700 text-left">
@@ -308,7 +319,7 @@ export default function App() {
     );
   }
 
-  // FLOW: If not logged in, render LoginScreen
+  // AUTHGATE: If not logged in, render LoginScreen only with NO background fetching!
   if (!authToken || !activeUser) {
     return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
   }
@@ -320,24 +331,42 @@ export default function App() {
         customers={customers}
         selectedCustomerId={selectedCustomerId}
         onOpenCustomerSearch={() => setIsCustomerSearchOpen(true)}
-        onGoHome={() => setSelectedCustomerId(null)}
+        onGoHome={() => {
+          setSelectedCustomerId(null);
+          setIsAdminView(false);
+        }}
         activeUser={activeUser}
         onOpenAddCustomer={() => {
           setCustomerToEdit(null);
           setIsCustomerManagerOpen(true);
         }}
-        onOpenLogin={() => setIsLoginOpen(true)}
         onLogout={handleLogout}
+        isAdminView={isAdminView}
+        onToggleAdminView={() => setIsAdminView(!isAdminView)}
       />
 
-      {/* Main Content: Customer File or Home Dashboard */}
+      {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-5">
         {isLoading ? (
           <div className="py-20 text-center text-slate-500 text-xs flex items-center justify-center space-x-2">
             <RefreshCw className="w-4 h-4 animate-spin text-[#005FB8]" />
-            <span>Loading customer accounts and database records...</span>
+            <span>Loading verified dossiers and security policies...</span>
           </div>
+        ) : isAdminView ? (
+          /* Admin Control Surface */
+          <AdminConsole
+            authToken={authToken}
+            activeUser={activeUser}
+            customers={customers}
+            employees={employees}
+            onRefreshData={loadInitialData}
+            onOpenEmployeeModal={(emp) => {
+              setEmployeeToEdit(emp);
+              setIsEmployeeManagerOpen(true);
+            }}
+          />
         ) : selectedCustomer ? (
+          /* Customer Hub / Dossier View */
           <CustomerHub
             customer={selectedCustomer}
             documents={documents}
@@ -350,27 +379,23 @@ export default function App() {
             onBackToHome={() => setSelectedCustomerId(null)}
           />
         ) : (
+          /* User Home: Dossiers-First Dashboard */
           <HomeDashboard
             customers={customers}
-            employees={employees}
             conflicts={conflicts}
             activeUser={activeUser}
             onSelectCustomer={(id) => setSelectedCustomerId(id)}
-            onOpenCustomerSearch={() => setIsCustomerSearchOpen(true)}
-            onOpenAddCustomer={() => {
-              setCustomerToEdit(null);
-              setIsCustomerManagerOpen(true);
-            }}
             onOpenRouter={() => setIsRouterOpen(true)}
           />
         )}
       </main>
 
-      {/* Modal: Smart Routing & Call Transfer */}
+      {/* Modal: Smart Routing & Call Transfer (with embedded graph) */}
       <SmartRouterModal
         isOpen={isRouterOpen}
         onClose={() => setIsRouterOpen(false)}
         customer={selectedCustomer}
+        customers={customers}
         employees={employees}
         conflicts={conflicts}
         activeUser={activeUser}
@@ -384,13 +409,6 @@ export default function App() {
         customers={customers}
         selectedCustomerId={selectedCustomerId}
         onSelectCustomer={(id) => setSelectedCustomerId(id)}
-      />
-
-      {/* Modal: Login */}
-      <LoginModal
-        isOpen={isLoginOpen}
-        onClose={() => setIsLoginOpen(false)}
-        onLoginSuccess={handleLoginSuccess}
       />
 
       {/* Modal: Customer Manager */}
@@ -417,7 +435,7 @@ export default function App() {
           <span className="font-medium text-slate-600">
             SD Worx Knowledge Portal & Case Assistant
           </span>
-          <span>Internal Employee Environment</span>
+          <span>Security & Compliance Engine Active (SHA-256 Ledger)</span>
         </div>
       </footer>
     </div>

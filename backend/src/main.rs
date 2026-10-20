@@ -1,164 +1,221 @@
+mod auth;
 mod db;
 mod expertise_graph;
+mod handlers;
 mod mock_data;
 mod models;
+mod rbac;
 mod security;
 mod trust_engine;
 
-use axum::{
-    async_trait,
-    extract::{FromRequestParts, Path, Query, State},
-    http::{header, request::Parts, HeaderMap, StatusCode},
-    response::IntoResponse,
-    routing::{get, post, put},
-    Json, Router,
-};
-use base64::Engine;
-use chrono::Utc;
+use auth::{login_user, get_current_user_profile, LoginLimiter};
 use db::Database;
-use expertise_graph::ExpertiseGraph;
-use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
-use mock_data::{get_mock_customers, get_mock_documents, get_mock_employees, get_mock_users};
-use models::{
-    AuditEntry, Claims, Customer, DocumentFeedback, DocumentItem, DocumentSourceType,
-    FeedbackSubmission, HandoffRequest, KeyFact, LoginRequest, LoginResponse,
-    RoutingRecommendation, RoutingRequest, TrustBreakdown, UserAccount,
-};
-use security::{AuditChain, PiiRedactor};
-use serde::{Deserialize, Serialize};
+use handlers::{admin, customers, documents, routing};
+use security::AuditChain;
 use std::sync::{Arc, Mutex};
+use axum::{
+    http::{header, HeaderValue, Method, StatusCode},
+    response::IntoResponse,
+    routing::{delete, get, post, put},
+    Router,
+};
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use trust_engine::TrustEngine;
-use uuid::Uuid;
-
-pub fn get_jwt_secret() -> Vec<u8> {
-    std::env::var("JWT_SECRET")
-        .unwrap_or_else(|_| "SDWorx_Tectonic_Hackathon_Secret_2026_Key!".to_string())
-        .into_bytes()
-}
 
 #[derive(Clone)]
 pub struct AppState {
     pub db: Arc<Mutex<Database>>,
     pub audit_chain: AuditChain,
-}
-
-pub struct AuthUser {
-    pub username: String,
-    pub role: String,
-    pub clearance: String,
-}
-
-#[async_trait]
-impl<S> FromRequestParts<S> for AuthUser
-where
-    S: Send + Sync,
-{
-    type Rejection = StatusCode;
-
-    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        if let Some(auth_header) = parts.headers.get(header::AUTHORIZATION) {
-            if let Ok(auth_str) = auth_header.to_str() {
-                if auth_str.starts_with("Bearer ") {
-                    let token = &auth_str[7..];
-                    let secret = get_jwt_secret();
-                    let decoding_key = DecodingKey::from_secret(&secret);
-                    let mut validation = Validation::default();
-                    validation.validate_exp = false; // Graceful in demo / local testing
-
-                    if let Ok(token_data) = decode::<Claims>(token, &decoding_key, &validation) {
-                        return Ok(AuthUser {
-                            username: token_data.claims.username,
-                            role: token_data.claims.role,
-                            clearance: token_data.claims.clearance,
-                        });
-                    }
-                }
-            }
-        }
-        // Demo fallback for local development
-        Ok(AuthUser {
-            username: "tom.desmet".to_string(),
-            role: "Consultant".to_string(),
-            clearance: "Standard".to_string(),
-        })
-    }
+    pub jwt_secret: Vec<u8>,
+    pub login_limiter: Arc<LoginLimiter>,
+    pub dummy_password_hash: String,
 }
 
 #[tokio::main]
 async fn main() {
+    dotenv::dotenv().ok();
+
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "sdworx_backend=debug,tower_http=debug".into()),
+                .unwrap_or_else(|_| "sdworx_backend=info,tower_http=info".into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    // Directory voor fysieke documenten
+    // 1. Validate JWT_SECRET from environment (at least 32 bytes)
+    let jwt_secret = match std::env::var("JWT_SECRET") {
+        Ok(s) if s.len() >= 32 => s.into_bytes(),
+        Ok(s) => {
+            eprintln!(
+                "❌ FATAL: JWT_SECRET must be at least 32 bytes long (currently {} bytes).",
+                s.len()
+            );
+            std::process::exit(1);
+        }
+        Err(_) => {
+            eprintln!("❌ FATAL: JWT_SECRET environment variable is missing.");
+            eprintln!("💡 Set JWT_SECRET in your environment, e.g.:");
+            eprintln!("   export JWT_SECRET=\"SDWorx_Tectonic_Secure_Key_Min_32_Bytes_Long!\"");
+            std::process::exit(1);
+        }
+    };
+
+    // 2. Ensure physical documents directory exists
     std::fs::create_dir_all("uploads").ok();
 
-    // SQLite database
+    // 3. Open and seed SQLite database
     let db_path = "tectonic.db";
-    let db = Database::new(db_path).expect("Mislukt om SQLite database te openen");
+    let db = Database::new(db_path).expect("Failed to initialize SQLite database");
 
-    // Ensure all tables (users, customers, documents, employees) are seeded if empty
-    println!("🌱 SQLite database opstarten & controleren op voorbeelddata...");
-    let initial_customers = get_mock_customers();
-    let initial_docs = get_mock_documents();
-    let initial_employees = get_mock_employees();
-    let initial_users = get_mock_users();
+    println!("🌱 SQLite database opstarten & controleren op initiële data...");
+    let initial_customers = mock_data::get_mock_customers();
+    let initial_docs = mock_data::get_mock_documents();
+    let initial_employees = mock_data::get_mock_employees();
+    let initial_users = mock_data::get_mock_users();
+    let initial_assignments = mock_data::get_mock_assignments();
+
     db.seed(
         initial_customers,
         initial_docs,
         initial_employees,
         initial_users,
+        initial_assignments,
     )
-    .expect("Mislukt om database te seeden");
+    .expect("Failed to seed database");
 
+    // 4. Initialize Cryptographic SHA-256 Audit Chain
     let existing_audits = db.get_audit_entries().unwrap_or_default();
     let audit_chain = AuditChain::from_existing(existing_audits);
-
     for entry in audit_chain.get_entries() {
         db.insert_audit_entry(&entry).ok();
     }
 
+    // 5. Dummy password hash for constant-time comparison
+    let dummy_password_hash = bcrypt::hash(
+        "dummy-password-constant-time-mitigation",
+        models::BCRYPT_COST,
+    )
+    .unwrap_or_else(|_| "$2b$12$e9y.U725M.5Q3aH9eY8O9uB7l1J8q0W2k3L4m5N6o7P8q9R0S1T2U".to_string());
+
     let state = AppState {
         db: Arc::new(Mutex::new(db)),
         audit_chain,
+        jwt_secret,
+        login_limiter: Arc::new(LoginLimiter::new()),
+        dummy_password_hash,
     };
 
-    let app = Router::new()
+    // 6. Configured CORS from environment allowlist (replacing permissive CORS)
+    let allowed_origins_str = std::env::var("ALLOWED_ORIGINS").unwrap_or_else(|_| {
+        "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173".to_string()
+    });
+    let origins: Vec<HeaderValue> = allowed_origins_str
+        .split(',')
+        .filter_map(|s| s.trim().parse::<HeaderValue>().ok())
+        .collect();
+
+    let cors = CorsLayer::new()
+        .allow_origin(origins)
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::DELETE,
+            Method::OPTIONS,
+        ])
+        .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE, header::ACCEPT]);
+
+    // 7. Compose Public vs Protected Routers
+    let public_routes = Router::new()
         .route("/api/health", get(health_check))
-        .route("/api/auth/login", post(login_user))
+        .route("/api/auth/login", post(login_user));
+
+    let protected_routes = Router::new()
+        // Auth profile
         .route("/api/auth/me", get(get_current_user_profile))
-        .route("/api/customers", get(list_customers).post(create_customer))
+        // Customers & Dossiers
+        .route(
+            "/api/customers",
+            get(customers::list_customers).post(customers::create_customer),
+        )
         .route(
             "/api/customers/:id",
-            get(get_customer).put(update_customer),
+            get(customers::get_customer).put(customers::update_customer),
         )
-        .route("/api/customers/:id/documents", get(get_customer_documents))
-        .route("/api/customers/:id/conflicts", get(get_customer_conflicts))
-        .route("/api/conflicts/resolve", post(resolve_conflict_endpoint))
-        .route("/api/documents", post(create_document))
-        .route("/api/documents/:id/file", get(download_document_file))
-        .route("/api/documents/:id/feedback", post(submit_document_feedback))
-        .route("/api/routing/recommend", post(recommend_experts))
-        .route("/api/routing/handoff", post(execute_handoff))
-        .route("/api/employees", get(list_employees).post(create_employee))
-        .route("/api/employees/:id", put(update_employee))
-        .route("/api/users", get(list_users).post(create_user))
-        .route("/api/security/audit-chain", get(get_audit_chain))
-        .route("/api/security/verify", post(verify_audit_integrity))
-        .layer(CorsLayer::permissive())
+        .route(
+            "/api/customers/:id/documents",
+            get(documents::get_customer_documents),
+        )
+        .route(
+            "/api/customers/:id/conflicts",
+            get(documents::get_customer_conflicts),
+        )
+        .route(
+            "/api/conflicts/summary",
+            get(customers::conflict_summary),
+        )
+        .route(
+            "/api/conflicts/resolve",
+            post(documents::resolve_conflict_endpoint),
+        )
+        // Documents & Files
+        .route("/api/documents", post(documents::create_document))
+        .route(
+            "/api/documents/:id/file",
+            get(documents::download_document_file),
+        )
+        .route(
+            "/api/documents/:id/feedback",
+            post(documents::submit_document_feedback),
+        )
+        // Expert Routing & Employees
+        .route(
+            "/api/employees",
+            get(routing::list_employees).post(routing::create_employee),
+        )
+        .route("/api/employees/:id", put(routing::update_employee))
+        .route(
+            "/api/routing/recommend",
+            post(routing::recommend_experts),
+        )
+        .route("/api/routing/handoff", post(routing::execute_handoff))
+        // Admin: Users, Assignments, and Audit Chain
+        .route(
+            "/api/users",
+            get(admin::list_users).post(admin::create_user),
+        )
+        .route(
+            "/api/admin/assignments",
+            get(admin::list_assignments).post(admin::add_assignment),
+        )
+        .route(
+            "/api/admin/assignments/:user_id/:customer_id",
+            delete(admin::remove_assignment),
+        )
+        .route("/api/security/audit-chain", get(admin::get_audit_chain))
+        .route(
+            "/api/security/verify",
+            post(admin::verify_audit_integrity),
+        );
+
+    let app = Router::new()
+        .merge(public_routes)
+        .merge(protected_routes)
+        .layer(cors)
         .with_state(state);
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
+    let bind_addr = "0.0.0.0:8080";
+    let listener = tokio::net::TcpListener::bind(bind_addr).await.unwrap();
     println!("🚀 SD Worx TECTONIC Backend gestart op http://127.0.0.1:8080");
     println!("💾 SQLite Database actief op: {}", db_path);
-    println!("🔒 JWT Authenticatie & SHA-256 Audit Keten ACTIEF");
-    axum::serve(listener, app).await.unwrap();
+    println!("🔒 HS256 JWT Authenticatie, RBAC & SHA-256 Audit Keten ACTIEF");
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .await
+    .unwrap();
 }
 
 async fn health_check() -> impl IntoResponse {
@@ -166,713 +223,4 @@ async fn health_check() -> impl IntoResponse {
         StatusCode::OK,
         "SD Worx TECTONIC Backend API Status: ACTIVE & HEALTHY",
     )
-}
-
-// --- AUTHENTICATIE HANDLERS ---
-async fn login_user(
-    State(state): State<AppState>,
-    Json(credentials): Json<LoginRequest>,
-) -> Result<Json<LoginResponse>, StatusCode> {
-    let clean_username = credentials.username.trim();
-    let clean_password = credentials.password.trim();
-
-    let db = state.db.lock().unwrap();
-    let user = match db.get_user_by_username(clean_username) {
-        Ok(Some(u)) => u,
-        _ => {
-            // Constant-time dummy verification to eliminate timing enumeration attacks
-            let dummy_hash = "$2b$04$e9y.U725M.5Q3aH9eY8O9uB7l1J8q0W2k3L4m5N6o7P8q9R0S1T2U";
-            let _ = bcrypt::verify(clean_password, dummy_hash);
-            eprintln!("🔒 Login mislukt: Gebruiker '{}' niet gevonden in SQLite.", clean_username);
-            return Err(StatusCode::UNAUTHORIZED);
-        }
-    };
-
-    let valid = bcrypt::verify(clean_password, &user.password_hash).unwrap_or(false);
-    if !valid {
-        eprintln!("🔒 Login mislukt: Ongeldig wachtwoord voor gebruiker '{}'.", clean_username);
-        return Err(StatusCode::UNAUTHORIZED);
-    }
-
-    let exp = (Utc::now() + chrono::Duration::hours(24)).timestamp() as usize;
-    let claims = Claims {
-        sub: user.id.clone(),
-        username: user.username.clone(),
-        role: user.role.as_str().to_string(),
-        clearance: user.clearance_level.clone(),
-        exp,
-    };
-
-    let secret = get_jwt_secret();
-    let token = match encode(
-        &Header::default(),
-        &claims,
-        &EncodingKey::from_secret(&secret),
-    ) {
-        Ok(t) => t,
-        Err(_) => return Err(StatusCode::INTERNAL_SERVER_ERROR),
-    };
-
-    let entry = state.audit_chain.append(
-        &user.username,
-        user.role.as_str(),
-        "USER_LOGIN_SUCCESS",
-        &user.id,
-        &format!("Gebruiker {} succesvol ingelogd met JWT.", user.username),
-    );
-    db.insert_audit_entry(&entry).ok();
-
-    Ok(Json(LoginResponse { token, user }))
-}
-
-async fn get_current_user_profile(
-    auth: AuthUser,
-    State(state): State<AppState>,
-) -> Result<Json<UserAccount>, StatusCode> {
-    let db = state.db.lock().unwrap();
-    match db.get_user_by_username(&auth.username) {
-        Ok(Some(u)) => Ok(Json(u)),
-        _ => Err(StatusCode::NOT_FOUND),
-    }
-}
-
-async fn list_users(
-    auth: AuthUser,
-    State(state): State<AppState>,
-) -> Result<Json<Vec<UserAccount>>, StatusCode> {
-    if auth.role != "Admin" && auth.clearance != "Admin" {
-        return Err(StatusCode::FORBIDDEN);
-    }
-    let db = state.db.lock().unwrap();
-    Ok(Json(db.get_users().unwrap_or_default()))
-}
-
-async fn create_user(
-    auth: AuthUser,
-    State(state): State<AppState>,
-    Json(mut user): Json<UserAccount>,
-) -> Result<Json<UserAccount>, StatusCode> {
-    if auth.role != "Admin" && auth.clearance != "Admin" {
-        return Err(StatusCode::FORBIDDEN);
-    }
-    let db = state.db.lock().unwrap();
-    if user.id.is_empty() {
-        user.id = format!("USR-{}", Uuid::new_v4().simple().to_string()[..6].to_uppercase());
-    }
-    if !user.password_hash.starts_with("$2") {
-        user.password_hash = bcrypt::hash(&user.password_hash, 4).unwrap_or(user.password_hash);
-    }
-    if db.insert_user(&user).is_ok() {
-        let entry = state.audit_chain.append(
-            &auth.username,
-            &auth.role,
-            "CREATE_USER_ACCOUNT",
-            &user.id,
-            &format!("Nieuw gebruikersaccount aangemaakt: {}", user.username),
-        );
-        db.insert_audit_entry(&entry).ok();
-        Ok(Json(user))
-    } else {
-        Err(StatusCode::INTERNAL_SERVER_ERROR)
-    }
-}
-
-// --- CUSTOMER HANDLERS ---
-async fn list_customers(
-    _auth: AuthUser,
-    State(state): State<AppState>,
-) -> Json<Vec<Customer>> {
-    let db = state.db.lock().unwrap();
-    Json(db.get_customers().unwrap_or_default())
-}
-
-async fn get_customer(
-    _auth: AuthUser,
-    Path(id): Path<String>,
-    State(state): State<AppState>,
-) -> Result<Json<Customer>, StatusCode> {
-    let db = state.db.lock().unwrap();
-    match db.get_customer_by_id(&id) {
-        Ok(Some(c)) => Ok(Json(c)),
-        _ => Err(StatusCode::NOT_FOUND),
-    }
-}
-
-async fn create_customer(
-    auth: AuthUser,
-    State(state): State<AppState>,
-    Json(customer): Json<Customer>,
-) -> Result<Json<Customer>, StatusCode> {
-    if auth.clearance != "Senior" && auth.clearance != "Admin" && auth.role != "SeniorPayrollOfficer" && auth.role != "Admin" {
-        return Err(StatusCode::FORBIDDEN);
-    }
-    let db = state.db.lock().unwrap();
-    if db.insert_customer(&customer).is_ok() {
-        let entry = state.audit_chain.append(
-            &auth.username,
-            &auth.role,
-            "CREATE_CUSTOMER",
-            &customer.id,
-            &format!("Nieuwe klant geregistreerd in SQLite: {}", customer.name),
-        );
-        db.insert_audit_entry(&entry).ok();
-        Ok(Json(customer))
-    } else {
-        Err(StatusCode::INTERNAL_SERVER_ERROR)
-    }
-}
-
-async fn update_customer(
-    auth: AuthUser,
-    Path(id): Path<String>,
-    State(state): State<AppState>,
-    Json(mut customer): Json<Customer>,
-) -> Result<Json<Customer>, StatusCode> {
-    if auth.clearance != "Senior" && auth.clearance != "Admin" && auth.role != "SeniorPayrollOfficer" && auth.role != "Admin" {
-        return Err(StatusCode::FORBIDDEN);
-    }
-    customer.id = id;
-    let db = state.db.lock().unwrap();
-    if db.insert_customer(&customer).is_ok() {
-        let entry = state.audit_chain.append(
-            &auth.username,
-            &auth.role,
-            "UPDATE_CUSTOMER",
-            &customer.id,
-            &format!("Klantgegevens bijgewerkt in SQLite: {}", customer.name),
-        );
-        db.insert_audit_entry(&entry).ok();
-        Ok(Json(customer))
-    } else {
-        Err(StatusCode::INTERNAL_SERVER_ERROR)
-    }
-}
-
-// --- DOCUMENT HANDLERS ---
-#[derive(Deserialize)]
-struct DocQuery {
-    pub redact_pii: Option<bool>,
-    pub redact_salaries: Option<bool>,
-}
-
-#[derive(Serialize)]
-struct CustomerDocumentsResponse {
-    pub customer_id: String,
-    pub documents: Vec<DocumentItem>,
-    pub conflicts: Vec<crate::models::ConflictAlert>,
-}
-
-async fn get_customer_documents(
-    auth: AuthUser,
-    Path(customer_id): Path<String>,
-    Query(query): Query<DocQuery>,
-    State(state): State<AppState>,
-) -> Json<CustomerDocumentsResponse> {
-    let db = state.db.lock().unwrap();
-    let customer_docs = db.get_documents_by_customer_id(&customer_id).unwrap_or_default();
-
-    let (evaluated_docs, conflicts) =
-        TrustEngine::evaluate_all_documents(customer_docs, &customer_id);
-
-    // Security RBAC Check: Only users with Senior or Admin clearance can unmask PII or Salaries!
-    let has_senior_clearance = auth.clearance == "Senior"
-        || auth.clearance == "Admin"
-        || auth.role == "SeniorPayrollOfficer"
-        || auth.role == "Admin";
-
-    let redact_pii = if !has_senior_clearance {
-        true
-    } else {
-        query.redact_pii.unwrap_or(true)
-    };
-
-    let redact_salaries = if !has_senior_clearance {
-        true
-    } else {
-        query.redact_salaries.unwrap_or(true)
-    };
-
-    let sanitized_docs: Vec<DocumentItem> = evaluated_docs
-        .into_iter()
-        .map(|mut doc| {
-            if redact_pii {
-                doc.raw_content = PiiRedactor::redact_text(&doc.raw_content, redact_salaries);
-            }
-            doc
-        })
-        .collect();
-
-    let entry = state.audit_chain.append(
-        &auth.username,
-        &auth.role,
-        "VIEW_CUSTOMER_DOCUMENTS",
-        &customer_id,
-        &format!(
-            "Documenten geconsulteerd voor klant {}. PII gemaskeerd: {}, Conflicten: {}",
-            customer_id,
-            redact_pii,
-            conflicts.len()
-        ),
-    );
-    db.insert_audit_entry(&entry).ok();
-
-    Json(CustomerDocumentsResponse {
-        customer_id,
-        documents: sanitized_docs,
-        conflicts,
-    })
-}
-
-async fn get_customer_conflicts(
-    _auth: AuthUser,
-    Path(customer_id): Path<String>,
-    State(state): State<AppState>,
-) -> Json<Vec<crate::models::ConflictAlert>> {
-    let db = state.db.lock().unwrap();
-    let customer_docs = db.get_documents_by_customer_id(&customer_id).unwrap_or_default();
-    let (_, conflicts) = TrustEngine::evaluate_all_documents(customer_docs, &customer_id);
-    Json(conflicts)
-}
-
-#[derive(Deserialize)]
-pub struct CreateDocumentInput {
-    pub customer_id: String,
-    pub title: String,
-    pub source_type: String,
-    pub author: String,
-    pub author_role: Option<String>,
-    pub summary: String,
-    pub raw_content: String,
-    pub file_name: Option<String>,
-    pub file_base64: Option<String>,
-    pub key_facts: Option<Vec<KeyFact>>,
-    pub tags: Option<Vec<String>>,
-}
-
-async fn create_document(
-    auth: AuthUser,
-    State(state): State<AppState>,
-    Json(input): Json<CreateDocumentInput>,
-) -> Result<Json<DocumentItem>, StatusCode> {
-    let db = state.db.lock().unwrap();
-
-    let st = match input.source_type.as_str() {
-        "SignedContract" => DocumentSourceType::SignedContract,
-        "OfficialTemplate" => DocumentSourceType::OfficialTemplate,
-        "CrmNote" => DocumentSourceType::CrmNote,
-        "TicketResolution" => DocumentSourceType::TicketResolution,
-        "TicketComment" => DocumentSourceType::TicketComment,
-        _ => DocumentSourceType::ChatMessage,
-    };
-
-    let doc_id = format!("DOC-{}", Uuid::new_v4().simple().to_string()[..6].to_uppercase());
-    let now_str = chrono::Utc::now().format("%Y-%m-%d").to_string();
-
-    let mut saved_file_path: Option<String> = None;
-    let mut saved_file_size: Option<usize> = None;
-
-    if let (Some(b64), Some(raw_fname)) = (input.file_base64, input.file_name.clone()) {
-        // Enforce max 15MB base64 payload size limit (~10MB file limit)
-        if b64.len() > 15 * 1024 * 1024 {
-            return Err(StatusCode::PAYLOAD_TOO_LARGE);
-        }
-
-        // Sanitize filename to eliminate path traversal sequences
-        let safe_fname = std::path::Path::new(&raw_fname)
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("file.bin")
-            .replace(|c: char| !c.is_alphanumeric() && c != '.' && c != '_' && c != '-', "");
-
-        let file_path = format!("uploads/{}_{}", doc_id, safe_fname);
-
-        if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(&b64) {
-            if std::fs::write::<&String, &[u8]>(&file_path, &bytes).is_ok() {
-                // Verify canonical path resides strictly inside uploads/ directory
-                if let (Ok(canonical_uploads), Ok(canonical_file)) = (
-                    std::fs::canonicalize("uploads"),
-                    std::fs::canonicalize(&file_path),
-                ) {
-                    if canonical_file.starts_with(&canonical_uploads) {
-                        saved_file_size = Some(bytes.len());
-                        saved_file_path = Some(file_path);
-                    } else {
-                        std::fs::remove_file(&file_path).ok();
-                        return Err(StatusCode::FORBIDDEN);
-                    }
-                } else {
-                    saved_file_size = Some(bytes.len());
-                    saved_file_path = Some(file_path);
-                }
-            }
-        }
-    }
-
-    let unmasked = input.raw_content.clone();
-    let mut doc = DocumentItem {
-        id: doc_id.clone(),
-        customer_id: input.customer_id.clone(),
-        title: input.title,
-        source_type: st.clone(),
-        source_label: st.label().to_string(),
-        date: now_str,
-        author: input.author,
-        author_role: input.author_role.unwrap_or_else(|| auth.role.clone()),
-        summary: input.summary,
-        raw_content: input.raw_content,
-        unmasked_raw_content: Some(unmasked),
-        file_path: saved_file_path,
-        file_name: input.file_name,
-        file_size: saved_file_size,
-        key_facts: input.key_facts.unwrap_or_default(),
-        tags: input.tags.unwrap_or_default(),
-        trust: TrustBreakdown::default(),
-        feedback: DocumentFeedback::default(),
-    };
-
-    // Compute trust score strictly server-side
-    doc.trust = TrustEngine::compute_trust(&doc, 80.0, false);
-
-    if db.insert_document(&doc).is_ok() {
-        let entry = state.audit_chain.append(
-            &auth.username,
-            &auth.role,
-            "CREATE_DOCUMENT",
-            &doc_id,
-            &format!(
-                "Nieuw document toegevoegd voor klant {}: '{}'",
-                input.customer_id, doc.title
-            ),
-        );
-        db.insert_audit_entry(&entry).ok();
-        Ok(Json(doc))
-    } else {
-        Err(StatusCode::INTERNAL_SERVER_ERROR)
-    }
-}
-
-async fn download_document_file(
-    _auth: AuthUser,
-    Path(doc_id): Path<String>,
-    State(state): State<AppState>,
-) -> Result<impl IntoResponse, StatusCode> {
-    let db = state.db.lock().unwrap();
-    let doc = match db.get_document_by_id(&doc_id) {
-        Ok(Some(d)) => d,
-        _ => return Err(StatusCode::NOT_FOUND),
-    };
-
-    let file_path = match doc.file_path {
-        Some(fp) => fp,
-        None => return Err(StatusCode::NOT_FOUND),
-    };
-
-    // Verify canonical path is inside uploads/ base directory
-    let canonical_uploads = std::fs::canonicalize("uploads").map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let canonical_file = std::fs::canonicalize(&file_path).map_err(|_| StatusCode::FORBIDDEN)?;
-    if !canonical_file.starts_with(&canonical_uploads) {
-        return Err(StatusCode::FORBIDDEN);
-    }
-
-    let bytes = match std::fs::read(&canonical_file) {
-        Ok(b) => b,
-        Err(_) => return Err(StatusCode::NOT_FOUND),
-    };
-
-    let file_name = doc.file_name.unwrap_or_else(|| "document.bin".to_string());
-    let mut headers = HeaderMap::new();
-    headers.insert(
-        header::CONTENT_TYPE,
-        "application/octet-stream".parse().unwrap(),
-    );
-    headers.insert(
-        header::CONTENT_DISPOSITION,
-        format!("attachment; filename=\"{}\"", file_name)
-            .parse()
-            .unwrap(),
-    );
-
-    Ok((headers, bytes))
-}
-
-async fn submit_document_feedback(
-    auth: AuthUser,
-    Path(doc_id): Path<String>,
-    State(state): State<AppState>,
-    Json(feedback): Json<FeedbackSubmission>,
-) -> Result<Json<DocumentItem>, StatusCode> {
-    let db = state.db.lock().unwrap();
-    let emp_id = if feedback.employee_id.is_empty() {
-        auth.username.clone()
-    } else {
-        feedback.employee_id.clone()
-    };
-
-    match db.update_feedback(&doc_id, &feedback.feedback_type, &emp_id) {
-        Ok(Some(doc)) => {
-            let entry = state.audit_chain.append(
-                &auth.username,
-                &auth.role,
-                "SUBMIT_DOCUMENT_FEEDBACK",
-                &doc_id,
-                &format!(
-                    "Feedback registered in database: {} for document '{}'",
-                    feedback.feedback_type, doc.title
-                ),
-            );
-            db.insert_audit_entry(&entry).ok();
-            Ok(Json(doc))
-        }
-        Ok(None) => Err(StatusCode::NOT_FOUND),
-        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
-    }
-}
-
-#[derive(Serialize)]
-struct ConflictResolveResponse {
-    pub success: bool,
-    pub message: String,
-    pub resolution_document: DocumentItem,
-}
-
-async fn resolve_conflict_endpoint(
-    auth: AuthUser,
-    State(state): State<AppState>,
-    Json(input): Json<crate::models::ResolveConflictInput>,
-) -> Result<Json<ConflictResolveResponse>, StatusCode> {
-    let db = state.db.lock().unwrap();
-    let resolver = if input.resolved_by.is_empty() {
-        auth.username.clone()
-    } else {
-        input.resolved_by.clone()
-    };
-
-    match db.resolve_conflict(
-        &input.customer_id,
-        &input.field,
-        &input.chosen_value,
-        &input.resolution_note,
-        &resolver,
-    ) {
-        Ok(res_doc) => {
-            let entry = state.audit_chain.append(
-                &auth.username,
-                &auth.role,
-                "RESOLVE_DOCUMENT_CONFLICT",
-                &input.customer_id,
-                &format!(
-                    "Conflict resolved for field '{}' to standard value '{}'. Resolution doc: {}",
-                    input.field, input.chosen_value, res_doc.title
-                ),
-            );
-            db.insert_audit_entry(&entry).ok();
-
-            Ok(Json(ConflictResolveResponse {
-                success: true,
-                message: format!(
-                    "Conflict on '{}' successfully resolved. Standardized to '{}'.",
-                    input.field, input.chosen_value
-                ),
-                resolution_document: res_doc,
-            }))
-        }
-        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
-    }
-}
-
-// --- ROUTING HANDLERS ---
-async fn recommend_experts(
-    auth: AuthUser,
-    State(state): State<AppState>,
-    Json(req): Json<RoutingRequest>,
-) -> Json<Vec<RoutingRecommendation>> {
-    let db = state.db.lock().unwrap();
-    let employees = db.get_employees().unwrap_or_default();
-    let expertise_graph = ExpertiseGraph::new(employees);
-    let recommendations = expertise_graph.recommend_experts(&req);
-
-    let target_cust = req.customer_id.as_deref().unwrap_or("Algemeen");
-    let query_summary = req.query.as_deref().unwrap_or_else(|| req.domain.as_deref().unwrap_or("Zoekopdracht"));
-
-    let entry = state.audit_chain.append(
-        &auth.username,
-        &auth.role,
-        "CALCULATE_ROUTING_MATCH",
-        target_cust,
-        &format!(
-            "Beste matches berekend voor '{}'. Top match: {}",
-            query_summary,
-            recommendations
-                .first()
-                .map(|r| r.employee.name.as_str())
-                .unwrap_or("Geen")
-        ),
-    );
-    db.insert_audit_entry(&entry).ok();
-
-    Json(recommendations)
-}
-
-#[derive(Serialize)]
-struct HandoffResponse {
-    pub success: bool,
-    pub employee: crate::models::Employee,
-    pub message: String,
-    pub audit_hash: String,
-}
-
-async fn execute_handoff(
-    auth: AuthUser,
-    State(state): State<AppState>,
-    Json(handoff): Json<HandoffRequest>,
-) -> Result<Json<HandoffResponse>, StatusCode> {
-    let db = state.db.lock().unwrap();
-
-    // Verify customer exists in database
-    if db.get_customer_by_id(&handoff.customer_id).unwrap_or(None).is_none() {
-        return Err(StatusCode::NOT_FOUND);
-    }
-
-    match db.record_handoff(
-        &handoff.employee_id,
-        &handoff.customer_id,
-        &handoff.inquiry_summary,
-        &handoff.caller_name,
-    ) {
-        Ok(Some(emp)) => {
-            let entry = state.audit_chain.append(
-                &auth.username,
-                &auth.role,
-                "EXECUTE_WARM_HANDOFF",
-                &handoff.customer_id,
-                &format!(
-                    "Klantoproep succesvol doorgeschakeld naar expert {} met {} gekoppelde documenten.",
-                    emp.name,
-                    handoff.attached_doc_ids.len()
-                ),
-            );
-            db.insert_audit_entry(&entry).ok();
-
-            Ok(Json(HandoffResponse {
-                success: true,
-                employee: emp.clone(),
-                message: format!("Klant succesvol doorgeschakeld naar {}!", emp.name),
-                audit_hash: entry.hash,
-            }))
-        }
-        _ => Err(StatusCode::NOT_FOUND),
-    }
-}
-
-// --- EMPLOYEE HANDLERS ---
-async fn list_employees(
-    _auth: AuthUser,
-    State(state): State<AppState>,
-) -> Json<Vec<crate::models::Employee>> {
-    let db = state.db.lock().unwrap();
-    let mut employees = db.get_employees().unwrap_or_default();
-    employees.sort_by(|a, b| b.completed_cases.cmp(&a.completed_cases));
-    Json(employees)
-}
-
-async fn create_employee(
-    auth: AuthUser,
-    State(state): State<AppState>,
-    Json(mut emp): Json<crate::models::Employee>,
-) -> Result<Json<crate::models::Employee>, StatusCode> {
-    if auth.clearance != "Senior" && auth.clearance != "Admin" && auth.role != "SeniorPayrollOfficer" && auth.role != "Admin" {
-        return Err(StatusCode::FORBIDDEN);
-    }
-    let db = state.db.lock().unwrap();
-    if emp.id.is_empty() {
-        emp.id = format!("EMP-{}", Uuid::new_v4().simple().to_string()[..6].to_uppercase());
-    }
-    if db.insert_employee(&emp).is_ok() {
-        let entry = state.audit_chain.append(
-            &auth.username,
-            &auth.role,
-            "CREATE_EMPLOYEE",
-            &emp.id,
-            &format!("Nieuwe medewerker toegevoegd aan SQLite: {}", emp.name),
-        );
-        db.insert_audit_entry(&entry).ok();
-        Ok(Json(emp))
-    } else {
-        Err(StatusCode::INTERNAL_SERVER_ERROR)
-    }
-}
-
-async fn update_employee(
-    auth: AuthUser,
-    Path(id): Path<String>,
-    State(state): State<AppState>,
-    Json(mut emp): Json<crate::models::Employee>,
-) -> Result<Json<crate::models::Employee>, StatusCode> {
-    if auth.clearance != "Senior" && auth.clearance != "Admin" && auth.role != "SeniorPayrollOfficer" && auth.role != "Admin" {
-        return Err(StatusCode::FORBIDDEN);
-    }
-    emp.id = id;
-    let db = state.db.lock().unwrap();
-    if db.insert_employee(&emp).is_ok() {
-        let entry = state.audit_chain.append(
-            &auth.username,
-            &auth.role,
-            "UPDATE_EMPLOYEE",
-            &emp.id,
-            &format!("Medewerkergegevens bijgewerkt in SQLite: {}", emp.name),
-        );
-        db.insert_audit_entry(&entry).ok();
-        Ok(Json(emp))
-    } else {
-        Err(StatusCode::INTERNAL_SERVER_ERROR)
-    }
-}
-
-// --- SECURITY & AUDIT HANDLERS ---
-#[derive(Serialize)]
-struct AuditChainResponse {
-    pub is_valid: bool,
-    pub total_entries: usize,
-    pub entries: Vec<AuditEntry>,
-}
-
-async fn get_audit_chain(
-    auth: AuthUser,
-    State(state): State<AppState>,
-) -> Result<Json<AuditChainResponse>, StatusCode> {
-    if auth.role != "Admin" && auth.clearance != "Admin" {
-        return Err(StatusCode::FORBIDDEN);
-    }
-    let is_valid = state.audit_chain.verify_integrity();
-    let entries = state.audit_chain.get_entries();
-    let total_entries = entries.len();
-
-    Ok(Json(AuditChainResponse {
-        is_valid,
-        total_entries,
-        entries,
-    }))
-}
-
-#[derive(Serialize)]
-struct IntegrityResponse {
-    pub is_valid: bool,
-    pub status: String,
-}
-
-async fn verify_audit_integrity(
-    auth: AuthUser,
-    State(state): State<AppState>,
-) -> Result<Json<IntegrityResponse>, StatusCode> {
-    if auth.role != "Admin" && auth.clearance != "Admin" {
-        return Err(StatusCode::FORBIDDEN);
-    }
-    let is_valid = state.audit_chain.verify_integrity();
-    let status = if is_valid {
-        "Cryptografische integriteit van alle audit logs geverifieerd (SHA-256 keten intact).".to_string()
-    } else {
-        "WAARSCHUWING: Corruptie of manipulatie gedetecteerd in audit ledger!".to_string()
-    };
-
-    Ok(Json(IntegrityResponse { is_valid, status }))
 }
