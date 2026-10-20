@@ -137,6 +137,25 @@ async fn main() {
         ms_tokens: Arc::new(Mutex::new(HashMap::new())),
     };
 
+    // Microsoft Graph-tokens herstellen na server-herstart (persistief in SQLite).
+    {
+        let restored = state
+            .db
+            .lock()
+            .unwrap()
+            .load_ms_tokens()
+            .unwrap_or_default();
+        let mut tokens = state.ms_tokens.lock().unwrap();
+        let mut kept = 0usize;
+        for (user_id, tok) in restored {
+            tokens.insert(user_id, tok);
+            kept += 1;
+        }
+        if kept > 0 {
+            println!("[INIT] {kept} Microsoft Graph-token(s) hersteld uit database");
+        }
+    }
+
     // 6. Configured CORS from environment allowlist (replacing permissive CORS)
     let allowed_origins_str = std::env::var("ALLOWED_ORIGINS").unwrap_or_else(|_| {
         "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173".to_string()
@@ -242,6 +261,10 @@ async fn main() {
         .route(
             "/api/insights/analyze",
             post(insights::analyze_insights),
+        )
+        .route(
+            "/api/insights/graph-status",
+            get(insights::graph_status),
         );
 
     let app = Router::new()

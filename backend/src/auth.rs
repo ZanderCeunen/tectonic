@@ -499,8 +499,15 @@ fn complete_ms_login(
         Err(_) => return ms_error(state, "jwt"),
     };
 
-    // Graph-token bewaren voor agenda/mail-toegang (in-memory, per sessie).
+    // Graph-token bewaren voor agenda/mail-toegang (per sessie + persistief in
+    // SQLite zodat server-herstarts de koppeling niet verliezen).
     if let Some(tk) = tokens {
+        let _ = state.db.lock().unwrap().upsert_ms_token(
+            &user.id,
+            &tk.access_token,
+            tk.refresh_token.as_deref().unwrap_or(""),
+            &tk.expires_at.to_rfc3339(),
+        );
         state
             .ms_tokens
             .lock()

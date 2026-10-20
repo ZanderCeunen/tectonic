@@ -49,6 +49,12 @@ async fn collect_sources(state: &AppState, auth: &AuthUser) -> InsightSources {
                         .lock()
                         .unwrap()
                         .insert(auth.id.clone(), fresh.clone());
+                    let _ = state.db.lock().unwrap().upsert_ms_token(
+                        &auth.id,
+                        &fresh.access_token,
+                        fresh.refresh_token.as_deref().unwrap_or(""),
+                        &fresh.expires_at.to_rfc3339(),
+                    );
                     tok = fresh;
                 }
             }
@@ -59,10 +65,8 @@ async fn collect_sources(state: &AppState, auth: &AuthUser) -> InsightSources {
     }
 
     let Some(access) = access else {
-        return insight_engine::empty_sources(vec![
-            "Geen Microsoft Graph-token voor deze sessie — log in met Microsoft 365 voor agenda/mail-analyse."
-                .to_string(),
-        ]);
+        // Geen delegated sessietoken → app-only fallback (tenant-brede rechten).
+        return app_only_sources(state, auth).await;
     };
 
     let start = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
@@ -130,6 +134,170 @@ async fn collect_sources(state: &AppState, auth: &AuthUser) -> InsightSources {
     }
 
     insight_engine::parse_graph_sources(&cal_v, &mail_v, warnings)
+}
+
+/// App-only fallback: leest mailboxen/agenda's via application permissions
+/// (client-credentials). Standaard het adres van de huidige gebruiker;
+/// met MS_TENANT_WIDE=true alle gebruikers (max 12).
+async fn app_only_sources(state: &AppState, auth: &AuthUser) -> InsightSources {
+    let app = match state.microsoft.app_token().await {
+        Ok(t) => t,
+        Err(e) => {
+            return insight_engine::empty_sources(vec![
+                "Geen Microsoft-sessietoken en app-only token mislukt — log opnieuw in met de Microsoft-knop."
+                    .to_string(),
+                format!("App-only reden: {e}"),
+            ]);
+        }
+    };
+
+    let users = match state.microsoft.fetch_tenant_users(&app.access_token).await {
+        Ok(u) => u,
+        Err(e) => {
+            return insight_engine::empty_sources(vec![
+                "App-only gebruikers ophalen mislukt — geef 'User.Read.All' application permission + admin consent in Entra.".to_string(),
+                format!("Graph reden: {e}"),
+            ]);
+        }
+    };
+    if users.is_empty() {
+        return insight_engine::empty_sources(
+            vec!["Geen gebruikers gevonden in de tenant.".to_string()],
+        );
+    }
+
+    let tenant_wide = std::env::var("MS_TENANT_WIDE")
+        .map(|v| v == "true" || v == "1")
+        .unwrap_or(false);
+
+    let my_email = state
+        .db
+        .lock()
+        .unwrap()
+        .get_user_by_username(&auth.username)
+        .ok()
+        .flatten()
+        .map(|u| u.email)
+        .unwrap_or_default();
+
+    let pick: Vec<&crate::microsoft::MsProfile> = if tenant_wide {
+        users.iter().take(12).collect()
+    } else {
+        let found = users.iter().find(|u| {
+            let em = u.email();
+            !my_email.is_empty() && em.eq_ignore_ascii_case(&my_email)
+        });
+        match found {
+            Some(p) => vec![p],
+            None => users.iter().take(1).collect(),
+        }
+    };
+
+    let start = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    let end = (chrono::Utc::now() + chrono::Duration::days(14))
+        .format("%Y-%m-%dT%H:%M:%SZ")
+        .to_string();
+
+    let mut warnings: Vec<String> = vec![format!(
+        "App-only modus: {} mailbox/agenda(s) gelezen via application permissions.",
+        pick.len()
+    )];
+    let mut events: Vec<serde_json::Value> = Vec::new();
+    let mut mails: Vec<serde_json::Value> = Vec::new();
+
+    for u in &pick {
+        let who = u.email();
+        let cal_url = format!(
+            "{}/users/{}/calendarView?startDateTime={start}&endDateTime={end}&$top=15\
+             &$select=subject,bodyPreview,start,end,location,attendees,importance",
+            crate::microsoft::GRAPH_BASE,
+            u.id
+        );
+        let mails_url = format!(
+            "{}/users/{}/messages?$top=20\
+             &$select=subject,bodyPreview,from,receivedDateTime,importance",
+            crate::microsoft::GRAPH_BASE,
+            u.id
+        );
+        let (c, m) = tokio::join!(
+            state
+                .microsoft
+                .http
+                .get(&cal_url)
+                .header("Prefer", "outlook.timezone=\"UTC\"")
+                .bearer_auth(&app.access_token)
+                .send(),
+            state
+                .microsoft
+                .http
+                .get(&mails_url)
+                .bearer_auth(&app.access_token)
+                .send()
+        );
+        match c {
+            Ok(r) if r.status().is_success() => {
+                if let Ok(v) = r.json::<serde_json::Value>().await {
+                    if let Some(arr) = v.get("value").and_then(|a| a.as_array()) {
+                        for item in arr {
+                            events.push(item.clone());
+                        }
+                    }
+                }
+            }
+            Ok(r) => warnings.push(format!(
+                "Agenda van {who} mislukt (HTTP {}).",
+                r.status().as_u16()
+            )),
+            Err(_) => warnings.push(format!("Agenda van {who} onbereikbaar.")),
+        }
+        match m {
+            Ok(r) if r.status().is_success() => {
+                if let Ok(v) = r.json::<serde_json::Value>().await {
+                    if let Some(arr) = v.get("value").and_then(|a| a.as_array()) {
+                        for item in arr {
+                            mails.push(item.clone());
+                        }
+                    }
+                }
+            }
+            Ok(r) => warnings
+                .push(format!("Mail van {who} mislukt (HTTP {}).", r.status().as_u16())),
+            Err(_) => warnings.push(format!("Mail van {who} onbereikbaar.")),
+        }
+    }
+
+    if events.is_empty() && mails.is_empty() {
+        warnings.push("Geen agenda-items of mails opgehaald.".to_string());
+        return insight_engine::empty_sources(warnings);
+    }
+
+    let cal_v = serde_json::json!({ "value": events });
+    let mail_v = serde_json::json!({ "value": mails });
+    insight_engine::parse_graph_sources(&cal_v, &mail_v, warnings)
+}
+
+/// Admin-status van de Microsoft Graph-koppeling (app-only rechten zichtbaar).
+pub async fn graph_status(
+    auth: AuthUser,
+    State(state): State<AppState>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    if !rbac::is_admin(&auth) {
+        return Err(StatusCode::FORBIDDEN);
+    }
+    let configured = state.microsoft.is_configured();
+    let (app_only, tenant_users) = match state.microsoft.app_token().await {
+        Ok(t) => match state.microsoft.fetch_tenant_users(&t.access_token).await {
+            Ok(u) => ("ok".to_string(), Some(u.len())),
+            Err(e) => (format!("fout: {e}"), None),
+        },
+        Err(e) => (format!("tokenfout: {e}"), None),
+    };
+    Ok(Json(serde_json::json!({
+        "configured": configured,
+        "app_only": app_only,
+        "tenant_users": tenant_users,
+        "tenant_wide": std::env::var("MS_TENANT_WIDE").unwrap_or_else(|_| "false".to_string()),
+    })))
 }
 
 fn redact_sources(s: &mut InsightSources) {

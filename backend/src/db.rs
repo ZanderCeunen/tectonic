@@ -114,6 +114,13 @@ impl Database {
                 customer_id TEXT NOT NULL,
                 PRIMARY KEY (user_id, customer_id)
             );
+
+            CREATE TABLE IF NOT EXISTS ms_tokens (
+                user_id TEXT PRIMARY KEY,
+                access_token TEXT NOT NULL,
+                refresh_token TEXT NOT NULL,
+                expires_at TEXT NOT NULL
+            );
             ",
         )?;
         self.migrate_schema()?;
@@ -1144,6 +1151,49 @@ impl Database {
     }
 
     // --- AUDIT TRAIL ---
+    /// Microsoft Graph-tokens persistief bewaren (surviven server-herstarts).
+    pub fn upsert_ms_token(
+        &self,
+        user_id: &str,
+        access_token: &str,
+        refresh_token: &str,
+        expires_at: &str,
+    ) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO ms_tokens (user_id, access_token, refresh_token, expires_at)
+             VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(user_id) DO UPDATE SET
+                access_token = ?2, refresh_token = ?3, expires_at = ?4",
+            params![user_id, access_token, refresh_token, expires_at],
+        )?;
+        Ok(())
+    }
+
+    pub fn load_ms_tokens(&self) -> Result<Vec<(String, crate::microsoft::MsUserTokens)>> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT user_id, access_token, refresh_token, expires_at FROM ms_tokens")?;
+        let rows = stmt.query_map([], |row| {
+            let expires_raw: String = row.get(3)?;
+            let expires_at = chrono::DateTime::parse_from_rfc3339(&expires_raw)
+                .map(|d| d.with_timezone(&chrono::Utc))
+                .unwrap_or_else(|_| chrono::Utc::now());
+            Ok((
+                row.get::<_, String>(0)?,
+                crate::microsoft::MsUserTokens {
+                    access_token: row.get(1)?,
+                    refresh_token: Some(row.get::<_, String>(2)?),
+                    expires_at,
+                },
+            ))
+        })?;
+        let mut out = Vec::new();
+        for r in rows {
+            out.push(r?);
+        }
+        Ok(out)
+    }
+
     pub fn insert_audit_entry(&self, entry: &AuditEntry) -> Result<()> {
         self.conn.execute(
             "INSERT OR REPLACE INTO audit_entries

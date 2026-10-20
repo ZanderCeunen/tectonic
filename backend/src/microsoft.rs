@@ -147,6 +147,50 @@ impl MicrosoftConfig {
         })
     }
 
+    /// Application-permission token (client-credentials) voor tenant-brede Graph-lezing.
+    pub async fn app_token(&self) -> Result<MsUserTokens, String> {
+        if !self.is_configured() {
+            return Err("Microsoft 365 niet geconfigureerd".to_string());
+        }
+        self.post_token(&[
+            ("client_id", self.client_id.as_str()),
+            ("scope", "https://graph.microsoft.com/.default"),
+            ("client_secret", self.client_secret.as_str()),
+            ("grant_type", "client_credentials"),
+        ])
+        .await
+    }
+
+    /// Alle tenant-gebruikers (app-only; vereist User.Read.All application permission).
+    pub async fn fetch_tenant_users(&self, app_access: &str) -> Result<Vec<MsProfile>, String> {
+        let url = format!(
+            "{}/users?$select=id,displayName,mail,userPrincipalName,jobTitle,department&$top=999",
+            GRAPH_BASE
+        );
+        let res = self
+            .http
+            .get(&url)
+            .bearer_auth(app_access)
+            .send()
+            .await
+            .map_err(|e| format!("Graph /users onbereikbaar: {e}"))?;
+        let status = res.status();
+        let body: serde_json::Value = res
+            .json()
+            .await
+            .map_err(|e| format!("ongeldige /users respons: {e}"))?;
+        if !status.is_success() {
+            let code = body["error"]["code"].as_str().unwrap_or("unknown");
+            return Err(format!("HTTP {} ({})", status.as_u16(), code));
+        }
+        let empty = Vec::new();
+        let arr = body.get("value").and_then(|v| v.as_array()).unwrap_or(&empty);
+        Ok(arr
+            .iter()
+            .filter_map(|v| serde_json::from_value::<MsProfile>(v.clone()).ok())
+            .collect())
+    }
+
     pub async fn exchange_code(&self, code: &str) -> Result<MsUserTokens, String> {
         let form = [
             ("client_id", self.client_id.as_str()),

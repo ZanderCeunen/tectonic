@@ -152,7 +152,13 @@ pub async fn get_audit_chain(
     let is_valid = state.audit_chain.verify_integrity();
     let all = state.audit_chain.get_entries();
     let total_entries = all.len();
-    let entries = all.into_iter().skip(offset).take(limit).collect();
+    // Nieuw → oud tonen (meest recente acties eerst).
+    let entries = all
+        .into_iter()
+        .rev()
+        .skip(offset)
+        .take(limit)
+        .collect();
     Ok(Json(AuditChainResponse {
         is_valid,
         total_entries,
