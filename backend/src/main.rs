@@ -270,6 +270,7 @@ async fn main() {
     let app = Router::new()
         .merge(public_routes)
         .merge(protected_routes)
+        .layer(axum::extract::DefaultBodyLimit::max(16 * 1024 * 1024))
         .layer(cors)
         .with_state(state);
 

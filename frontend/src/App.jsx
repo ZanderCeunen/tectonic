@@ -50,6 +50,15 @@ export default function App() {
     const msToken = params.get('ms_token');
     const msError = params.get('ms_error');
     if (msToken) {
+      // Clear previous user's dossier data before switching token
+      setSelectedCustomerId(null);
+      setDocuments([]);
+      setConflicts([]);
+      setCustomers([]);
+      setInsight(null);
+      setInsightSources(null);
+      setIsAdminView(false);
+
       localStorage.setItem('tectonic_jwt', msToken);
       window.history.replaceState(null, '', window.location.pathname + window.location.search);
       setAuthToken(msToken);
@@ -91,6 +100,15 @@ export default function App() {
     setConflicts([]);
     setSelectedCustomerId(null);
     setIsAdminView(false);
+    setInsight(null);
+    setInsightSources(null);
+    setCustomerToEdit(null);
+    setEmployeeToEdit(null);
+    setIsCustomerSearchOpen(false);
+    setIsCustomerManagerOpen(false);
+    setIsEmployeeManagerOpen(false);
+    setIsInsightOpen(false);
+    setIsAiHelpOpen(false);
   };
 
   // 1. Load user profile and initial assigned data
@@ -129,7 +147,16 @@ export default function App() {
       const custRes = await fetch('/api/customers', { headers: authHeader });
       if (custRes.ok) {
         const custData = await custRes.json();
-        setCustomers(custData || []);
+        const validCustomers = custData || [];
+        setCustomers(validCustomers);
+        // Clear selected customer if it does not belong to the current user's assigned cases
+        setSelectedCustomerId((prevId) => {
+          if (!prevId) return null;
+          return validCustomers.some((c) => c.id === prevId) ? prevId : null;
+        });
+      } else {
+        setCustomers([]);
+        setSelectedCustomerId(null);
       }
 
       // Step C: Fetch employees for routing
@@ -201,6 +228,10 @@ export default function App() {
       return;
     }
 
+    // Immediately clear stale documents when requesting a new customer dossier
+    setDocuments([]);
+    setConflicts([]);
+
     try {
       const docRes = await fetch(`/api/customers/${customerId}/documents`, {
         headers: { Authorization: `Bearer ${authToken}` },
@@ -211,9 +242,11 @@ export default function App() {
         setConflicts(docData.conflicts || []);
       } else if (docRes.status === 401) {
         handleLogout();
-      } else if (docRes.status === 404) {
+      } else if (docRes.status === 404 || docRes.status === 403) {
         // IDOR / assignment isolation: user is not assigned to this case
         setSelectedCustomerId(null);
+        setDocuments([]);
+        setConflicts([]);
         alert('Case not found or you are not authorized to view this customer dossier.');
       }
     } catch (err) {
@@ -224,6 +257,9 @@ export default function App() {
   useEffect(() => {
     if (selectedCustomerId) {
       loadCustomerDocuments(selectedCustomerId);
+    } else {
+      setDocuments([]);
+      setConflicts([]);
     }
   }, [selectedCustomerId, authToken]);
 
@@ -324,6 +360,17 @@ export default function App() {
 
   // 6. Login Success Callback
   const handleLoginSuccess = (user, token) => {
+    // Reset any state remaining from prior user session
+    setSelectedCustomerId(null);
+    setDocuments([]);
+    setConflicts([]);
+    setCustomers([]);
+    setInsight(null);
+    setInsightSources(null);
+    setIsAdminView(false);
+    setCustomerToEdit(null);
+    setEmployeeToEdit(null);
+
     localStorage.setItem('tectonic_jwt', token);
     setAuthToken(token);
     setActiveUser({

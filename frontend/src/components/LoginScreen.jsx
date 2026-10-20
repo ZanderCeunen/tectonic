@@ -67,7 +67,7 @@ export default function LoginScreen({ onLoginSuccess, initialError }) {
               className="h-12 w-auto mx-auto object-contain"
             />
             <h1 className="text-xl font-semibold text-slate-900 tracking-tight">
-              Sign in with portal account (admins &amp; demo)
+              Sign in
             </h1>
           </div>
 

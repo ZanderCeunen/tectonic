@@ -292,18 +292,14 @@ impl MicrosoftConfig {
         }
 
         // 2. Functieafdruk uit het Microsoft-account (jobTitle/department)
+        // BEVEILIGING: Admin-rechten kunnen NOOIT via vrije functietekst worden toegekend,
+        // enkel via expliciete Entra-groepen (MS_ADMIN_GROUP_ID) of bestaande adminaccounts.
         let text = format!(
             "{} {}",
             profile.job_title.as_deref().unwrap_or(""),
             profile.department.as_deref().unwrap_or("")
         )
         .to_lowercase();
-        if text.contains("admin") {
-            return RoleDecision::declared(
-                UserRole::Admin,
-                format!("Microsoft functie '{}'", profile.job_title.as_deref().unwrap_or("")),
-            );
-        }
         if text.contains("senior") {
             return RoleDecision::declared(
                 UserRole::SeniorPayrollOfficer,

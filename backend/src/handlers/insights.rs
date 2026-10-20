@@ -201,9 +201,10 @@ async fn app_only_sources(state: &AppState, auth: &AuthUser) -> InsightSources {
         );
     }
 
-    let tenant_wide = std::env::var("MS_TENANT_WIDE")
-        .map(|v| v == "true" || v == "1")
-        .unwrap_or(false);
+    let tenant_wide = rbac::is_admin(auth)
+        && std::env::var("MS_TENANT_WIDE")
+            .map(|v| v == "true" || v == "1")
+            .unwrap_or(false);
 
     let my_email = state
         .db
@@ -424,7 +425,11 @@ pub async fn analyze_insights(
 
     let customers = {
         let db = state.db.lock().unwrap();
-        db.get_customers()
+        if rbac::can_list_all_customers(&auth) {
+            db.get_customers()
+        } else {
+            db.get_customers_for_user(&auth.id)
+        }
     }
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 

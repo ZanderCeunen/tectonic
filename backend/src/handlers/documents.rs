@@ -68,12 +68,31 @@ fn apply_visibility(mut doc: DocumentItem, auth: &AuthUser) -> DocumentItem {
     if !rbac::can_unmask(auth) {
         doc.raw_content = PiiRedactor::redact_text(&doc.raw_content, true);
         doc.summary = PiiRedactor::redact_text(&doc.summary, true);
+        for fact in &mut doc.key_facts {
+            fact.value = PiiRedactor::redact_text(&fact.value, true);
+            fact.label = PiiRedactor::redact_text(&fact.label, true);
+        }
     }
     if !rbac::can_download_file(auth, doc.sensitivity.as_str()) {
         doc.file_name = None;
         doc.file_size = None;
     }
     doc
+}
+
+fn apply_conflict_visibility(
+    mut alert: crate::models::ConflictAlert,
+    auth: &AuthUser,
+) -> crate::models::ConflictAlert {
+    if !rbac::can_unmask(auth) {
+        alert.consensus_value = PiiRedactor::redact_text(&alert.consensus_value, true);
+        alert.explanation = PiiRedactor::redact_text(&alert.explanation, true);
+        alert.resolution_action = PiiRedactor::redact_text(&alert.resolution_action, true);
+        for d in &mut alert.conflicting_docs {
+            d.stated_value = PiiRedactor::redact_text(&d.stated_value, true);
+        }
+    }
+    alert
 }
 
 pub async fn get_customer_documents(
@@ -95,6 +114,11 @@ pub async fn get_customer_documents(
         .map(|doc| apply_visibility(doc, &auth))
         .collect();
 
+    let sanitized_conflicts: Vec<crate::models::ConflictAlert> = conflicts
+        .into_iter()
+        .map(|c| apply_conflict_visibility(c, &auth))
+        .collect();
+
     let entry = state.audit_chain.append(
         &auth.username,
         auth.role_label(),
@@ -107,7 +131,7 @@ pub async fn get_customer_documents(
     Ok(Json(CustomerDocumentsResponse {
         customer_id,
         documents: sanitized_docs,
-        conflicts,
+        conflicts: sanitized_conflicts,
     }))
 }
 
@@ -122,7 +146,11 @@ pub async fn get_customer_conflicts(
         .get_documents_by_customer_id(&customer_id)
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let (_, conflicts) = TrustEngine::evaluate_all_documents(customer_docs, &customer_id);
-    Ok(Json(conflicts))
+    let sanitized_conflicts: Vec<crate::models::ConflictAlert> = conflicts
+        .into_iter()
+        .map(|c| apply_conflict_visibility(c, &auth))
+        .collect();
+    Ok(Json(sanitized_conflicts))
 }
 
 pub async fn create_document(
@@ -142,7 +170,18 @@ pub async fn create_document(
     let db = state.db.lock().unwrap();
     rbac::require_customer_access(&db, &auth, &input.customer_id)?;
 
-    let st = parse_source_type(&input.source_type);
+    let mut st = parse_source_type(&input.source_type);
+    // Beperk gezaghebbende documenttypen tot senior payroll officers, legal advisors en admins
+    if (st == DocumentSourceType::SignedContract || st == DocumentSourceType::OfficialTemplate)
+        && !rbac::can_ingest_authoritative_doc(&auth)
+    {
+        st = DocumentSourceType::CrmNote;
+    }
+    // Een getekend contract vereist een daadwerkelijke bestandsbijlage
+    if st == DocumentSourceType::SignedContract && input.file_base64.is_none() {
+        st = DocumentSourceType::CrmNote;
+    }
+
     let doc_id = format!(
         "DOC-{}",
         Uuid::new_v4().simple().to_string()[..6].to_uppercase()
@@ -161,24 +200,27 @@ pub async fn create_document(
         if safe_fname.is_empty() {
             return Err(StatusCode::BAD_REQUEST);
         }
-        let file_path = format!("uploads/{}_{}", doc_id, safe_fname);
         let bytes = base64::engine::general_purpose::STANDARD
             .decode(&b64)
             .map_err(|_| StatusCode::BAD_REQUEST)?;
         if bytes.len() > 10 * 1024 * 1024 {
             return Err(StatusCode::PAYLOAD_TOO_LARGE);
         }
-        std::fs::write(&file_path, &bytes).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-        let canonical_uploads = std::fs::canonicalize("uploads")
+
+        // Canonical containment controle VOORAFGAAND aan schrijven
+        let uploads_dir = std::fs::canonicalize("uploads")
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-        let canonical_file =
-            std::fs::canonicalize(&file_path).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-        if !canonical_file.starts_with(&canonical_uploads) {
-            std::fs::remove_file(&file_path).ok();
+        // Zuiver server-gegenereerde opslagnaam sluit path traversal en overschrijving van tectonic.db uit
+        let disk_filename = format!("{}_{}.bin", doc_id, Uuid::new_v4().simple());
+        let target_path = uploads_dir.join(&disk_filename);
+        if !target_path.starts_with(&uploads_dir) {
             return Err(StatusCode::FORBIDDEN);
         }
+
+        std::fs::write(&target_path, &bytes).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
         saved_file_size = Some(bytes.len());
-        saved_file_path = Some(file_path);
+        saved_file_path = Some(format!("uploads/{}", disk_filename));
         saved_file_name = Some(safe_fname);
     }
 
@@ -247,11 +289,15 @@ pub async fn download_document_file(
         None => return Err(StatusCode::NOT_FOUND),
     };
 
-    let canonical_uploads =
+    let uploads_dir =
         std::fs::canonicalize("uploads").map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    // Enkel de bestandsnaam-component gebruiken; verhindert elke relatieve traversal
+    let raw_path = std::path::Path::new(&file_path);
+    let file_stem = raw_path.file_name().ok_or(StatusCode::NOT_FOUND)?;
+    let target = uploads_dir.join(file_stem);
     let canonical_file =
-        std::fs::canonicalize(&file_path).map_err(|_| StatusCode::NOT_FOUND)?;
-    if !canonical_file.starts_with(&canonical_uploads) {
+        std::fs::canonicalize(&target).map_err(|_| StatusCode::NOT_FOUND)?;
+    if !canonical_file.starts_with(&uploads_dir) || !canonical_file.is_file() {
         return Err(StatusCode::FORBIDDEN);
     }
 
@@ -330,7 +376,7 @@ pub async fn resolve_conflict_endpoint(
     State(state): State<AppState>,
     Json(input): Json<crate::models::ResolveConflictInput>,
 ) -> Result<Json<ConflictResolveResponse>, StatusCode> {
-    rbac::require(rbac::can_mutate_dossiers(&auth))?;
+    rbac::require(rbac::can_resolve_conflicts(&auth))?;
     if !within_len(&input.field, MAX_TITLE)
         || !within_len(&input.chosen_value, MAX_TITLE)
         || input.resolution_note.len() > MAX_NOTE
@@ -340,12 +386,43 @@ pub async fn resolve_conflict_endpoint(
     let db = state.db.lock().unwrap();
     rbac::require_customer_access(&db, &auth, &input.customer_id)?;
 
+    // 1. Verify active conflict exists for this customer and field
+    let customer_docs = db
+        .get_documents_by_customer_id(&input.customer_id)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let (_, conflicts) = TrustEngine::evaluate_all_documents(customer_docs, &input.customer_id);
+
+    let field_clean = input.field.trim().to_lowercase();
+    let matching_conflict = conflicts.iter().find(|c| {
+        c.field.trim().to_lowercase() == field_clean
+            || c.topic.trim().to_lowercase() == field_clean
+    });
+
+    let chosen_clean = input.chosen_value.trim().to_lowercase();
+    if let Some(conflict) = matching_conflict {
+        // Verify chosen_value is one of the eligible values from the conflict
+        let mut eligible_values: Vec<String> = conflict
+            .conflicting_docs
+            .iter()
+            .map(|d| d.stated_value.trim().to_lowercase())
+            .collect();
+        eligible_values.push(conflict.consensus_value.trim().to_lowercase());
+
+        if !eligible_values.iter().any(|v| v == &chosen_clean) && !rbac::is_admin(&auth) {
+            return Err(StatusCode::BAD_REQUEST);
+        }
+    } else if !rbac::is_admin(&auth) {
+        // No active conflict found for this field to resolve
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
     match db.resolve_conflict(
         &input.customer_id,
         &input.field,
         &input.chosen_value,
         &input.resolution_note,
         &auth.username,
+        auth.role_label(),
     ) {
         Ok(res_doc) => {
             let entry = state.audit_chain.append(

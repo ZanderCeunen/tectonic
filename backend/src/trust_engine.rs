@@ -13,7 +13,17 @@ impl TrustEngine {
         consensus_score: f64,
         has_conflict: bool,
     ) -> TrustBreakdown {
-        let s_source = doc.source_type.base_score();
+        let mut s_source = doc.source_type.base_score();
+        // Als een document beweert een getekend contract of officieel sjabloon te zijn zonder bestandsbijlage
+        // of uit ongeverifieerde gebruikersbron, verlaag de authenticiteitsscore
+        if doc.facts_source == "user_supplied"
+            && (doc.source_type == crate::models::DocumentSourceType::SignedContract
+                || doc.source_type == crate::models::DocumentSourceType::OfficialTemplate)
+            && doc.file_path.is_none()
+        {
+            s_source = 70.0;
+        }
+
         let s_recency = Self::compute_recency(&doc.date, &doc.source_type);
         let s_feedback = Self::compute_feedback(&doc.feedback);
         let s_consensus = consensus_score;
@@ -52,8 +62,12 @@ impl TrustEngine {
         };
 
         let now = Utc::now().date_naive();
-        let days_diff = (now - parsed_date).num_days().max(0) as f64;
-        let years = days_diff / 365.25;
+        let days_diff = (now - parsed_date).num_days();
+        if days_diff < 0 {
+            // Datum in de toekomst duidt op gemanipuleerde of niet-authentieke documentdata
+            return 15.0;
+        }
+        let years = (days_diff as f64) / 365.25;
 
         // Decay lambda per source type (contracts valid for years, chat notes decay rapidly)
         let lambda = match source_type {

@@ -17,17 +17,20 @@ use std::net::SocketAddr;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-const MAX_FAILURES: usize = 5;
+const MAX_FAILURES_PER_ACCOUNT: usize = 5;
+const MAX_FAILURES_PER_IP: usize = 25;
 const WINDOW: Duration = Duration::from_secs(15 * 60);
 
 pub struct LoginLimiter {
-    failures: Mutex<HashMap<String, Vec<Instant>>>,
+    account_failures: Mutex<HashMap<String, Vec<Instant>>>,
+    ip_failures: Mutex<HashMap<String, Vec<Instant>>>,
 }
 
 impl LoginLimiter {
     pub fn new() -> Self {
         Self {
-            failures: Mutex::new(HashMap::new()),
+            account_failures: Mutex::new(HashMap::new()),
+            ip_failures: Mutex::new(HashMap::new()),
         }
     }
 
@@ -35,32 +38,60 @@ impl LoginLimiter {
         times.retain(|t| now.duration_since(*t) < WINDOW);
     }
 
-    pub fn is_blocked(&self, key: &str) -> bool {
+    pub fn is_blocked(&self, ip: &str, username: &str) -> bool {
         let now = Instant::now();
-        let mut map = self.failures.lock().unwrap();
-        if let Some(times) = map.get_mut(key) {
-            Self::prune(times, now);
-            return times.len() >= MAX_FAILURES;
+        {
+            let mut ip_map = self.ip_failures.lock().unwrap();
+            if let Some(times) = ip_map.get_mut(ip) {
+                Self::prune(times, now);
+                if times.len() >= MAX_FAILURES_PER_IP {
+                    return true;
+                }
+            }
+        }
+        {
+            let mut acc_map = self.account_failures.lock().unwrap();
+            if let Some(times) = acc_map.get_mut(username) {
+                Self::prune(times, now);
+                if times.len() >= MAX_FAILURES_PER_ACCOUNT {
+                    return true;
+                }
+            }
         }
         false
     }
 
-    pub fn register_failure(&self, key: &str) {
+    pub fn register_failure(&self, ip: &str, username: &str) {
         let now = Instant::now();
-        let mut map = self.failures.lock().unwrap();
-        let times = map.entry(key.to_string()).or_default();
-        Self::prune(times, now);
-        times.push(now);
-        if map.len() > 10_000 {
-            map.retain(|_, v| {
-                Self::prune(v, now);
-                !v.is_empty()
-            });
+        {
+            let mut ip_map = self.ip_failures.lock().unwrap();
+            let times = ip_map.entry(ip.to_string()).or_default();
+            Self::prune(times, now);
+            times.push(now);
+            if ip_map.len() > 10_000 {
+                ip_map.retain(|_, v| {
+                    Self::prune(v, now);
+                    !v.is_empty()
+                });
+            }
+        }
+        {
+            let mut acc_map = self.account_failures.lock().unwrap();
+            let times = acc_map.entry(username.to_string()).or_default();
+            Self::prune(times, now);
+            times.push(now);
+            if acc_map.len() > 10_000 {
+                acc_map.retain(|_, v| {
+                    Self::prune(v, now);
+                    !v.is_empty()
+                });
+            }
         }
     }
 
-    pub fn reset(&self, key: &str) {
-        self.failures.lock().unwrap().remove(key);
+    pub fn reset(&self, ip: &str, username: &str) {
+        self.ip_failures.lock().unwrap().remove(ip);
+        self.account_failures.lock().unwrap().remove(username);
     }
 }
 
@@ -112,11 +143,23 @@ impl FromRequestParts<AppState> for AuthUser {
         }
 
         let claims = decode_token(token, &state.jwt_secret)?;
+
+        // Valideer dat de gebruiker daadwerkelijk bestaat in de database en haal actuele rechten op
+        // Dit voorkomt dat privileges blijven hangen na een account-downgrade of verwijdering
+        let db = state.db.lock().unwrap();
+        let user = match db.get_user_by_id(&claims.sub) {
+            Ok(Some(u)) => u,
+            _ => match db.get_user_by_username(&claims.username) {
+                Ok(Some(u)) => u,
+                _ => return Err(StatusCode::UNAUTHORIZED),
+            },
+        };
+
         Ok(AuthUser {
-            id: claims.sub,
-            username: claims.username,
-            role: UserRole::from_str(&claims.role),
-            clearance: claims.clearance,
+            id: user.id,
+            username: user.username,
+            role: user.role,
+            clearance: user.clearance_level,
         })
     }
 }
@@ -137,8 +180,9 @@ pub async fn login_user(
         return Err(StatusCode::BAD_REQUEST);
     }
 
-    let limit_key = format!("{}:{}", addr.ip(), clean_username.to_lowercase());
-    if state.login_limiter.is_blocked(&limit_key) {
+    let ip_str = addr.ip().to_string();
+    let user_key = clean_username.to_lowercase();
+    if state.login_limiter.is_blocked(&ip_str, &user_key) {
         let entry = state.audit_chain.append(
             clean_username,
             "Anonymous",
@@ -156,7 +200,7 @@ pub async fn login_user(
         Ok(Some(u)) => u,
         _ => {
             let _ = bcrypt::verify(clean_password, &state.dummy_password_hash);
-            state.login_limiter.register_failure(&limit_key);
+            state.login_limiter.register_failure(&ip_str, &user_key);
             let entry = state.audit_chain.append(
                 clean_username,
                 "Anonymous",
@@ -175,7 +219,7 @@ pub async fn login_user(
 
     let valid = bcrypt::verify(clean_password, &user.password_hash).unwrap_or(false);
     if !valid {
-        state.login_limiter.register_failure(&limit_key);
+        state.login_limiter.register_failure(&ip_str, &user_key);
         let entry = state.audit_chain.append(
             &user.username,
             user.role.as_str(),
@@ -191,7 +235,7 @@ pub async fn login_user(
         return Err(StatusCode::UNAUTHORIZED);
     }
 
-    state.login_limiter.reset(&limit_key);
+    state.login_limiter.reset(&ip_str, &user_key);
 
     let exp = (Utc::now() + chrono::Duration::hours(24)).timestamp() as usize;
     let claims = Claims {
@@ -284,7 +328,11 @@ pub async fn microsoft_login(State(state): State<AppState>) -> Redirect {
     }
     if state.microsoft.is_configured() {
         let url = state.microsoft.authorize_url(&st);
-        Redirect::to(&url)
+        if url.starts_with("https://login.microsoftonline.com/") {
+            Redirect::to(&url)
+        } else {
+            safe_frontend_redirect(&state, "ms_error=invalid_endpoint")
+        }
     } else {
         // Geen tenant geconfigureerd → doorloop exact hetzelfde pad met een demo-profiel.
         complete_ms_login(&state, MsProfile::demo(), Vec::new(), None, "MS_LOGIN_DEMO")
@@ -343,9 +391,26 @@ pub async fn microsoft_callback(
     complete_ms_login(&state, profile, groups, Some(tokens), "MS_LOGIN_SUCCESS")
 }
 
+fn safe_frontend_redirect(state: &AppState, fragment: &str) -> Redirect {
+    let clean_fragment: String = fragment
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '=' || *c == '&' || *c == '_' || *c == '-')
+        .take(2048)
+        .collect();
+    let url = state.microsoft.frontend_redirect(&clean_fragment);
+    let is_safe = url.starts_with("http://localhost:3000#")
+        || url.starts_with("http://127.0.0.1:3000#")
+        || url.starts_with("http://localhost:5173#")
+        || url.starts_with("/#");
+    if is_safe {
+        Redirect::to(&url)
+    } else {
+        Redirect::to("http://localhost:3000/#ms_error=invalid_redirect")
+    }
+}
+
 fn ms_error(state: &AppState, code: &str) -> Redirect {
-    let url = state.microsoft.frontend_redirect(&format!("ms_error={code}"));
-    Redirect::to(&url)
+    safe_frontend_redirect(state, &format!("ms_error={code}"))
 }
 
 /// UPN-lokaal deel → veilige portaalusername (ascii, ≤ MAX_USERNAME).
@@ -515,8 +580,5 @@ fn complete_ms_login(
             .insert(user.id.clone(), tk);
     }
 
-    let url = state
-        .microsoft
-        .frontend_redirect(&format!("ms_token={token}"));
-    Redirect::to(&url)
+    safe_frontend_redirect(state, &format!("ms_token={token}"))
 }

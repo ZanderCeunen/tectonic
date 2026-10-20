@@ -40,6 +40,13 @@ impl AuditChain {
         resource: &str,
         details: &str,
     ) -> AuditEntry {
+        // Prevent log injection and unbounded memory consumption per entry
+        let safe_actor: String = actor.chars().filter(|c| *c != '\n' && *c != '\r').take(100).collect();
+        let safe_role: String = actor_role.chars().filter(|c| *c != '\n' && *c != '\r').take(50).collect();
+        let safe_action: String = action.chars().filter(|c| *c != '\n' && *c != '\r').take(100).collect();
+        let safe_resource: String = resource.chars().filter(|c| *c != '\n' && *c != '\r').take(200).collect();
+        let safe_details: String = details.chars().filter(|c| *c != '\n' && *c != '\r').take(2000).collect();
+
         let mut entries = self.entries.lock().unwrap();
         let index = entries.len();
         let timestamp = Utc::now();
@@ -54,25 +61,30 @@ impl AuditChain {
         let mut hasher = Sha256::new();
         hasher.update(index.to_string().as_bytes());
         hasher.update(timestamp.to_rfc3339().as_bytes());
-        hasher.update(actor.as_bytes());
-        hasher.update(actor_role.as_bytes());
-        hasher.update(action.as_bytes());
-        hasher.update(resource.as_bytes());
-        hasher.update(details.as_bytes());
+        hasher.update(safe_actor.as_bytes());
+        hasher.update(safe_role.as_bytes());
+        hasher.update(safe_action.as_bytes());
+        hasher.update(safe_resource.as_bytes());
+        hasher.update(safe_details.as_bytes());
         hasher.update(prev_hash.as_bytes());
         let hash = format!("{:x}", hasher.finalize());
 
         let entry = AuditEntry {
             index,
             timestamp,
-            actor: actor.to_string(),
-            actor_role: actor_role.to_string(),
-            action: action.to_string(),
-            resource: resource.to_string(),
-            details: details.to_string(),
+            actor: safe_actor,
+            actor_role: safe_role,
+            action: safe_action,
+            resource: safe_resource,
+            details: safe_details,
             prev_hash,
             hash,
         };
+
+        // Prevent unbounded memory consumption: cap in-memory cache to 10,000 entries
+        if entries.len() >= 10_000 {
+            entries.drain(0..1_000);
+        }
 
         entries.push(entry.clone());
         entry

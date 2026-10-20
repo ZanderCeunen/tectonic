@@ -3,6 +3,7 @@ use crate::models::{
     DocumentSensitivity, DocumentSourceType, Employee, KeyFact, TrustBreakdown, UserAccount,
     UserRole, MAX_CONTENT, MAX_TITLE,
 };
+use crate::trust_engine::TrustEngine;
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, Result, Row};
 use std::collections::HashMap;
@@ -193,7 +194,7 @@ impl Database {
     // --- USER MANAGEMENT ---
     pub fn insert_user(&self, u: &UserAccount) -> Result<()> {
         self.conn.execute(
-            "INSERT OR REPLACE INTO users (id, username, name, email, password_hash, role, clearance_level, employee_id)
+            "INSERT INTO users (id, username, name, email, password_hash, role, clearance_level, employee_id)
             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![
                 u.id,
@@ -207,6 +208,31 @@ impl Database {
             ],
         )?;
         Ok(())
+    }
+
+    pub fn get_user_by_id(&self, id: &str) -> Result<Option<UserAccount>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, username, name, email, password_hash, role, clearance_level, employee_id FROM users WHERE id = ?1",
+        )?;
+        let mut rows = stmt.query_map(params![id], |row: &Row| {
+            let role_str: String = row.get(5)?;
+            Ok(UserAccount {
+                id: row.get(0)?,
+                username: row.get(1)?,
+                name: row.get(2)?,
+                email: row.get(3)?,
+                password_hash: row.get(4)?,
+                role: UserRole::from_str(&role_str),
+                clearance_level: row.get(6)?,
+                employee_id: row.get(7)?,
+            })
+        })?;
+
+        if let Some(r) = rows.next() {
+            Ok(Some(r?))
+        } else {
+            Ok(None)
+        }
     }
 
     pub fn get_user_by_username(&self, username: &str) -> Result<Option<UserAccount>> {
@@ -279,13 +305,19 @@ impl Database {
             if !ms_email.is_empty() {
                 e.email = ms_email.to_string();
             }
-            e.role = u.role.clone();
-            e.clearance_level = u.clearance_level.clone();
-            self.insert_user(&e)?;
+            // Zelf-toewijzing van Admin-rechten via extern profiel blokkeren
+            if u.role != UserRole::Admin || e.role == UserRole::Admin {
+                e.role = u.role.clone();
+                e.clearance_level = u.clearance_level.clone();
+            }
+            self.conn.execute(
+                "UPDATE users SET name=?2, email=?3, role=?4, clearance_level=?5 WHERE id=?1",
+                params![e.id, e.name, e.email, e.role.as_str(), e.clearance_level],
+            )?;
             return Ok(e);
         }
 
-        // Nieuw account: username vrijwareren (UNIQUE constraint; nooit een ander account vervangen).
+        // Nieuw account: username vrijwaren (UNIQUE constraint; nooit een ander account vervangen).
         let mut candidate = u.username.clone();
         if let Some(taken) = self.get_user_by_username(&candidate)? {
             let from_email = ms_email.replace('@', ".");
@@ -883,7 +915,50 @@ impl Database {
         employee_id: &str,
     ) -> Result<Option<DocumentItem>> {
         let f_type = feedback_type.to_uppercase();
-        
+        if !["VERIFIED", "OUTDATED", "QUESTIONABLE"].contains(&f_type.as_str()) {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+
+        // Check if user already voted to prevent business logic bypass and vote manipulation
+        let prev_vote: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT vote_type FROM document_user_votes WHERE document_id = ?1 AND employee_id = ?2",
+                params![doc_id, employee_id],
+                |row| row.get(0),
+            )
+            .ok();
+
+        if let Some(ref old_vote) = prev_vote {
+            if old_vote == &f_type {
+                // Already voted this type, idempotent return
+                return self.get_document_by_id(doc_id);
+            }
+            // Decrement previous vote count
+            match old_vote.as_str() {
+                "VERIFIED" => {
+                    self.conn.execute(
+                        "UPDATE documents SET verified_count = MAX(0, verified_count - 1) WHERE id = ?1",
+                        params![doc_id],
+                    )?;
+                }
+                "OUTDATED" => {
+                    self.conn.execute(
+                        "UPDATE documents SET outdated_count = MAX(0, outdated_count - 1) WHERE id = ?1",
+                        params![doc_id],
+                    )?;
+                }
+                "QUESTIONABLE" => {
+                    self.conn.execute(
+                        "UPDATE documents SET questionable_count = MAX(0, questionable_count - 1) WHERE id = ?1",
+                        params![doc_id],
+                    )?;
+                }
+                _ => {}
+            }
+        }
+
+        // Increment new vote count
         match f_type.as_str() {
             "VERIFIED" => {
                 self.conn.execute(
@@ -921,49 +996,54 @@ impl Database {
         chosen_value: &str,
         resolution_note: &str,
         resolved_by: &str,
+        resolver_role: &str,
     ) -> Result<DocumentItem> {
+        // Enforce customer existence
+        if self.get_customer_by_id(customer_id)?.is_none() {
+            return Err(rusqlite::Error::QueryReturnedNoRows);
+        }
+
         let field_clean = field.trim().to_lowercase();
-        let docs = self.get_documents()?;
+        let docs = self.get_documents_by_customer_id(customer_id)?;
         for mut doc in docs {
-            if doc.customer_id == customer_id {
-                let mut modified = false;
-                for fact in &mut doc.key_facts {
-                    let fact_field = fact.field.trim().to_lowercase();
-                    let fact_label = fact.label.trim().to_lowercase();
-                    if fact_field == field_clean
-                        || fact_label == field_clean
-                        || field_clean.contains(&fact_field)
-                        || fact_field.contains(&field_clean)
-                    {
-                        fact.value = chosen_value.to_string();
-                        fact.is_conflicting = false;
-                        modified = true;
-                    }
+            // NEVER mutate or tamper with historic signed contracts!
+            if doc.source_type == DocumentSourceType::SignedContract {
+                continue;
+            }
+            let mut modified = false;
+            for fact in &mut doc.key_facts {
+                let fact_field = fact.field.trim().to_lowercase();
+                let fact_label = fact.label.trim().to_lowercase();
+                // Strict equality check prevents arbitrary fact tampering
+                if fact_field == field_clean || fact_label == field_clean {
+                    fact.value = chosen_value.to_string();
+                    fact.is_conflicting = false;
+                    modified = true;
                 }
-                if modified {
-                    self.update_document(&doc)?;
-                }
+            }
+            if modified {
+                self.update_document(&doc)?;
             }
         }
 
         let now_str = chrono::Utc::now().format("%Y-%m-%d").to_string();
         let doc_id = format!("RES-{}", uuid::Uuid::new_v4().simple().to_string()[..6].to_uppercase());
-        let res_doc = DocumentItem {
+        let mut res_doc = DocumentItem {
             id: doc_id,
             customer_id: customer_id.to_string(),
             title: format!("Conflict Resolution Note: {}", field),
-            source_type: DocumentSourceType::OfficialTemplate,
-            source_label: "Official SD Worx Template".to_string(),
+            source_type: DocumentSourceType::TicketResolution,
+            source_label: DocumentSourceType::TicketResolution.label().to_string(),
             date: now_str,
             author: resolved_by.to_string(),
-            author_role: "Payroll Consultant".to_string(),
+            author_role: resolver_role.to_string(),
             summary: format!(
-                "Official conflict resolution recorded. Parameter '{}' standardized to '{}'. Note: {}",
+                "Conflict resolution recorded. Parameter '{}' standardized to '{}'. Note: {}",
                 field, chosen_value, resolution_note
             ),
             raw_content: format!(
-                "Formal dispute resolution registered by {}. Standardized value: '{}'. Details: {}",
-                resolved_by, chosen_value, resolution_note
+                "Dispute resolution registered by {} ({}). Standardized value: '{}'. Details: {}",
+                resolved_by, resolver_role, chosen_value, resolution_note
             ),
             unmasked_raw_content: None,
             file_path: None,
@@ -976,25 +1056,11 @@ impl Database {
                     value: chosen_value.to_string(),
                     is_conflicting: false,
                 },
-                KeyFact {
-                    field: field.to_string(),
-                    label: field.to_string(),
-                    value: chosen_value.to_string(),
-                    is_conflicting: false,
-                },
             ],
             tags: vec!["Conflict Resolution".to_string(), "Standardized".to_string()],
-            trust: TrustBreakdown {
-                overall_score: 98.0,
-                source_score: 95.0,
-                recency_score: 100.0,
-                consensus_score: 100.0,
-                feedback_score: 100.0,
-                is_authoritative: true,
-                conflict_flag: false,
-            },
+            trust: TrustBreakdown::default(),
             feedback: DocumentFeedback {
-                verified_count: 5,
+                verified_count: 1,
                 outdated_count: 0,
                 questionable_count: 0,
             },
@@ -1004,6 +1070,7 @@ impl Database {
             external_id: None,
         };
 
+        res_doc.trust = TrustEngine::compute_trust(&res_doc, 85.0, false);
         self.insert_document(&res_doc)?;
         Ok(res_doc)
     }
@@ -1123,12 +1190,56 @@ impl Database {
         Ok(list)
     }
 
+    pub fn get_employee_by_id(&self, id: &str) -> Result<Option<Employee>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, name, title, department, extension, direct_phone, avatar_url, availability, completed_cases, customer_familiarity_json, domain_expertise_json, recent_activity FROM employees WHERE id = ?1",
+        )?;
+
+        let mut rows = stmt.query_map(params![id], |row: &Row| {
+            let avail_str: String = row.get(7)?;
+            let availability = match avail_str.as_str() {
+                "Available" => AvailabilityStatus::Available,
+                "InCall" => AvailabilityStatus::InCall,
+                "Busy" => AvailabilityStatus::Busy,
+                _ => AvailabilityStatus::Away,
+            };
+
+            let comp_cases: i64 = row.get(8)?;
+            let cust_json: String = row.get(9)?;
+            let cust_fam: HashMap<String, f64> = serde_json::from_str(&cust_json).unwrap_or_default();
+
+            let dom_json: String = row.get(10)?;
+            let dom_exp: HashMap<String, f64> = serde_json::from_str(&dom_json).unwrap_or_default();
+
+            Ok(Employee {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                title: row.get(2)?,
+                department: row.get(3)?,
+                extension: row.get(4)?,
+                direct_phone: row.get(5)?,
+                avatar_url: row.get(6)?,
+                availability,
+                completed_cases: comp_cases as usize,
+                customer_familiarity: cust_fam,
+                domain_expertise: dom_exp,
+                recent_activity: row.get(11)?,
+            })
+        })?;
+
+        if let Some(r) = rows.next() {
+            Ok(Some(r?))
+        } else {
+            Ok(None)
+        }
+    }
+
     pub fn record_handoff(
         &self,
         emp_id: &str,
         customer_id: &str,
-        inquiry_summary: &str,
-        caller_name: &str,
+        _inquiry_summary: &str,
+        _caller_name: &str,
     ) -> Result<Option<Employee>> {
         let emps = self.get_employees()?;
         if let Some(mut emp) = emps.into_iter().find(|e| e.id == emp_id) {
@@ -1138,9 +1249,10 @@ impl Database {
                 .entry(customer_id.to_string())
                 .or_insert(20.0);
             *current = (*current + 3.5).min(100.0);
+            // Geen vertrouwelijke klantvraag of persoonsgegevens opslaan in publiek zichtbaar medewerkersprofiel
             emp.recent_activity = format!(
-                "Doorgeschakeld met klantvraag: '{}' (Beller: {})",
-                inquiry_summary, caller_name
+                "Doorgeschakelde klantvraag behandeld (Dossier #{})",
+                emp.completed_cases
             );
 
             self.update_employee(&emp)?;
