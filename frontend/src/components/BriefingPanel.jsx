@@ -3,12 +3,12 @@ import { X, RefreshCw, AlertTriangle, Calendar, Mail, FileText, Users, Info } fr
 
 const SEVERITY = {
   high: {
-    label: 'Kritiek',
+    label: 'Critical',
     border: 'border-l-rose-500',
     badge: 'bg-rose-50 text-rose-700 border-rose-200',
   },
   medium: {
-    label: 'Waarschuwing',
+    label: 'Warning',
     border: 'border-l-amber-400',
     badge: 'bg-amber-50 text-amber-700 border-amber-200',
   },
@@ -20,12 +20,12 @@ const SEVERITY = {
 };
 
 /**
- * Insight-analist-paneel.
+ * Briefing panel.
  *
- * De analyse draait volledig stil op de achtergrond in App.jsx; dit paneel
- * toont enkel het laatste rapport en de (Graph-)bronnen. Geen demo-data,
- * geen simulatie-theater: de engine analyseert de echte dossierdocumenten
- * en kruist die met Microsoft 365-bronnen wanneer die beschikbaar zijn.
+ * The analysis runs quietly in the background in App.jsx; this panel only
+ * shows the latest report and the (Graph) sources. No demo data,
+ * no simulation theater: it analyzes the real case documents and cross-checks
+ * them with Microsoft 365 sources whenever those are available.
  */
 export default function AIInsightPanel({
   isOpen,
@@ -60,7 +60,7 @@ export default function AIInsightPanel({
   const steps = report?.reasoning_steps || [];
   const stats = report?.stats || {};
   const generated = report?.generated_at
-    ? new Date(report.generated_at).toLocaleString('nl-BE', {
+    ? new Date(report.generated_at).toLocaleString('en-GB', {
         day: '2-digit',
         month: '2-digit',
         hour: '2-digit',
@@ -69,9 +69,9 @@ export default function AIInsightPanel({
     : null;
 
   const sourceSections = [
-    { key: 'agenda', icon: Calendar, label: 'Agenda', items: calendar },
-    { key: 'mail', icon: Mail, label: 'Mails', items: mails },
-    { key: 'verslag', icon: FileText, label: 'Verslagen', items: minutes },
+    { key: 'agenda', icon: Calendar, label: 'Calendar', items: calendar },
+    { key: 'mail', icon: Mail, label: 'Emails', items: mails },
+    { key: 'verslag', icon: FileText, label: 'Minutes', items: minutes },
   ];
 
   return (
@@ -80,7 +80,7 @@ export default function AIInsightPanel({
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-label="Insight-analist"
+      aria-label="Open briefing"
     >
       <div
         className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[88vh] flex flex-col overflow-hidden"
@@ -93,11 +93,11 @@ export default function AIInsightPanel({
               <Users className="w-4 h-4 text-indigo-600" />
             </div>
             <div className="min-w-0">
-              <h2 className="text-sm font-bold text-slate-900 truncate">Insight-analist</h2>
+              <h2 className="text-sm font-bold text-slate-900 truncate">Briefing</h2>
               <p className="text-[11px] text-slate-500 truncate">
-                {report?.model || 'Deterministische dossieranalyse'}
-                {generated ? ` • laatste analyse ${generated}` : ''}
-                {busy ? ' • analyse draait…' : ''}
+                Case briefing
+                {generated ? ` • last run ${generated}` : ''}
+                {busy ? ' • analysis running…' : ''}
               </p>
             </div>
           </div>
@@ -107,7 +107,7 @@ export default function AIInsightPanel({
                 onClick={onRefresh}
                 disabled={busy}
                 className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
-                title="Analyse opnieuw draaien"
+                title="Refresh briefing"
               >
                 <RefreshCw className={`w-4 h-4 ${busy ? 'animate-spin' : ''}`} />
               </button>
@@ -115,20 +115,20 @@ export default function AIInsightPanel({
             <button
               onClick={onClose}
               className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
-              title="Sluiten (Esc)"
+              title="Close (Esc)"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Bronwaarschuwingen (eerlijk, geen demodata) */}
+        {/* Source warnings (honest, no demo data) */}
         {noGraph && (
           <div className="mx-5 mt-3 flex items-start space-x-2 text-[12px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
             <Info className="w-4 h-4 shrink-0 mt-px" />
             <span>
-              Geen Microsoft 365-bronnen voor deze sessie — de analyse draait op de dossierdocumenten.
-              Log in met Microsoft 365 om agenda, mails en vergaderverslagen mee te nemen.
+              No Microsoft 365 sources for this session — the briefing runs on your case documents.
+              Sign in with Microsoft 365 to include your calendar, emails and meeting minutes.
             </span>
           </div>
         )}
@@ -149,8 +149,8 @@ export default function AIInsightPanel({
         {/* Tabs */}
         <div className="flex items-center space-x-1 px-5 pt-3 border-b border-slate-200">
           {[
-            { id: 'rapport', label: 'Rapport' },
-            { id: 'bronnen', label: `Bronnen (${calendar.length + mails.length + minutes.length})` },
+            { id: 'rapport', label: 'Report' },
+            { id: 'bronnen', label: `Sources (${calendar.length + mails.length + minutes.length})` },
           ].map((t) => (
             <button
               key={t.id}
@@ -172,8 +172,8 @@ export default function AIInsightPanel({
             !report ? (
               <div className="py-16 text-center text-sm text-slate-500">
                 {busy
-                  ? 'Analyse draait op de achtergrond…'
-                  : 'Nog geen analyse beschikbaar. Klik op ververs om de analyse te draaien.'}
+                  ? 'Analysis is running in the background…'
+                  : 'No report available yet. Click refresh to run the analysis.'}
               </div>
             ) : (
               <div className="space-y-5">
@@ -200,11 +200,11 @@ export default function AIInsightPanel({
                 {/* Stats */}
                 <div className="flex flex-wrap gap-2 text-[11px]">
                   {[
-                    ['Bevindingen', findings.length],
-                    ['Klantendossiers', stats.customers_matched ?? 0],
-                    ['Sleutelfeiten', stats.facts_extracted ?? 0],
-                    ['Dossierconflicten', stats.conflicts_detected ?? 0],
-                    ['Bronnen', stats.sources ?? 0],
+                    ['Findings', findings.length],
+                    ['Customer cases', stats.customers_matched ?? 0],
+                    ['Key facts', stats.facts_extracted ?? 0],
+                    ['Case conflicts', stats.conflicts_detected ?? 0],
+                    ['Sources', stats.sources ?? 0],
                   ].map(([label, value]) => (
                     <span
                       key={label}
@@ -215,11 +215,11 @@ export default function AIInsightPanel({
                   ))}
                 </div>
 
-                {/* Redenering */}
+                {/* Reasoning */}
                 {steps.length > 0 && (
                   <details className="rounded-lg border border-slate-200 bg-slate-50/60">
                     <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-slate-700 select-none">
-                      Redenering van de engine ({steps.length} stappen)
+                      Reasoning ({steps.length} steps)
                     </summary>
                     <ol className="px-5 pb-3 pt-1 space-y-1.5 text-xs text-slate-700 list-decimal">
                       {steps.map((s, i) => (
@@ -232,7 +232,7 @@ export default function AIInsightPanel({
                 {/* Findings */}
                 {findings.length > 0 && (
                   <div className="space-y-2.5">
-                    <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide">Bevindingen</h4>
+                    <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide">Findings</h4>
                     {findings.map((f) => {
                       const sev = SEVERITY[f.severity] || SEVERITY.low;
                       return (
@@ -254,7 +254,7 @@ export default function AIInsightPanel({
                               <p className="mt-1 text-xs text-slate-600 leading-relaxed">{f.detail}</p>
                               {f.customer_name && (
                                 <div className="mt-1.5 text-[11px] text-slate-500">
-                                  Dossier: <span className="font-semibold text-slate-700">{f.customer_name}</span>
+                                  Case: <span className="font-semibold text-slate-700">{f.customer_name}</span>
                                 </div>
                               )}
                               {f.evidence?.length > 0 && (
@@ -274,10 +274,10 @@ export default function AIInsightPanel({
                   </div>
                 )}
 
-                {/* Actiepunten */}
+                {/* Action items */}
                 {actions.length > 0 && (
                   <div className="space-y-2">
-                    <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide">Actiepunten</h4>
+                    <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide">Action items</h4>
                     {actions.map((a, i) => (
                       <div key={i} className="flex items-start space-x-3 rounded-lg border border-slate-200 p-3">
                         <span className="mt-px shrink-0 w-6 h-6 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center justify-center text-[11px] font-bold">
@@ -303,7 +303,7 @@ export default function AIInsightPanel({
                 {routing.length > 0 && (
                   <div className="space-y-2">
                     <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
-                      Aanbevolen experts
+                      Recommended experts
                     </h4>
                     <div className="grid sm:grid-cols-3 gap-2">
                       {routing.map((r, i) => (
@@ -342,7 +342,7 @@ export default function AIInsightPanel({
                         onClick={onOpenRouter}
                         className="mt-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800"
                       >
-                        Open Smart Router voor doorverwijzing →
+                        Open Smart Router for referral →
                       </button>
                     )}
                   </div>
@@ -350,7 +350,7 @@ export default function AIInsightPanel({
               </div>
             )
           ) : (
-            /* Bronnen-tab */
+            /* Sources tab */
             <div className="space-y-4">
               {sourceSections.map(({ key, icon: Icon, label, items }) => (
                 <div key={key}>
@@ -362,7 +362,7 @@ export default function AIInsightPanel({
                   </h4>
                   {items.length === 0 ? (
                     <p className="mt-1 text-xs text-slate-400">
-                      Geen {label.toLowerCase()} beschikbaar via Microsoft Graph.
+                      No {label.toLowerCase()} available via Microsoft Graph.
                     </p>
                   ) : (
                     <ul className="mt-1.5 space-y-1.5">
@@ -393,9 +393,9 @@ export default function AIInsightPanel({
 
         {/* Footer / disclaimer */}
         <div className="px-5 py-2.5 border-t border-slate-200 bg-slate-50 text-[10px] text-slate-500 leading-relaxed">
-          Deterministische analyse-engine (Trust Engine + Expertise Graph) op dossierdata
-          {noGraph ? '' : ' en Microsoft 365-bronnen'} — externe AI. Elke analyse wordt gelogd in de
-          SHA-256 auditketen.
+          Compiled automatically from your case documents
+          {noGraph ? '' : ' and Microsoft 365 sources'}. Every run is recorded in the
+          SHA-256 audit chain.
         </div>
       </div>
     </div>

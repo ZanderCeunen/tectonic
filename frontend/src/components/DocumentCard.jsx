@@ -58,7 +58,7 @@ export default function DocumentCard({ doc, activeUser, onFeedback }) {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!res.ok) {
-        alert('Bestandsdownload niet toegestaan of bestand niet gevonden.');
+        alert('File download not allowed or file not found.');
         return;
       }
       const blob = await res.blob();

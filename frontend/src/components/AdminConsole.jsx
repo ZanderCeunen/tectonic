@@ -74,7 +74,7 @@ export default function AdminConsole({
         setUsers(data);
       }
     } catch (e) {
-      console.error('Laden van gebruikers mislukt:', e);
+      console.error('Failed to load users:', e);
     }
   };
 
@@ -88,7 +88,7 @@ export default function AdminConsole({
         setAssignments(data);
       }
     } catch (e) {
-      console.error('Laden van toewijzingen mislukt:', e);
+      console.error('Failed to load assignments:', e);
     }
   };
 
@@ -102,7 +102,7 @@ export default function AdminConsole({
         setAuditChain(data);
       }
     } catch (e) {
-      console.error('Laden van audit trail mislukt:', e);
+      console.error('Failed to load audit trail:', e);
     }
   };
 
@@ -113,7 +113,7 @@ export default function AdminConsole({
         const text = await res.text();
         setHealthStatus({ ok: true, message: text });
       } else {
-        setHealthStatus({ ok: false, message: `Statuscode ${res.status}` });
+        setHealthStatus({ ok: false, message: `Status code ${res.status}` });
       }
     } catch (e) {
       setHealthStatus({ ok: false, message: e.message });
@@ -145,7 +145,7 @@ export default function AdminConsole({
       });
 
       if (res.ok) {
-        setActionMessage({ type: 'success', text: `Gebruiker ${newUser.username} succesvol aangemaakt.` });
+        setActionMessage({ type: 'success', text: `User ${newUser.username} created successfully.` });
         setNewUser({
           username: '',
           name: '',
@@ -158,7 +158,7 @@ export default function AdminConsole({
         fetchUsers();
       } else {
         const err = await res.text();
-        setActionMessage({ type: 'error', text: `Aanmaken mislukt: ${err || res.status}` });
+        setActionMessage({ type: 'error', text: `Failed to create: ${err || res.status}` });
       }
     } catch (e) {
       setActionMessage({ type: 'error', text: e.message });
@@ -180,12 +180,12 @@ export default function AdminConsole({
       });
 
       if (res.ok) {
-        setActionMessage({ type: 'success', text: 'Klantendossier succesvol toegewezen.' });
+        setActionMessage({ type: 'success', text: 'Case assigned successfully.' });
         setNewAssignment({ user_id: '', customer_id: '' });
         fetchAssignments();
         if (onRefreshData) onRefreshData();
       } else {
-        setActionMessage({ type: 'error', text: 'Toewijzen van dossier mislukt.' });
+        setActionMessage({ type: 'error', text: 'Failed to assign case.' });
       }
     } catch (e) {
       setActionMessage({ type: 'error', text: e.message });
@@ -199,11 +199,11 @@ export default function AdminConsole({
         headers: { Authorization: `Bearer ${authToken}` },
       });
       if (res.ok) {
-        setActionMessage({ type: 'success', text: 'Toewijzing ingetrokken.' });
+        setActionMessage({ type: 'success', text: 'Assignment revoked.' });
         fetchAssignments();
         if (onRefreshData) onRefreshData();
       } else {
-        setActionMessage({ type: 'error', text: 'Intrekken van toewijzing mislukt.' });
+        setActionMessage({ type: 'error', text: 'Failed to revoke assignment.' });
       }
     } catch (e) {
       setActionMessage({ type: 'error', text: e.message });
@@ -240,24 +240,24 @@ export default function AdminConsole({
 
   return (
     <div className="space-y-6">
-      {/* Beheerder Kopbalk */}
+      {/* Admin header */}
       <section className="bg-slate-900 text-white rounded-xl p-5 sm:p-6 border border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center space-x-2 text-blue-400 text-xs font-semibold uppercase tracking-wider mb-1">
             <Shield className="w-4 h-4" />
-            <span>Beheerderspaneel &amp; Veiligheidstoezicht</span>
+            <span>Admin panel &amp; Security oversight</span>
           </div>
           <h1 className="text-xl font-bold tracking-tight text-white">
-            TECTONIC Systeembeheer &amp; Autorisaties
+            TECTONIC System Administration &amp; Permissions
           </h1>
           <p className="text-sm text-slate-400 mt-1 max-w-2xl leading-relaxed">
-            Beheer gebruikersrollen, dossierautorisaties per consulent en valideer het cryptografische SHA-256 auditlogboek.
+            Manage user roles, case permissions per consultant, and validate the cryptographic SHA-256 audit log.
           </p>
         </div>
 
         <div className="flex items-center space-x-3 text-xs self-start md:self-center">
           <span className="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 font-mono">
-            Machtiging: <strong className="text-emerald-400">{activeUser?.clearance_level || 'Admin'}</strong>
+            Clearance: <strong className="text-emerald-400">{activeUser?.clearance_level || 'Admin'}</strong>
           </span>
           <button
             onClick={() => {
@@ -267,14 +267,14 @@ export default function AdminConsole({
               checkHealth();
             }}
             className="min-h-[38px] p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
-            title="Gegevens verversen"
+            title="Refresh data"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </section>
 
-      {/* Meldingen */}
+      {/* Notifications */}
       {actionMessage && (
         <div
           role="alert"
@@ -289,12 +289,12 @@ export default function AdminConsole({
             onClick={() => setActionMessage(null)}
             className="text-xs font-semibold underline ml-4 hover:opacity-80"
           >
-            Sluiten
+            Close
           </button>
         </div>
       )}
 
-      {/* Navigatietabbladen */}
+      {/* Navigation tabs */}
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
         <button
           onClick={() => setActiveTab('assignments')}
@@ -303,7 +303,7 @@ export default function AdminConsole({
           }`}
         >
           <Building2 className="w-4 h-4" />
-          <span>Dossiertoewijzingen ({assignments.length})</span>
+          <span>Case assignments ({assignments.length})</span>
         </button>
 
         <button
@@ -313,7 +313,7 @@ export default function AdminConsole({
           }`}
         >
           <Users className="w-4 h-4" />
-          <span>Gebruikers &amp; Rollen ({users.length})</span>
+          <span>Users &amp; Roles ({users.length})</span>
         </button>
 
         <button
@@ -323,7 +323,7 @@ export default function AdminConsole({
           }`}
         >
           <UserCheck className="w-4 h-4" />
-          <span>Routing Specialisten ({employees.length})</span>
+          <span>Routing Specialists ({employees.length})</span>
         </button>
 
         <button
@@ -333,7 +333,7 @@ export default function AdminConsole({
           }`}
         >
           <Database className="w-4 h-4" />
-          <span>Cryptografisch Auditlogboek ({auditChain.total_entries || auditChain.entries?.length || 0})</span>
+          <span>Cryptographic Audit Log ({auditChain.total_entries || auditChain.entries?.length || 0})</span>
         </button>
 
         <button
@@ -343,20 +343,20 @@ export default function AdminConsole({
           }`}
         >
           <Activity className="w-4 h-4" />
-          <span>Systeemstatus</span>
+          <span>System Status</span>
         </button>
       </div>
 
-      {/* TAB 1: DOSSIER TOEWIJZINGEN */}
+      {/* TAB 1: CASE ASSIGNMENTS */}
       {activeTab === 'assignments' && (
         <div className="space-y-4">
           <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs space-y-4">
             <div>
               <h2 className="text-sm font-bold text-slate-900">
-                Klantendossier Toewijzen aan Medewerker
+                Assign a Case to a Team Member
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Consulenten en Senior Officers kunnen uitsluitend dossiers inzien waartoe zij expliciet bevoegd zijn verklaard.
+                Consultants and Senior Officers can only view cases they have been explicitly authorized for.
               </p>
             </div>
 
@@ -364,7 +364,7 @@ export default function AdminConsole({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label htmlFor="assign-user" className="block text-xs font-semibold text-slate-700">
-                    Gebruikersaccount
+                    User account
                   </label>
                   <select
                     id="assign-user"
@@ -373,7 +373,7 @@ export default function AdminConsole({
                     className="w-full min-h-[44px] px-3.5 py-2 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
                     required
                   >
-                    <option value="">Selecteer medewerker...</option>
+                    <option value="">Select a team member...</option>
                     {users.map((u) => (
                       <option key={u.id} value={u.id}>
                         {u.name} (@{u.username}) — {u.role}
@@ -384,7 +384,7 @@ export default function AdminConsole({
 
                 <div className="space-y-1">
                   <label htmlFor="assign-customer" className="block text-xs font-semibold text-slate-700">
-                    Klantendossier
+                    Case
                   </label>
                   <select
                     id="assign-customer"
@@ -393,7 +393,7 @@ export default function AdminConsole({
                     className="w-full min-h-[44px] px-3.5 py-2 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
                     required
                   >
-                    <option value="">Selecteer klant...</option>
+                    <option value="">Select a customer...</option>
                     {customers.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name} ({c.id} - {c.joint_committee?.split(' - ')[0]})
@@ -409,7 +409,7 @@ export default function AdminConsole({
                   className="min-h-[44px] px-6 py-2 bg-[#005FB8] hover:bg-[#004b93] active:bg-[#003c75] text-white text-sm font-semibold rounded-lg transition-colors flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>Toewijzing toevoegen</span>
+                  <span>Add assignment</span>
                 </button>
               </div>
             </form>
@@ -417,12 +417,12 @@ export default function AdminConsole({
 
           <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
             <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-              <span className="text-sm font-bold text-slate-800">Actieve toewijzingen ({assignments.length})</span>
-              <span className="text-xs text-slate-500">Niet-toegewezen dossiers geven een 404 (geen datalek)</span>
+              <span className="text-sm font-bold text-slate-800">Active assignments ({assignments.length})</span>
+              <span className="text-xs text-slate-500">Unassigned cases return a 404 (not a data breach)</span>
             </div>
             <div className="divide-y divide-slate-100">
               {assignments.length === 0 ? (
-                <div className="p-8 text-center text-sm text-slate-500">Geen actieve toewijzingen geregistreerd.</div>
+                <div className="p-8 text-center text-sm text-slate-500">No active assignments recorded.</div>
               ) : (
                 assignments.map((a) => (
                   <div key={`${a.user_id}-${a.customer_id}`} className="p-4 flex items-center justify-between hover:bg-slate-50">
@@ -432,13 +432,13 @@ export default function AdminConsole({
                       </div>
                       <div>
                         <div className="font-semibold text-slate-900 text-sm">{getUserLabel(a.user_id)}</div>
-                        <div className="text-slate-500 text-xs mt-0.5">Gemachtigd voor: {getCustomerLabel(a.customer_id)}</div>
+                        <div className="text-slate-500 text-xs mt-0.5">Authorized for: {getCustomerLabel(a.customer_id)}</div>
                       </div>
                     </div>
                     <button
                       onClick={() => handleRemoveAssignment(a.user_id, a.customer_id)}
                       className="min-h-[38px] p-2 text-slate-400 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-rose-500"
-                      title="Toewijzing intrekken"
+                      title="Revoke assignment"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -450,16 +450,16 @@ export default function AdminConsole({
         </div>
       )}
 
-      {/* TAB 2: GEBRUIKERS & ROLLEN */}
+      {/* TAB 2: USERS & ROLES */}
       {activeTab === 'users' && (
         <div className="space-y-4">
           <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs space-y-4">
             <div>
               <h2 className="text-sm font-bold text-slate-900">
-                Nieuw Gebruikersaccount Aanmaken
+                Create a New User Account
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Stel de juiste functierol en veiligheidsmachtiging in conform de beleidsregels.
+                Set the correct job role and security clearance in line with the policy rules.
               </p>
             </div>
 
@@ -467,7 +467,7 @@ export default function AdminConsole({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label htmlFor="new-user-username" className="block text-xs font-semibold text-slate-700">
-                    Gebruikersnaam *
+                    Username *
                   </label>
                   <input
                     id="new-user-username"
@@ -481,7 +481,7 @@ export default function AdminConsole({
 
                 <div className="space-y-1">
                   <label htmlFor="new-user-name" className="block text-xs font-semibold text-slate-700">
-                    Volledige naam *
+                    Full name *
                   </label>
                   <input
                     id="new-user-name"
@@ -495,7 +495,7 @@ export default function AdminConsole({
 
                 <div className="space-y-1">
                   <label htmlFor="new-user-email" className="block text-xs font-semibold text-slate-700">
-                    E-mailadres *
+                    Email address *
                   </label>
                   <input
                     id="new-user-email"
@@ -509,7 +509,7 @@ export default function AdminConsole({
 
                 <div className="space-y-1">
                   <label htmlFor="new-user-password" className="block text-xs font-semibold text-slate-700">
-                    Wachtwoord (minimaal 8 tekens) *
+                    Password (at least 8 characters) *
                   </label>
                   <input
                     id="new-user-password"
@@ -524,7 +524,7 @@ export default function AdminConsole({
 
                 <div className="space-y-1">
                   <label htmlFor="new-user-role" className="block text-xs font-semibold text-slate-700">
-                    Functierol &amp; Toegangsrechten
+                    Job Role &amp; Access Rights
                   </label>
                   <select
                     id="new-user-role"
@@ -536,11 +536,11 @@ export default function AdminConsole({
                     }}
                     className="w-full min-h-[44px] px-3.5 py-2 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
                   >
-                    <option value="Consultant">Consultant (Gemaskeerde dossiers, standaard)</option>
-                    <option value="SeniorPayrollOfficer">SeniorPayrollOfficer (Volledige tekst, dossierbeheer)</option>
-                    <option value="LegalAdvisor">LegalAdvisor (Juridische beslissingsbevoegdheid)</option>
-                    <option value="Auditor">Auditor (Alleen-lezen inspectie &amp; auditlogboek)</option>
-                    <option value="Admin">Admin (Onderhoud &amp; gebruikersbeheer)</option>
+                    <option value="Consultant">Consultant (Masked cases, standard)</option>
+                    <option value="SeniorPayrollOfficer">SeniorPayrollOfficer (Full text, case management)</option>
+                    <option value="LegalAdvisor">LegalAdvisor (Legal decision authority)</option>
+                    <option value="Auditor">Auditor (Read-only inspection &amp; audit log)</option>
+                    <option value="Admin">Admin (Maintenance &amp; user management)</option>
                   </select>
                 </div>
               </div>
@@ -551,7 +551,7 @@ export default function AdminConsole({
                   className="min-h-[44px] px-6 py-2 bg-[#005FB8] hover:bg-[#004b93] active:bg-[#003c75] text-white text-sm font-semibold rounded-lg transition-colors flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>Gebruiker registreren</span>
+                  <span>Register user</span>
                 </button>
               </div>
             </form>
@@ -559,17 +559,17 @@ export default function AdminConsole({
 
           <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
             <div className="p-4 bg-slate-50 border-b border-slate-200">
-              <span className="text-sm font-bold text-slate-800">Gebruikerslijst ({users.length})</span>
+              <span className="text-sm font-bold text-slate-800">User list ({users.length})</span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-600 border-b border-slate-200">
                   <tr>
-                    <th className="p-4 font-semibold">Gebruiker</th>
-                    <th className="p-4 font-semibold">Rol</th>
-                    <th className="p-4 font-semibold">Machtiging</th>
-                    <th className="p-4 font-semibold">E-mail</th>
-                    <th className="p-4 font-semibold">Expert-ID</th>
+                    <th className="p-4 font-semibold">User</th>
+                    <th className="p-4 font-semibold">Role</th>
+                    <th className="p-4 font-semibold">Clearance</th>
+                    <th className="p-4 font-semibold">Email</th>
+                    <th className="p-4 font-semibold">Expert ID</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -607,16 +607,16 @@ export default function AdminConsole({
         </div>
       )}
 
-      {/* TAB 3: ROUTING SPECIALISTEN */}
+      {/* TAB 3: ROUTING SPECIALISTS */}
       {activeTab === 'employees' && (
         <div className="space-y-4">
           <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs flex items-center justify-between">
             <div>
               <h2 className="text-sm font-bold text-slate-900">
-                SD Worx Interne Specialisten
+                SD Worx Internal Specialists
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Collega's met gespecialiseerde domeinkennis voor de Smart Router.
+                Colleagues with specialised domain knowledge for the Smart Router.
               </p>
             </div>
             {onOpenEmployeeModal && (
@@ -625,7 +625,7 @@ export default function AdminConsole({
                 className="min-h-[44px] px-5 py-2 bg-[#005FB8] hover:bg-[#004b93] active:bg-[#003c75] text-white text-sm font-semibold rounded-lg transition-colors flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
               >
                 <Plus className="w-4 h-4" />
-                <span>Specialist toevoegen</span>
+                <span>Add specialist</span>
               </button>
             )}
           </div>
@@ -642,26 +642,26 @@ export default function AdminConsole({
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-bold text-slate-900 truncate">{emp.name}</div>
                     <div className="text-xs text-slate-500 truncate">{emp.title}</div>
-                    <div className="text-xs text-[#005FB8] font-mono">toestel {emp.extension || '4100'}</div>
+                    <div className="text-xs text-[#005FB8] font-mono">extension {emp.extension || '4100'}</div>
                   </div>
                   {onOpenEmployeeModal && (
                     <button
                       onClick={() => onOpenEmployeeModal(emp)}
                       className="p-1.5 text-slate-500 hover:text-slate-900 rounded transition-colors text-xs font-semibold underline"
                     >
-                      Bewerken
+                      Edit
                     </button>
                   )}
                 </div>
 
                 <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
-                  <span>Dossiers voltooid: <strong className="text-slate-900">{emp.completed_cases}</strong></span>
+                  <span>Cases completed: <strong className="text-slate-900">{emp.completed_cases}</strong></span>
                   <span
                     className={`font-semibold ${
                       emp.availability === 'Available' ? 'text-emerald-700' : 'text-slate-500'
                     }`}
                   >
-                    ● {emp.availability === 'Available' ? 'Beschikbaar' : emp.availability}
+                    ● {emp.availability === 'Available' ? 'Available' : emp.availability}
                   </span>
                 </div>
               </div>

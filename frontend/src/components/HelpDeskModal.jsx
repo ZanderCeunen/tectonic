@@ -49,11 +49,11 @@ export default function AiHelpModal({
 
   // Minimal quick suggestion pills
   const samplePrompts = [
-    'A1-aanvraag bij expat detachering naar Frankrijk',
-    'Weerverletzegels en mobiliteitsvergoeding in PC 124',
-    'Voorwaarden voor flexi-jobs en Dimona FLI in PC 302',
-    'Cafetariaplan met fietsleasing en eindejaarspremie',
-    'Structureel telewerk en bureauvergoeding in PC 200',
+    'A1 application for expat secondment to France',
+    'Bad-weather allowance and mobility allowance in PC 124',
+    'Conditions for flexi-jobs and Dimona FLI in PC 302',
+    'Cafeteria plan with bike leasing and end-of-year bonus',
+    'Structural teleworking and home-office allowance in PC 200',
   ];
 
   // Background expert matcher (uses domain expertise, availability, and customer familiarity)
@@ -144,43 +144,43 @@ export default function AiHelpModal({
         activeCustConflicts.length > 0 &&
         (q.includes('uur') || q.includes('telewerk') || q.includes('contract') || q.includes('loon'))
       ) {
-        conflictNotice = `Let op: Er is een openstaand dossierconflict voor ${customer.name} inzake "${
+        conflictNotice = `Warning: there is an unresolved case conflict for ${customer.name} regarding "${
           activeCustConflicts[0].field_label || activeCustConflicts[0].field
         }".`;
       }
     }
 
     if (q.includes('expat') || q.includes('a1') || q.includes('detachering') || q.includes('buitenland')) {
-      framework = 'Verordening (EG) nr. 883/2004 & Limosa-aangifte';
+      framework = 'Regulation (EC) No 883/2004 & Limosa notification';
       text =
-        'Bij detachering van een werknemer naar een andere EU-lidstaat met behoud van het Belgische arbeidscontract blijft de werknemer tot maximaal 24 maanden onderworpen aan de Belgische RSZ. Hiervoor is een voorafgaande A1-aanvraag via de portaalsite van de RSZ (Working in Europe) verplicht. Tevens moet in het ontvangende land worden voldaan aan de lokale meldingsplicht (zoals SIPSI in Frankrijk). Indien de werknemer structureel in twee of meer lidstaten werkt, geldt de 25%-substantieelheidsregel van de woonstaat.';
+        'When an employee is seconded to another EU member state while keeping their Belgian employment contract, they remain subject to Belgian social security for up to 24 months. A prior A1 application via the social security portal (Working in Europe) is mandatory. The local notification duty in the receiving country (such as SIPSI in France) must also be met. If the employee structurally works in two or more member states, the 25% substantial activity rule of the country of residence applies.';
     } else if (q.includes('bouw') || q.includes('124') || q.includes('weerverlet') || q.includes('mobiliteit')) {
-      framework = 'Sectorale CAO PC 124 & Constructiv';
+      framework = 'Sectoral CBA PC 124 & Constructiv';
       text =
-        'Binnen PC 124 (Bouw) worden arbeiders bij tijdelijke werkloosheid wegens slecht weer vergoed via weerverletzegels, die worden uitgekeerd door Constructiv bovenop de RVA-uitkering. Voor het woon-werkverkeer naar de bouwwerf is de mobiliteitsvergoeding verplicht per kilometer, met aparte tarieven voor chauffeurs en passagiers. Vergeet niet de eerste werkloosheidsdag van de maand tijdig elektronisch aan de RVA te melden.';
+        'Within PC 124 (Construction), workers who are temporarily unemployed because of bad weather are compensated through bad-weather allowance certificates, paid out by Constructiv on top of the unemployment benefit. For commuting to the construction site, the mobility allowance is mandatory per kilometre, with separate rates for drivers and passengers. Do not forget to report the first day of unemployment of the month electronically to the National Employment Office (RVA/ONEM) in time.';
     } else if (q.includes('horeca') || q.includes('302') || q.includes('flexi')) {
-      framework = 'Wet sociaal statuut flexi-jobs & CAO PC 302';
+      framework = 'Flexi-job social status Act & CBA PC 302';
       text =
-        'Een flexi-jobwerknemer in PC 302 moet in kwartaal T-3 minstens 4/5de hebben gewerkt bij een andere werkgever (of gepensioneerd zijn in T-2). Het loon is vrij van RSZ-werknemersbijdragen en bedrijfsvoorheffing; de werkgever betaalt een bijzondere compensatiebijdrage van 28%. Vóór elke tewerkstelling moet een Dimona FLI (met begin- en einduur) worden ingediend, en er moet een schriftelijke raamovereenkomst aanwezig zijn.';
+        'A flexi-job employee in PC 302 must have worked at least 4/5 of the time for another employer in quarter T-3 (or be retired in T-2). The wage is exempt from employee social security contributions and withholding tax; the employer pays a special contribution of 28%. Before each engagement, a Dimona FLI declaration (with start and end time) must be filed, and a written framework agreement must be in place.';
     } else if (q.includes('chemie') || q.includes('207') || q.includes('ploeg') || q.includes('continu')) {
-      framework = 'Sectorale CAO PC 207 & art. 275/5 WIB 92';
+      framework = 'Sectoral CBA PC 207 & art. 275/5 Income Tax Code 92';
       text =
-        'Voor volcontinu- en ploegenstelsels in PC 207 gelden verplichte sectorale toeslagen. Indien ploegenarbeid aan de voorwaarden voldoet (minstens 2 ploegen van minstens 2 personen met dezelfde omvang die elkaar opvolgen zonder onderbreking), kan de werkgever aanspraak maken op de fiscale vrijstelling van doorstorting van bedrijfsvoorheffing, mits een ploegenpremie van ten minste 2% wordt toegekend.';
+        'For continuous and shift systems in PC 207, mandatory sectoral allowances apply. If shift work meets the conditions (at least 2 shift teams of at least 2 people with the same working time following each other without interruption), the employer can claim the tax exemption on the transfer of withholding tax, provided a shift premium of at least 2% is granted.';
     } else if (q.includes('cafetaria') || q.includes('fiets') || q.includes('lease') || q.includes('bonus')) {
-      framework = 'Circulaire 2020/C/139 & Fiscale fietsvrijstelling';
+      framework = 'Circular 2020/C/139 & Tax exemption for company bikes';
       text =
-        'Een cafetariaplan maakt het mogelijk om loonelementen (zoals de sectorale eindejaarspremie, indien toegestaan door de CAO van het paritair comité) kostenneutraal om te ruilen voor extralegale voordelen. Een ter beschikking gestelde bedrijfsfiets die effectief wordt gebruikt voor woon-werkverplaatsingen is 100% vrijgesteld van RSZ en personenbelasting, en kan worden gecumuleerd met de belastingvrije kilometervergoeding.';
+        'A cafeteria plan allows wage elements (such as the sectoral end-of-year bonus, if permitted by the CBA of the joint committee) to be exchanged cost-neutrally for fringe benefits. A company bike made available and effectively used for commuting is 100% exempt from social security contributions and personal income tax, and can be combined with the tax-free kilometre allowance.';
     } else if (q.includes('200') || q.includes('bediende') || q.includes('telewerk') || q.includes('thuiswerk')) {
-      framework = 'Sectorale CAO PC 200 & CAO nr. 149';
+      framework = 'Sectoral CBA PC 200 & CBA No. 149';
       text =
-        'In PC 200 bedraagt de normale voltijdse arbeidsduur 38 uur per week. Bij structureel telewerk (minstens één dag per week) kan een forfaitaire bureauvergoeding worden toegekend die conform de actuele RSZ- en fiscale maxima vrij is van bijdragen en belasting. Er dient een schriftelijke telewerkovereenkomst te worden opgemaakt met afspraken over bereikbaarheid en arbeidstijden.';
+        'In PC 200, the normal full-time working week is 38 hours. With structural teleworking (at least one day per week), a flat-rate home-office allowance can be granted that is exempt from contributions and tax within the current social security and tax ceilings. A written teleworking agreement must be drawn up, covering availability and working hours.';
     } else {
-      framework = 'Belgisch Arbeidsrecht & RSZ-bepalingen';
-      text = `Op basis van uw vraag heeft de AI de relevante sociale wetgeving geraadpleegd. ${
+      framework = 'Belgian labour law & social security provisions';
+      text = `Based on your question, we reviewed the relevant social legislation. ${
         customer
-          ? `Voor dossier ${customer.name} (${customer.joint_committee || 'PC 200'}) zijn de sectorale CAO-bepalingen doorslaggevend.`
-          : 'Controleer steeds de sectorale CAO van het bevoegde paritair comité voor afwijkende barema\'s en premies.'
-      } Zorg ervoor dat afspraken steeds schriftelijk worden vastgelegd in het arbeidsreglement of een bijlage bij de arbeidsovereenkomst.`;
+          ? `For case ${customer.name} (${customer.joint_committee || 'PC 200'}), the sectoral CBA provisions are decisive.`
+          : 'Always check the sectoral CBA of the competent joint committee for exceptional scales and premiums.'
+      } Make sure agreements are always recorded in writing in the work regulations or in an annex to the employment contract.`;
     }
 
     return {
@@ -259,8 +259,8 @@ export default function AiHelpModal({
         onExecuteHandoff({
           customer_id: customer?.id || 'CUST-001',
           employee_id: expert.id,
-          caller_name: activeUser?.name || 'Consulent',
-          inquiry_summary: `AI Hulp: Doorverwijzing naar ${expert.name}`,
+          caller_name: activeUser?.name || 'Consultant',
+          inquiry_summary: `Help desk: Referral to ${expert.name}`,
           expert_name: expert.name,
         });
       }
@@ -277,12 +277,12 @@ export default function AiHelpModal({
       className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4"
     >
       <div className="bg-white rounded-xl max-w-2xl w-full border border-slate-200 shadow-xl overflow-hidden flex flex-col h-[85vh] max-h-[720px]">
-        {/* Header: Zeer rustig en minimalistisch */}
+        {/* Header: Very quiet and minimalist */}
         <header className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between shrink-0 bg-white">
           <div className="flex items-center space-x-2">
             <span className="w-2.5 h-2.5 rounded-full bg-[#F58220]" />
             <h2 id="ai-help-title" className="text-sm font-bold text-slate-900">
-              AI Hulp
+              Help desk
             </h2>
             {customer && (
               <span className="text-xs text-slate-500 font-medium">
@@ -296,32 +296,32 @@ export default function AiHelpModal({
               <button
                 onClick={() => setMessages([])}
                 className="text-xs text-slate-500 hover:text-slate-800 px-2 py-1 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-[#F58220]"
-                title="Wissen"
+                title="Clear"
               >
-                Wissen
+                Clear
               </button>
             )}
             <button
               onClick={onClose}
               className="text-slate-400 hover:text-slate-700 p-2 rounded-lg hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-[#F58220] min-w-[44px] min-h-[44px] flex items-center justify-center"
-              aria-label="Sluiten"
+              aria-label="Close"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
         </header>
 
-        {/* Chat Venster (Puur en leeg van rommel) */}
+        {/* Chat window (clean and free of clutter) */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
-          {/* Lege staat: Heel simpel */}
+          {/* Empty state: very simple */}
           {messages.length === 0 && (
             <div className="h-full flex flex-col justify-center items-center text-center max-w-md mx-auto py-8 space-y-5">
               <div className="space-y-1">
                 <h3 className="text-base font-semibold text-slate-900">
-                  Waarmee kan ik helpen?
+                  How can I help?
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Stel een sociaaljuridische vraag of leg een dossierkwestie voor.
+                  Ask a social-law question or raise a case issue.
                 </p>
               </div>
 
@@ -339,18 +339,18 @@ export default function AiHelpModal({
             </div>
           )}
 
-          {/* Berichtenlijst */}
+          {/* Message list */}
           {messages.map((msg) => (
             <div key={msg.id} className="space-y-2">
               {msg.role === 'user' ? (
-                /* Gebruikersbericht: strak & subtiel rechts */
+                /* User message: tight & subtle on the right */
                 <div className="flex justify-end">
                   <div className="bg-slate-900 text-white rounded-lg px-4 py-2.5 max-w-lg text-xs leading-relaxed">
                     {msg.text}
                   </div>
                 </div>
               ) : (
-                /* AI-antwoord: heldere typografie, geen overbodige kaders */
+                /* Answer: clear typography, no unnecessary frames */
                 <div className="space-y-3 py-1 max-w-xl">
                   {msg.conflictNotice && (
                     <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2.5 py-1.5 font-medium">

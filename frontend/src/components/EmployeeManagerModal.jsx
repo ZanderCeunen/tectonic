@@ -122,7 +122,7 @@ export default function EmployeeManagerModal({ isOpen, onClose, employeeToEdit, 
           <div className="flex items-center space-x-2.5">
             <UserPlus className="w-5 h-5 text-white" />
             <h2 id="emp-modal-title" className="text-base font-bold text-white">
-              {isEdit ? `Expert bewerken: ${formData.name}` : 'Nieuwe SD Worx expert toevoegen'}
+              {isEdit ? `Edit expert: ${formData.name}` : 'Add new SD Worx expert'}
             </h2>
           </div>
           <button

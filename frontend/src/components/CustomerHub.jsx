@@ -18,14 +18,14 @@ export default function CustomerHub({
   const [selectedTag, setSelectedTag] = useState('ALL');
 
   const allTags = [
-    { id: 'ALL', label: 'Alle documenten' },
-    { id: 'Contract', label: 'Arbeidsovereenkomst' },
-    { id: 'Working Hours', label: 'Arbeidsduur' },
+    { id: 'ALL', label: 'All documents' },
+    { id: 'Contract', label: 'Employment contract' },
+    { id: 'Working Hours', label: 'Working hours' },
     { id: 'PC 200', label: 'PC 200' },
-    { id: 'Telework', label: 'Telewerk' },
-    { id: 'SD Worx Template', label: 'SD Worx Model' },
-    { id: 'CRM', label: 'CRM Notitie' },
-    { id: 'Ticket', label: 'Servicedesk Ticket' },
+    { id: 'Telework', label: 'Telework' },
+    { id: 'SD Worx Template', label: 'SD Worx template' },
+    { id: 'CRM', label: 'CRM note' },
+    { id: 'Ticket', label: 'Service desk ticket' },
   ];
 
   const filteredDocs = documents.filter((doc) => {

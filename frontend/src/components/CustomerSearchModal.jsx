@@ -84,10 +84,10 @@ export default function CustomerSearchModal({
           <div className="flex items-center justify-between">
             <div>
               <h2 id="customer-search-modal-title" className="text-base font-bold text-slate-900">
-                Klantendossier Selecteren &amp; Zoeken
+                Select &amp; Search Cases
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Zoek op bedrijfsnaam, KBO-ondernemingsnummer, contactpersoon of paritair comité
+                Search by company name, KBO enterprise number, contact person, or Joint Committee (PC)
               </p>
             </div>
             <button

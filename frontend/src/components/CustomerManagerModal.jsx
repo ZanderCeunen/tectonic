@@ -121,7 +121,7 @@ export default function CustomerManagerModal({ isOpen, onClose, customerToEdit, 
           <div className="flex items-center space-x-2.5">
             <Building2 className="w-5 h-5 text-white" />
             <h2 id="customer-modal-title" className="text-base font-bold text-white">
-              {isEdit ? `Klant bewerken: ${formData.name}` : 'Nieuw klantendossier registreren'}
+              {isEdit ? `Edit customer: ${formData.name}` : 'Register new case'}
             </h2>
           </div>
           <button

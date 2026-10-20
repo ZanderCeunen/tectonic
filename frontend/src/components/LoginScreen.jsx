@@ -67,7 +67,7 @@ export default function LoginScreen({ onLoginSuccess, initialError }) {
               className="h-12 w-auto mx-auto object-contain"
             />
             <h1 className="text-xl font-semibold text-slate-900 tracking-tight">
-              Sign in
+              Sign in with portal account (admins &amp; demo)
             </h1>
           </div>
 
@@ -93,7 +93,7 @@ export default function LoginScreen({ onLoginSuccess, initialError }) {
                     <rect x="1" y="11" width="9" height="9" fill="#00A4EF" />
                     <rect x="11" y="11" width="9" height="9" fill="#FFB900" />
                   </svg>
-                  Continue with Microsoft 365
+                  Sign in with Microsoft
                 </button>
               </div>
 

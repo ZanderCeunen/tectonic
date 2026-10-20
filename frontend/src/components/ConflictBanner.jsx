@@ -23,7 +23,7 @@ export default function ConflictBanner({ conflicts, customerId, onResolveConflic
         customer_id: customerId || conflict.customer_id,
         field: conflict.field,
         chosen_value: valueToSet,
-        resolution_note: resolutionNote || 'Formele juridische resolutie bevestigd na hiërarchische controle.',
+        resolution_note: resolutionNote || 'Formal legal resolution confirmed after hierarchical review.',
       });
     }
     setIsSubmitting(false);

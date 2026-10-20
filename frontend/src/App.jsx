@@ -4,11 +4,11 @@ import HomeDashboard from './components/HomeDashboard';
 import CustomerHub from './components/CustomerHub';
 import CustomerSearchModal from './components/CustomerSearchModal';
 import LoginScreen from './components/LoginScreen';
-import AIInsightPanel from './components/AIInsightPanel';
+import BriefingPanel from './components/BriefingPanel';
 import CustomerManagerModal from './components/CustomerManagerModal';
 import EmployeeManagerModal from './components/EmployeeManagerModal';
 import AdminConsole from './components/AdminConsole';
-import AiHelpModal from './components/AiHelpModal';
+import HelpDeskModal from './components/HelpDeskModal';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 export default function App() {
@@ -36,15 +36,15 @@ export default function App() {
   const [employeeToEdit, setEmployeeToEdit] = useState(null);
   const [isInsightOpen, setIsInsightOpen] = useState(false);
 
-  // Foutmelding uit de Microsoft OAuth2-callback (URL-fragment)
+  // Error message from the Microsoft OAuth2 callback (URL fragment)
   const [authNotice, setAuthNotice] = useState('');
 
-  // Insight-analist: rapport uit de stille achtergrondanalyse
+  // Briefing: report from the silent background run
   const [insight, setInsight] = useState(null);
   const [insightSources, setInsightSources] = useState(null);
   const [insightBusy, setInsightBusy] = useState(false);
 
-  // Microsoft login-callback: token of fout uit de URL-fragment halen
+  // Microsoft login callback: pick up token or error from the URL fragment
   useEffect(() => {
     const hash = window.location.hash;
     if (!hash || hash.length < 2) return;
@@ -57,18 +57,18 @@ export default function App() {
       setAuthToken(msToken);
     } else if (msError) {
       const messages = {
-        not_configured: 'Microsoft login is niet geconfigureerd op de server.',
-        invalid_state: 'Microsoft login-sessie verlopen of ongeldig. Probeer opnieuw.',
-        missing_code: 'Microsoft gaf geen autorisatiecode terug.',
+        not_configured: 'Microsoft login is not configured on the server.',
+        invalid_state: 'Microsoft login session expired or invalid. Please try again.',
+        missing_code: 'Microsoft did not return an authorization code.',
         token_exchange:
-          'Microsoft token-uitwisseling mislukt (controleer TENANT_ID, CLIENT_ID en CLIENT_SECRET in .env).',
+          'Microsoft token exchange failed (check TENANT_ID, CLIENT_ID and CLIENT_SECRET in .env).',
         graph_profile:
-          'Microsoft Graph profiel ophalen mislukt (controleer delegated permission User.Read).',
-        access_denied: 'Toegang geweigerd bij Microsoft.',
-        db_upsert: 'Kon je Microsoft-account niet koppelen aan het portaal.',
-        jwt: 'Sessietoken kon niet worden aangemaakt.',
+          'Could not fetch your Microsoft Graph profile (check the delegated permission User.Read).',
+        access_denied: 'Access was denied by Microsoft.',
+        db_upsert: 'Could not link your Microsoft account to the portal.',
+        jwt: 'The session token could not be created.',
       };
-      setAuthNotice(messages[msError] || `Microsoft login-fout: ${msError}`);
+      setAuthNotice(messages[msError] || `Microsoft login error: ${msError}`);
       window.history.replaceState(null, '', window.location.pathname + window.location.search);
     }
   }, []);
@@ -164,8 +164,8 @@ export default function App() {
     loadInitialData();
   }, [authToken]);
 
-  // Stille achtergrondanalyse (Insight-analist): draait eenmaal na login;
-  // verder op verzoek via het paneel. Blokkeert de UI niet en opent niets.
+  // Quiet background briefing: runs once after login;
+  // afterwards on demand via the panel. Never blocks the UI or opens anything.
   const runBackgroundInsight = async () => {
     if (!authToken) return;
     setInsightBusy(true);
@@ -182,7 +182,7 @@ export default function App() {
       if (repRes.ok) setInsight(await repRes.json());
       if (srcRes.ok) setInsightSources(await srcRes.json());
     } catch {
-      // Insight-analist is ondersteunend: stil falen, de UX niet breken
+      // The briefing is supportive: fail silently, never break the UX
     } finally {
       setInsightBusy(false);
     }
@@ -376,9 +376,9 @@ export default function App() {
             <AlertTriangle className="w-6 h-6" />
           </div>
           <div className="space-y-1">
-            <h2 className="text-base font-bold text-slate-900">Verbinding met API Server Vereist</h2>
+            <h2 className="text-base font-bold text-slate-900">Connection to the API server required</h2>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Het TECTONIC portaal communiceert met de lokale backend server op <code className="font-mono bg-slate-100 px-1 py-0.5 rounded">http://127.0.0.1:8080</code>.
+              The TECTONIC portal talks to the local backend server at <code className="font-mono bg-slate-100 px-1 py-0.5 rounded">http://127.0.0.1:8080</code>.
             </p>
           </div>
           <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs font-mono text-slate-700 text-left">
@@ -390,7 +390,7 @@ export default function App() {
             className="w-full min-h-[44px] bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-lg flex items-center justify-center space-x-2 transition-colors focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
           >
             <RefreshCw className="w-4 h-4" />
-            <span>Opnieuw proberen</span>
+            <span>Try again</span>
           </button>
         </div>
       </div>
@@ -430,7 +430,7 @@ export default function App() {
         {isLoading ? (
           <div className="py-24 text-center text-slate-500 text-sm flex items-center justify-center space-x-2.5">
             <RefreshCw className="w-5 h-5 animate-spin text-[#005FB8]" />
-            <span>Klantendossiers en beveiligingsbeleid laden...</span>
+            <span>Loading customer cases and security policy...</span>
           </div>
         ) : isAdminView ? (
           /* Admin Control Surface */
@@ -470,8 +470,8 @@ export default function App() {
         )}
       </main>
 
-      {/* Modal: AI Assistent / Hulp Nodig */}
-      <AiHelpModal
+      {/* Modal: Help desk / find a specialist */}
+      <HelpDeskModal
         isOpen={isAiHelpOpen}
         onClose={() => setIsAiHelpOpen(false)}
         employees={employees}
@@ -510,8 +510,8 @@ export default function App() {
         authToken={authToken}
       />
 
-      {/* Modal: Insight-analist (toont het rapport van de achtergrondanalyse) */}
-      <AIInsightPanel
+      {/* Modal: Briefing (shows the background report) */}
+      <BriefingPanel
         isOpen={isInsightOpen}
         onClose={() => setIsInsightOpen(false)}
         report={insight}
@@ -528,10 +528,10 @@ export default function App() {
       <footer className="border-t border-slate-200 bg-white py-4 text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2">
           <span className="font-medium text-slate-700">
-            SD Worx TECTONIC • Kennisportaal &amp; Dossierbeheer
+            SD Worx TECTONIC &bull; Knowledge Portal &amp; Case Management
           </span>
           <span className="text-slate-500">
-            Beveiliging &amp; Compliance Actief (SHA-256 Cryptografische Audit Ledger)
+            Security &amp; compliance active (SHA-256 cryptographic audit ledger)
           </span>
         </div>
       </footer>
