@@ -1,539 +1,401 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  X,
-  Sparkles,
-  CalendarDays,
-  Mail,
-  FileText,
-  AlertTriangle,
-  Info,
-  ListChecks,
-  Users,
-  RefreshCw,
-  ChevronDown,
-  ExternalLink,
-} from 'lucide-react';
-
-const TABS = [
-  { key: 'agenda', label: 'Agenda', icon: CalendarDays },
-  { key: 'mail', label: 'Mail', icon: Mail },
-  { key: 'verslag', label: 'Verslagen', icon: FileText },
-];
+import React, { useEffect, useState } from 'react';
+import { X, RefreshCw, AlertTriangle, Calendar, Mail, FileText, Users, Info } from 'lucide-react';
 
 const SEVERITY = {
-  high: { label: 'Kritiek', cls: 'border-l-rose-500 bg-rose-50/70 text-rose-800', chip: 'bg-rose-100 text-rose-700' },
-  medium: { label: 'Waarschuwing', cls: 'border-l-amber-500 bg-amber-50/70 text-amber-900', chip: 'bg-amber-100 text-amber-800' },
-  low: { label: 'Info', cls: 'border-l-sky-500 bg-sky-50/70 text-sky-900', chip: 'bg-sky-100 text-sky-700' },
+  high: {
+    label: 'Kritiek',
+    border: 'border-l-rose-500',
+    badge: 'bg-rose-50 text-rose-700 border-rose-200',
+  },
+  medium: {
+    label: 'Waarschuwing',
+    border: 'border-l-amber-400',
+    badge: 'bg-amber-50 text-amber-700 border-amber-200',
+  },
+  low: {
+    label: 'Info',
+    border: 'border-l-sky-400',
+    badge: 'bg-sky-50 text-sky-700 border-sky-200',
+  },
 };
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
 /**
- * AI Insight Analyst — analyse van agenda-punten, mails en vergaderverslagen.
- * Toont live "redeneerlog", bronnen links en het rapport rechts.
+ * Insight-analist-paneel.
+ *
+ * De analyse draait volledig stil op de achtergrond in App.jsx; dit paneel
+ * toont enkel het laatste rapport en de (Graph-)bronnen. Geen demo-data,
+ * geen simulatie-theater: de engine analyseert de echte dossierdocumenten
+ * en kruist die met Microsoft 365-bronnen wanneer die beschikbaar zijn.
  */
 export default function AIInsightPanel({
   isOpen,
   onClose,
-  authToken,
-  customers = [],
-  selectedCustomerId,
+  report,
+  sources,
+  busy = false,
+  onRefresh,
   onOpenRouter,
 }) {
-  const [phase, setPhase] = useState('idle'); // idle | running | done | error
-  const [logs, setLogs] = useState([]);
-  const [sources, setSources] = useState(null);
-  const [report, setReport] = useState(null);
-  const [errorMsg, setErrorMsg] = useState('');
-  const [activeTab, setActiveTab] = useState('agenda');
-  const [showReasoning, setShowReasoning] = useState(false);
-  const logRef = useRef(null);
-  const runIdRef = useRef(0);
+  const [tab, setTab] = useState('rapport');
 
   useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && onClose();
+    if (!isOpen) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
-  useEffect(() => {
-    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
-  }, [logs]);
-
-  const pushLog = (line) => setLogs((prev) => [...prev, line]);
-
-  const runAnalysis = async () => {
-    const runId = ++runIdRef.current;
-    setPhase('running');
-    setLogs([]);
-    setSources(null);
-    setReport(null);
-    setErrorMsg('');
-    setShowReasoning(false);
-
-    const stillCurrent = () => runIdRef.current === runId;
-
-    try {
-      pushLog('> Microsoft Graph agenda, mail en vergaderverslagen ophalen...');
-      const sourcesPromise = fetch('/api/insights/sources', {
-        headers: { Authorization: `Bearer ${authToken}` },
-      });
-      await sleep(420);
-      if (!stillCurrent()) return;
-
-      const sourcesRes = await sourcesPromise;
-      if (!sourcesRes.ok) throw new Error(`Bronnen ophalen mislukt (${sourcesRes.status})`);
-      const src = await sourcesRes.json();
-      if (!stillCurrent()) return;
-      setSources(src);
-      pushLog(
-        `  ✓ ${src.calendar.length} agendapunten, ${src.mails.length} mails, ${src.minutes.length} verslagen (${src.origin})`
-      );
-
-      await sleep(380);
-      if (!stillCurrent()) return;
-      pushLog('> Sleutelfeiten extraheren: PC-codes, werkuren, termijnen, bedragen...');
-      await sleep(400);
-      if (!stillCurrent()) return;
-      pushLog('> Dossierdocumenten kruisen met Trust Engine-hiërarchie...');
-
-      const body = {};
-      if (selectedCustomerId) body.customer_id = selectedCustomerId;
-      const analyzePromise = fetch('/api/insights/analyze', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`,
-        },
-        body: JSON.stringify(body),
-      });
-      await sleep(450);
-      if (!stillCurrent()) return;
-
-      const analyzeRes = await analyzePromise;
-      if (!analyzeRes.ok) throw new Error(`Analyse mislukt (${analyzeRes.status})`);
-      const rep = await analyzeRes.json();
-      if (!stillCurrent()) return;
-
-      pushLog(`  ✓ ${rep.stats.facts_extracted} feiten, ${rep.stats.conflicts_detected} bestaande conflicten gevonden`);
-      await sleep(320);
-      if (!stillCurrent()) return;
-      pushLog('> Expert routing wegen op PC-expertise, klantkennis en beschikbaarheid...');
-      await sleep(380);
-      if (!stillCurrent()) return;
-      pushLog(`  ✓ ${rep.routing.length} expertopties gewogen`);
-      pushLog(`> Rapport opgesteld (confidence ${(rep.confidence * 100).toFixed(0)}%) ✅`);
-
-      setReport(rep);
-      setPhase('done');
-    } catch (err) {
-      if (!stillCurrent()) return;
-      setErrorMsg(err.message || 'Onverwachte fout tijdens de analyse.');
-      pushLog(`! FOUT: ${err.message || 'onbekend'}`);
-      setPhase('error');
-    }
-  };
-
-  // Auto-run zodra het paneel opent
-  useEffect(() => {
-    if (isOpen && phase === 'idle') {
-      runAnalysis();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
-  const originBadge =
-    sources?.origin === 'microsoft-graph'
-      ? { text: 'Microsoft Graph', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
-      : sources?.origin === 'mock'
-      ? { text: 'Demo-bronnen', cls: 'bg-amber-50 text-amber-800 border-amber-200' }
-      : { text: 'Bronnen laden...', cls: 'bg-slate-100 text-slate-500 border-slate-200' };
+  const calendar = sources?.calendar || [];
+  const mails = sources?.mails || [];
+  const minutes = sources?.minutes || [];
+  const warnings = sources?.warnings || [];
+  const noGraph = sources?.origin === 'none';
+  const findings = report?.findings || [];
+  const actions = report?.action_items || [];
+  const routing = report?.routing || [];
+  const steps = report?.reasoning_steps || [];
+  const stats = report?.stats || {};
+  const generated = report?.generated_at
+    ? new Date(report.generated_at).toLocaleString('nl-BE', {
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : null;
 
-  const items =
-    !sources
-      ? []
-      : activeTab === 'agenda'
-      ? sources.calendar
-      : activeTab === 'mail'
-      ? sources.mails
-      : sources.minutes;
+  const sourceSections = [
+    { key: 'agenda', icon: Calendar, label: 'Agenda', items: calendar },
+    { key: 'mail', icon: Mail, label: 'Mails', items: mails },
+    { key: 'verslag', icon: FileText, label: 'Verslagen', items: minutes },
+  ];
 
   return (
     <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/40 backdrop-blur-sm"
+      onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-labelledby="ai-insight-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/50 backdrop-blur-sm"
-      onClick={onClose}
+      aria-label="Insight-analist"
     >
       <div
-        className="bg-white rounded-2xl w-full max-w-6xl max-h-[92vh] flex flex-col border border-slate-200 shadow-2xl overflow-hidden"
+        className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[88vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-5 sm:px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-gradient-to-r from-indigo-600 to-[#005FB8]">
-          <div className="flex items-center gap-3 text-white">
-            <span className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center">
-              <Sparkles className="w-5 h-5" />
-            </span>
-            <div>
-              <h2 id="ai-insight-title" className="text-base font-bold tracking-tight">
-                AI-analist — agenda, mails & vergaderverslagen
-              </h2>
-              <p className="text-xs text-indigo-100">
-                {report?.model || 'Tectonic Insight Engine'} • intelligente dossieranalyse
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 bg-white">
+          <div className="flex items-center space-x-3 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
+              <Users className="w-4 h-4 text-indigo-600" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-sm font-bold text-slate-900 truncate">Insight-analist</h2>
+              <p className="text-[11px] text-slate-500 truncate">
+                {report?.model || 'Deterministische dossieranalyse'}
+                {generated ? ` • laatste analyse ${generated}` : ''}
+                {busy ? ' • analyse draait…' : ''}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {sources && (
-              <span
-                className={`hidden sm:inline-flex text-[11px] font-semibold px-2.5 py-1 rounded-full border ${originBadge.cls}`}
+          <div className="flex items-center space-x-1.5 shrink-0">
+            {onRefresh && (
+              <button
+                onClick={onRefresh}
+                disabled={busy}
+                className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+                title="Analyse opnieuw draaien"
               >
-                {originBadge.text}
-              </span>
+                <RefreshCw className={`w-4 h-4 ${busy ? 'animate-spin' : ''}`} />
+              </button>
             )}
             <button
-              onClick={runAnalysis}
-              disabled={phase === 'running'}
-              className="p-2 rounded-lg text-white/90 hover:bg-white/15 transition-colors disabled:opacity-50"
-              title="Opnieuw analyseren"
-            >
-              <RefreshCw className={`w-4 h-4 ${phase === 'running' ? 'animate-spin' : ''}`} />
-            </button>
-            <button
               onClick={onClose}
-              className="p-2 rounded-lg text-white/90 hover:bg-white/15 transition-colors"
-              aria-label="Sluiten"
+              className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+              title="Sluiten (Esc)"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Body: bronnen | rapport */}
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-[320px,1fr] min-h-0">
-          {/* Linker kolom: gelezen bronnen */}
-          <aside className="border-b lg:border-b-0 lg:border-r border-slate-200 bg-slate-50/60 flex flex-col min-h-0">
-            <div className="px-4 pt-4 pb-2">
-              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                Gelezen bronnen
-              </h3>
-            </div>
-            <div className="px-3 flex gap-1">
-              {TABS.map((t) => {
-                const Icon = t.icon;
-                const count =
-                  t.key === 'agenda'
-                    ? sources?.calendar.length ?? 0
-                    : t.key === 'mail'
-                    ? sources?.mails.length ?? 0
-                    : sources?.minutes.length ?? 0;
-                return (
-                  <button
-                    key={t.key}
-                    onClick={() => setActiveTab(t.key)}
-                    className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-medium rounded-lg border transition-colors ${
-                      activeTab === t.key
-                        ? 'bg-white border-slate-300 text-[#005FB8] shadow-sm'
-                        : 'bg-transparent border-transparent text-slate-500 hover:text-slate-700'
-                    }`}
-                  >
-                    <Icon className="w-3.5 h-3.5" />
-                    {t.label}
-                    <span className="text-[10px] font-bold text-slate-400">{count}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
-              {!sources && phase === 'running' && (
-                <p className="text-xs text-slate-400 text-center py-6">Bronnen worden opgehaald...</p>
-              )}
-              {sources && items.length === 0 && (
-                <p className="text-xs text-slate-400 text-center py-6">Geen items in deze categorie.</p>
-              )}
-              {items.map((it) => (
-                <div
-                  key={it.id}
-                  className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-xs font-semibold text-slate-800 leading-snug">{it.title}</p>
-                    {it.importance === 'high' && (
-                      <span className="shrink-0 text-[9px] font-bold uppercase bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded">
-                        Hoog
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-slate-500 mt-1 line-clamp-3">{it.body}</p>
-                  <div className="flex items-center justify-between mt-2 text-[10px] text-slate-400">
-                    <span className="truncate max-w-[55%]">{it.originator}</span>
-                    <span>{it.when}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {sources?.warnings?.length > 0 && (
-              <div className="px-4 py-3 border-t border-amber-200 bg-amber-50 space-y-1">
-                {sources.warnings.map((w, i) => (
-                  <p key={i} className="text-[10px] text-amber-800 leading-snug flex gap-1.5">
-                    <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
-                    <span>{w}</span>
-                  </p>
-                ))}
+        {/* Bronwaarschuwingen (eerlijk, geen demodata) */}
+        {noGraph && (
+          <div className="mx-5 mt-3 flex items-start space-x-2 text-[12px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <Info className="w-4 h-4 shrink-0 mt-px" />
+            <span>
+              Geen Microsoft 365-bronnen voor deze sessie — de analyse draait op de dossierdocumenten.
+              Log in met Microsoft 365 om agenda, mails en vergaderverslagen mee te nemen.
+            </span>
+          </div>
+        )}
+        {warnings.length > 0 && (
+          <div className="mx-5 mt-2 space-y-1">
+            {warnings.map((w, i) => (
+              <div
+                key={i}
+                className="flex items-start space-x-2 text-[11px] text-slate-600 bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1.5"
+              >
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px text-slate-400" />
+                <span>{w}</span>
               </div>
-            )}
-          </aside>
+            ))}
+          </div>
+        )}
 
-          {/* Rechter kolom: rapport */}
-          <section className="min-h-0 overflow-y-auto p-5 sm:p-6">
-            {/* Live log tijdens analyse */}
-            {phase === 'running' && (
-              <div className="space-y-4">
-                <div
-                  ref={logRef}
-                  className="bg-slate-900 rounded-xl p-4 font-mono text-[12px] leading-relaxed text-emerald-300 max-h-[50vh] overflow-y-auto"
-                >
-                  {logs.map((l, i) => (
-                    <div key={i} className={l.startsWith('!') ? 'text-rose-400' : ''}>
-                      {l}
-                    </div>
-                  ))}
-                  <div className="text-slate-500">
-                    <span className="animate-pulse">▊</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-slate-500 justify-center">
-                  <Sparkles className="w-4 h-4 text-indigo-500 animate-pulse" />
-                  De AI-analist analyseert je agenda, mails en verslagen...
-                </div>
+        {/* Tabs */}
+        <div className="flex items-center space-x-1 px-5 pt-3 border-b border-slate-200">
+          {[
+            { id: 'rapport', label: 'Rapport' },
+            { id: 'bronnen', label: `Bronnen (${calendar.length + mails.length + minutes.length})` },
+          ].map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`px-3 py-2 text-xs font-semibold rounded-t-lg border-b-2 -mb-px transition-colors ${
+                tab === t.id
+                  ? 'border-indigo-500 text-indigo-700 bg-indigo-50/60'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          {tab === 'rapport' ? (
+            !report ? (
+              <div className="py-16 text-center text-sm text-slate-500">
+                {busy
+                  ? 'Analyse draait op de achtergrond…'
+                  : 'Nog geen analyse beschikbaar. Klik op ververs om de analyse te draaien.'}
               </div>
-            )}
-
-            {phase === 'error' && (
-              <div className="text-center py-10 space-y-4">
-                <div className="w-12 h-12 rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center mx-auto">
-                  <AlertTriangle className="w-6 h-6 text-rose-600" />
-                </div>
-                <p className="text-sm text-slate-700 font-medium">{errorMsg}</p>
-                <button
-                  onClick={runAnalysis}
-                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium rounded-lg"
-                >
-                  Opnieuw proberen
-                </button>
-              </div>
-            )}
-
-            {phase === 'done' && report && (
+            ) : (
               <div className="space-y-5">
                 {/* Headline + confidence */}
-                <div className="border border-indigo-100 bg-indigo-50/50 rounded-xl p-4">
+                <div>
                   <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider">
-                        Analyse-overzicht
-                      </p>
-                      <h3 className="text-lg font-bold text-slate-900 mt-0.5">{report.headline}</h3>
-                    </div>
+                    <h3 className="text-base font-bold text-slate-900 leading-snug">{report.headline}</h3>
                     <div className="text-right shrink-0">
-                      <p className="text-[11px] text-slate-500">Confidence</p>
-                      <p className="text-xl font-black text-indigo-700">
-                        {(report.confidence * 100).toFixed(0)}%
-                      </p>
+                      <div className="text-[11px] text-slate-500">confidence</div>
+                      <div className="text-sm font-bold text-indigo-600">
+                        {Math.round((report.confidence || 0) * 100)}%
+                      </div>
                     </div>
                   </div>
-                  <div className="h-1.5 bg-indigo-100 rounded-full mt-3 overflow-hidden">
+                  <div className="mt-1.5 h-1.5 rounded-full bg-slate-100 overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-indigo-500 to-[#005FB8] rounded-full transition-all"
-                      style={{ width: `${Math.round(report.confidence * 100)}%` }}
+                      className="h-full rounded-full bg-indigo-500"
+                      style={{ width: `${Math.round((report.confidence || 0) * 100)}%` }}
                     />
                   </div>
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    <span className="text-[11px] bg-white border border-slate-200 rounded-full px-2.5 py-1 text-slate-600">
-                      {report.stats.sources} bronnen
-                    </span>
-                    <span className="text-[11px] bg-white border border-slate-200 rounded-full px-2.5 py-1 text-slate-600">
-                      {report.stats.customers_matched} klant(en)
-                    </span>
-                    <span className="text-[11px] bg-white border border-slate-200 rounded-full px-2.5 py-1 text-slate-600">
-                      {report.stats.facts_extracted} feiten
-                    </span>
-                    <span className="text-[11px] bg-white border border-slate-200 rounded-full px-2.5 py-1 text-slate-600">
-                      {report.stats.conflicts_detected} dossierconflicten
-                    </span>
-                  </div>
-                  <p className="text-sm text-slate-700 mt-3 leading-relaxed">{report.summary}</p>
+                  <p className="mt-2 text-xs text-slate-600 leading-relaxed">{report.summary}</p>
                 </div>
 
-                {/* Redenering (simulatie) */}
-                <div className="border border-slate-200 rounded-xl overflow-hidden">
-                  <button
-                    onClick={() => setShowReasoning((v) => !v)}
-                    className="w-full px-4 py-3 flex items-center justify-between bg-slate-50 hover:bg-slate-100 transition-colors text-left"
-                  >
-                    <span className="text-xs font-bold text-slate-700 flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-indigo-500" />
-                      Redenering van de analist ({report.reasoning_steps.length} stappen)
+                {/* Stats */}
+                <div className="flex flex-wrap gap-2 text-[11px]">
+                  {[
+                    ['Bevindingen', findings.length],
+                    ['Klantendossiers', stats.customers_matched ?? 0],
+                    ['Sleutelfeiten', stats.facts_extracted ?? 0],
+                    ['Dossierconflicten', stats.conflicts_detected ?? 0],
+                    ['Bronnen', stats.sources ?? 0],
+                  ].map(([label, value]) => (
+                    <span
+                      key={label}
+                      className="px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 font-medium"
+                    >
+                      {label}: <strong>{value}</strong>
                     </span>
-                    <ChevronDown
-                      className={`w-4 h-4 text-slate-400 transition-transform ${showReasoning ? 'rotate-180' : ''}`}
-                    />
-                  </button>
-                  {showReasoning && (
-                    <ol className="p-4 space-y-1.5 bg-slate-900 font-mono text-[11px] text-slate-300">
-                      {report.reasoning_steps.map((s, i) => (
-                        <li key={i}>
-                          <span className="text-indigo-400">{i + 1}.</span> {s}
-                        </li>
+                  ))}
+                </div>
+
+                {/* Redenering */}
+                {steps.length > 0 && (
+                  <details className="rounded-lg border border-slate-200 bg-slate-50/60">
+                    <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-slate-700 select-none">
+                      Redenering van de engine ({steps.length} stappen)
+                    </summary>
+                    <ol className="px-5 pb-3 pt-1 space-y-1.5 text-xs text-slate-700 list-decimal">
+                      {steps.map((s, i) => (
+                        <li key={i}>{s}</li>
                       ))}
                     </ol>
-                  )}
-                </div>
+                  </details>
+                )}
 
-                {/* Bevindingen */}
-                <div>
-                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <AlertTriangle className="w-3.5 h-3.5" />
-                    Bevindingen ({report.findings.length})
-                  </h4>
-                  {report.findings.length === 0 && (
-                    <p className="text-sm text-slate-500 bg-slate-50 border border-slate-200 rounded-xl p-4">
-                      Geen tegenstrijdigheden gedetecteerd tussen de bronnen en je dossiers.
-                    </p>
-                  )}
-                  <div className="space-y-2">
-                    {report.findings.map((f) => {
+                {/* Findings */}
+                {findings.length > 0 && (
+                  <div className="space-y-2.5">
+                    <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide">Bevindingen</h4>
+                    {findings.map((f) => {
                       const sev = SEVERITY[f.severity] || SEVERITY.low;
                       return (
                         <div
                           key={f.id}
-                          className={`border border-l-4 rounded-xl p-3.5 ${sev.cls}`}
+                          className={`rounded-lg border border-l-4 border-slate-200 ${sev.border} bg-white p-3.5`}
                         >
                           <div className="flex items-start justify-between gap-3">
-                            <p className="text-sm font-bold">{f.title}</p>
-                            <span
-                              className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${sev.chip}`}
-                            >
-                              {sev.label}
-                            </span>
+                            <div className="min-w-0">
+                              <div className="flex items-center space-x-2 flex-wrap">
+                                <span
+                                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${sev.badge}`}
+                                >
+                                  {sev.label}
+                                </span>
+                                <span className="text-[10px] text-slate-500 font-medium">{f.category}</span>
+                              </div>
+                              <h5 className="mt-1 text-sm font-semibold text-slate-900">{f.title}</h5>
+                              <p className="mt-1 text-xs text-slate-600 leading-relaxed">{f.detail}</p>
+                              {f.customer_name && (
+                                <div className="mt-1.5 text-[11px] text-slate-500">
+                                  Dossier: <span className="font-semibold text-slate-700">{f.customer_name}</span>
+                                </div>
+                              )}
+                              {f.evidence?.length > 0 && (
+                                <ul className="mt-2 space-y-0.5">
+                                  {f.evidence.map((e, i) => (
+                                    <li key={i} className="text-[11px] text-slate-500 font-mono truncate">
+                                      • {e}
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
                           </div>
-                          <p className="text-xs mt-1 leading-relaxed opacity-90">{f.detail}</p>
-                          {f.customer_name && (
-                            <p className="text-[11px] font-semibold mt-2 flex items-center gap-1 opacity-75">
-                              <Users className="w-3 h-3" /> {f.customer_name} — {f.category}
-                            </p>
-                          )}
-                          {f.evidence?.length > 0 && (
-                            <ul className="mt-2 space-y-0.5">
-                              {f.evidence.map((e, i) => (
-                                <li key={i} className="text-[11px] opacity-75 flex gap-1.5">
-                                  <span>•</span> <span>{e}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          )}
                         </div>
                       );
                     })}
                   </div>
-                </div>
+                )}
 
                 {/* Actiepunten */}
-                <div>
-                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <ListChecks className="w-3.5 h-3.5" />
-                    Voorgestelde acties
-                  </h4>
+                {actions.length > 0 && (
                   <div className="space-y-2">
-                    {report.action_items.map((a, i) => (
-                      <div
-                        key={i}
-                        className="flex items-start gap-3 bg-white border border-slate-200 rounded-xl p-3"
-                      >
-                        <span className="shrink-0 w-6 h-6 rounded-lg bg-slate-900 text-white text-[11px] font-bold flex items-center justify-center">
+                    <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide">Actiepunten</h4>
+                    {actions.map((a, i) => (
+                      <div key={i} className="flex items-start space-x-3 rounded-lg border border-slate-200 p-3">
+                        <span className="mt-px shrink-0 w-6 h-6 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center justify-center text-[11px] font-bold">
                           {a.priority}
                         </span>
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold text-slate-800">{a.action}</p>
-                          <p className="text-xs text-slate-500 mt-0.5">{a.rationale}</p>
+                          <div className="flex items-center space-x-2 flex-wrap">
+                            <span className="text-sm font-semibold text-slate-900">{a.action}</span>
+                            {a.due && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-600 font-mono">
+                                {a.due}
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-0.5 text-xs text-slate-500">{a.rationale}</p>
                         </div>
-                        {a.due && (
-                          <span className="ml-auto shrink-0 text-[10px] font-bold bg-amber-50 border border-amber-200 text-amber-800 px-2 py-0.5 rounded-full">
-                            {a.due}
-                          </span>
-                        )}
                       </div>
                     ))}
                   </div>
-                </div>
+                )}
 
                 {/* Routing */}
-                {report.routing.length > 0 && (
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                      <Users className="w-3.5 h-3.5" />
-                      Aangeraden experts
+                {routing.length > 0 && (
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
+                      Aanbevolen experts
                     </h4>
-                    <div className="space-y-2">
-                      {report.routing.map((r, i) => (
-                        <div
-                          key={r.employee.id || i}
-                          className="flex items-center gap-3 bg-white border border-slate-200 rounded-xl p-3"
-                        >
-                          <div className="w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 font-bold text-sm flex items-center justify-center shrink-0">
-                            {r.employee.name
-                              .split(' ')
-                              .map((p) => p[0])
-                              .slice(0, 2)
-                              .join('')}
+                    <div className="grid sm:grid-cols-3 gap-2">
+                      {routing.map((r, i) => (
+                        <div key={i} className="rounded-lg border border-slate-200 p-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                              <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-[11px] font-bold text-slate-700">
+                                {(r.employee_name || '?')
+                                  .split(' ')
+                                  .map((p) => p[0])
+                                  .join('')
+                                  .slice(0, 2)
+                                  .toUpperCase()}
+                              </div>
+                              <div>
+                                <div className="text-xs font-semibold text-slate-900">{r.employee_name}</div>
+                                <div className="text-[10px] text-slate-500">{r.specialization || r.role}</div>
+                              </div>
+                            </div>
+                            {i === 0 && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                TOP
+                              </span>
+                            )}
                           </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-semibold text-slate-800 truncate">
-                              {r.employee.name}
-                              {i === 0 && (
-                                <span className="ml-2 text-[10px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">
-                                  TOP
-                                </span>
-                              )}
-                            </p>
-                            <p className="text-xs text-slate-500 truncate">
-                              {r.employee.title} • {Math.round(r.overall_match * 100)}% match
-                            </p>
-                          </div>
-                          <p className="hidden sm:block text-[11px] text-slate-400 max-w-[38%] truncate">
-                            {r.match_explanation}
-                          </p>
+                          {typeof r.match_score === 'number' && (
+                            <div className="mt-2 text-[10px] text-slate-500">
+                              match {Math.round(r.match_score * 100)}%
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
                     {onOpenRouter && (
                       <button
                         onClick={onOpenRouter}
-                        className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#005FB8] hover:bg-[#004b93] text-white text-xs font-semibold rounded-lg transition-colors"
+                        className="mt-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800"
                       >
-                        Open Smart Router voor doorverwijzing
-                        <ExternalLink className="w-3.5 h-3.5" />
+                        Open Smart Router voor doorverwijzing →
                       </button>
                     )}
                   </div>
                 )}
-
-                {/* Disclaimer / voet */}
-                <p className="text-[10px] text-slate-400 border-t border-slate-100 pt-3 flex items-center gap-1.5">
-                  <Info className="w-3 h-3" />
-                  {report.model} — geproduceerd door de TECTONIC Insight Engine (
-                  {report.origin === 'microsoft-graph' ? 'Microsoft Graph-bronnen' : 'demobronnen'}
-                  ). Elke analyse wordt vastgelegd in de SHA-256 auditketen.
-                </p>
               </div>
-            )}
-          </section>
+            )
+          ) : (
+            /* Bronnen-tab */
+            <div className="space-y-4">
+              {sourceSections.map(({ key, icon: Icon, label, items }) => (
+                <div key={key}>
+                  <h4 className="flex items-center space-x-1.5 text-xs font-bold text-slate-900 uppercase tracking-wide">
+                    <Icon className="w-3.5 h-3.5 text-slate-400" />
+                    <span>
+                      {label} ({items.length})
+                    </span>
+                  </h4>
+                  {items.length === 0 ? (
+                    <p className="mt-1 text-xs text-slate-400">
+                      Geen {label.toLowerCase()} beschikbaar via Microsoft Graph.
+                    </p>
+                  ) : (
+                    <ul className="mt-1.5 space-y-1.5">
+                      {items.map((it) => (
+                        <li key={it.id} className="rounded-lg border border-slate-200 px-3 py-2">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-xs font-semibold text-slate-900 truncate">{it.title}</div>
+                              <div className="text-[11px] text-slate-500 truncate">
+                                {it.originator} • {it.when}
+                              </div>
+                            </div>
+                            {it.importance === 'high' && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200 shrink-0">
+                                HIGH
+                              </span>
+                            )}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer / disclaimer */}
+        <div className="px-5 py-2.5 border-t border-slate-200 bg-slate-50 text-[10px] text-slate-500 leading-relaxed">
+          Deterministische analyse-engine (Trust Engine + Expertise Graph) op dossierdata
+          {noGraph ? '' : ' en Microsoft 365-bronnen'} — externe AI. Elke analyse wordt gelogd in de
+          SHA-256 auditketen.
         </div>
       </div>
     </div>

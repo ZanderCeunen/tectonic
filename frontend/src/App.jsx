@@ -41,6 +41,11 @@ export default function App() {
   // Foutmelding uit de Microsoft OAuth2-callback (URL-fragment)
   const [authNotice, setAuthNotice] = useState('');
 
+  // Insight-analist: rapport uit de stille achtergrondanalyse
+  const [insight, setInsight] = useState(null);
+  const [insightSources, setInsightSources] = useState(null);
+  const [insightBusy, setInsightBusy] = useState(false);
+
   // Microsoft login-callback: token of fout uit de URL-fragment halen
   useEffect(() => {
     const hash = window.location.hash;
@@ -160,6 +165,37 @@ export default function App() {
   useEffect(() => {
     loadInitialData();
   }, [authToken]);
+
+  // Stille achtergrondanalyse (Insight-analist): draait eenmaal na login;
+  // verder op verzoek via het paneel. Blokkeert de UI niet en opent niets.
+  const runBackgroundInsight = async () => {
+    if (!authToken) return;
+    setInsightBusy(true);
+    try {
+      const authHeader = { Authorization: `Bearer ${authToken}` };
+      const [repRes, srcRes] = await Promise.all([
+        fetch('/api/insights/analyze', {
+          method: 'POST',
+          headers: { ...authHeader, 'Content-Type': 'application/json' },
+          body: JSON.stringify(selectedCustomerId ? { customer_id: selectedCustomerId } : {}),
+        }),
+        fetch('/api/insights/sources', { headers: authHeader }),
+      ]);
+      if (repRes.ok) setInsight(await repRes.json());
+      if (srcRes.ok) setInsightSources(await srcRes.json());
+    } catch {
+      // Insight-analist is ondersteunend: stil falen, de UX niet breken
+    } finally {
+      setInsightBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (authToken && activeUser && customers.length > 0) {
+      runBackgroundInsight();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authToken, activeUser?.id, customers.length]);
 
   // 2. Load documents and conflicts for the selected customer dossier
   const loadCustomerDocuments = async (customerId) => {
@@ -388,6 +424,7 @@ export default function App() {
         isAdminView={isAdminView}
         onToggleAdminView={() => setIsAdminView(!isAdminView)}
         onOpenInsights={() => setIsInsightOpen(true)}
+        insightState={insightBusy ? 'busy' : insight ? 'ready' : null}
       />
 
       {/* Main Content Area */}
@@ -486,13 +523,14 @@ export default function App() {
         authToken={authToken}
       />
 
-      {/* Modal: AI Insight Analyst (agenda/mail/verslag-analyse) */}
+      {/* Modal: Insight-analist (toont het rapport van de achtergrondanalyse) */}
       <AIInsightPanel
         isOpen={isInsightOpen}
         onClose={() => setIsInsightOpen(false)}
-        authToken={authToken}
-        customers={customers}
-        selectedCustomerId={selectedCustomerId}
+        report={insight}
+        sources={insightSources}
+        busy={insightBusy}
+        onRefresh={runBackgroundInsight}
         onOpenRouter={() => {
           setIsInsightOpen(false);
           setIsRouterOpen(true);

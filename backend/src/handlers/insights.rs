@@ -18,14 +18,14 @@ pub struct AnalyzeRequest {
 }
 
 /// Bronnen ophalen: Microsoft Graph (agenda + mail) met token van de huidige
-/// Microsoft-sessie, anders demobronnen. Waarschuwingen staan in `warnings`.
-async fn collect_sources(
-    state: &AppState,
-    auth: &AuthUser,
-    customers: &[Customer],
-) -> InsightSources {
+/// Microsoft-sessie. Zonder token/tenant zijn er GEEN bronnen: de analyse
+/// beperkt zich tot de echte dossierdata (geen demodata).
+async fn collect_sources(state: &AppState, auth: &AuthUser) -> InsightSources {
     if !state.microsoft.is_configured() {
-        return insight_engine::mock_sources(customers);
+        return insight_engine::empty_sources(vec![
+            "Microsoft 365 is niet geconfigureerd — agenda/mail-analyse niet beschikbaar; analyse beperkt tot dossierdocumenten."
+                .to_string(),
+        ]);
     }
 
     // Token ophalen (in-memory). Geen token → portaallogin of server herstart.
@@ -59,12 +59,10 @@ async fn collect_sources(
     }
 
     let Some(access) = access else {
-        let mut s = insight_engine::mock_sources(customers);
-        s.warnings.push(
-            "Geen Microsoft Graph-token voor deze sessie (portaallogin?) — demobronnen gebruikt."
+        return insight_engine::empty_sources(vec![
+            "Geen Microsoft Graph-token voor deze sessie — log in met Microsoft 365 voor agenda/mail-analyse."
                 .to_string(),
-        );
-        return s;
+        ]);
     };
 
     let start = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
@@ -109,7 +107,7 @@ async fn collect_sources(
             }
         }
         Ok(r) => warnings.push(format!(
-            "Agenda ophalen via Graph mislukt (HTTP {}) — demobronnen voor agenda.",
+            "Agenda ophalen via Graph mislukt (HTTP {}) — agenda overgeslagen.",
             r.status().as_u16()
         )),
         Err(_) => warnings.push("Microsoft Graph agenda onbereikbaar.".to_string()),
@@ -121,16 +119,14 @@ async fn collect_sources(
             }
         }
         Ok(r) => warnings.push(format!(
-            "Mail ophalen via Graph mislukt (HTTP {}) — demobronnen voor mail.",
+            "Mail ophalen via Graph mislukt (HTTP {}) — mail overgeslagen.",
             r.status().as_u16()
         )),
         Err(_) => warnings.push("Microsoft Graph mail onbereikbaar.".to_string()),
     }
 
     if cal_v.is_null() && mail_v.is_null() {
-        let mut s = insight_engine::mock_sources(customers);
-        s.warnings.extend(warnings);
-        return s;
+        return insight_engine::empty_sources(warnings);
     }
 
     insight_engine::parse_graph_sources(&cal_v, &mail_v, warnings)
@@ -170,13 +166,7 @@ pub async fn get_insight_sources(
     auth: AuthUser,
     State(state): State<AppState>,
 ) -> Result<Json<InsightSources>, StatusCode> {
-    let customers = {
-        let db = state.db.lock().unwrap();
-        db.get_customers()
-    }
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    let mut sources = collect_sources(&state, &auth, &customers).await;
+    let mut sources = collect_sources(&state, &auth).await;
     if !rbac::can_unmask(&auth) {
         redact_sources(&mut sources);
     }
@@ -201,7 +191,8 @@ pub async fn get_insight_sources(
     Ok(Json(sources))
 }
 
-/// POST /api/insights/analyze — volledig "AI"-rapport over de bronnen.
+/// POST /api/insights/analyze — volledig analyse-rapport (dossieranalyse,
+/// aangevuld met Graph-bronnen wanneer de sessie Microsoft 365-bronnen heeft).
 pub async fn analyze_insights(
     auth: AuthUser,
     State(state): State<AppState>,
@@ -251,7 +242,7 @@ pub async fn analyze_insights(
         all_docs.extend(docs);
     }
 
-    let sources = collect_sources(&state, &auth, &customers).await;
+    let sources = collect_sources(&state, &auth).await;
     let mut report = insight_engine::analyze(
         &sources,
         &customers,

@@ -12,6 +12,7 @@ export default function Header({
   isAdminView = false,
   onToggleAdminView,
   onOpenInsights,
+  insightState = null,
 }) {
   const selectedCustomer = customers.find((c) => c.id === selectedCustomerId);
   const isAdmin = activeUser?.role === 'Admin' || activeUser?.clearance_level === 'Admin';
@@ -84,15 +85,24 @@ export default function Header({
 
           {/* Rechtersectie: Modus-wissel, Gebruiker & Afmelden */}
           <div className="flex items-center space-x-3 shrink-0">
-            {/* AI-analist: agenda/mail/verslag-analyse */}
+            {/* Insight-analist: stil, op de achtergrond — enkel icoon + statusdot */}
             {onOpenInsights && (
               <button
                 onClick={onOpenInsights}
-                className="inline-flex items-center space-x-1.5 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
-                title="AI-analist: analyseer agenda-punten, mails en vergaderverslagen"
+                className="relative p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg border border-transparent hover:border-indigo-200 transition-colors focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+                title="Insight-analist (analyse draait op de achtergrond)"
+                aria-label="Insight-analist openen"
               >
                 <Sparkles className="w-4 h-4" />
-                <span className="hidden md:inline">AI-analist</span>
+                {insightState === 'busy' && (
+                  <>
+                    <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-indigo-500 animate-ping" />
+                    <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-indigo-600" />
+                  </>
+                )}
+                {insightState === 'ready' && (
+                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-indigo-400" />
+                )}
               </button>
             )}
             {/* Beheerderspaneel / Dossiers Wisselaar */}

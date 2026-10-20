@@ -1,12 +1,12 @@
-//! TECTONIC Insight Engine — agenda/mail/verslag-analyse.
+//! TECTONIC Insight Engine — deterministische dossieranalyse.
 //!
-//! In productie hoort hier een echte LLM voor te zitten; voor deze use case is dit
-//! een deterministisch "slim programma dat zich voordoet als een AI": hetzelfde
-//! soort gestructureerde output (redeneringstappen, bevindingen, acties, confidence),
-//! maar gevoed door regex-extractie, Trust Engine-contradicties en Expert Routing.
+//! Echte programme-analyse (geen simulatie): Trust Engine-conflicten,
+//! key_fact-contradicties tussen documenten, kruiskoppeling met Microsoft
+//! Graph-bronnen (agenda/mails/verslagen) wanneer de sessie daarover beschikt,
+//! en Expert Routing op basis van de bevindingen.
 //!
-//! Bronnen: Microsoft Graph (agenda + mail + verslagen) of demobronnen wanneer
-//! er geen Graph-token beschikbaar is.
+//! Zonder Graph-bronnen analyseert de engine enkel de echte dossierdata;
+//! er wordt nooit met demodata gewerkt.
 
 use crate::expertise_graph::ExpertiseGraph;
 use crate::models::{Customer, DocumentItem, Employee, RoutingRecommendation, RoutingRequest};
@@ -34,7 +34,7 @@ pub struct InsightSourceItem {
 
 #[derive(Clone, Serialize)]
 pub struct InsightSources {
-    /// "microsoft-graph" | "mock"
+    /// "microsoft-graph" | "none"
     pub origin: String,
     pub obtained_at: String,
     pub calendar: Vec<InsightSourceItem>,
@@ -89,154 +89,20 @@ pub struct InsightReport {
 }
 
 // ---------------------------------------------------------------
-// Demobronnen (geen Graph-token / geen tenant)
+// Lege bronnen (geen Graph-token / geen tenant)
 // ---------------------------------------------------------------
 
-pub fn mock_sources(customers: &[Customer]) -> InsightSources {
-    let name = |i: usize, fb: &str| -> String {
-        customers
-            .get(i)
-            .map(|c| c.name.clone())
-            .unwrap_or_else(|| fb.to_string())
-    };
-    let pc = |i: usize, fb: &str| -> String {
-        customers
-            .get(i)
-            .map(|c| {
-                if c.joint_committee.trim().is_empty() {
-                    fb.to_string()
-                } else {
-                    c.joint_committee.clone()
-                }
-            })
-            .unwrap_or_else(|| fb.to_string())
-    };
-
-    let n1 = name(0, "Bouwbedrijf Vandenberghe NV");
-    let n2 = name(1, "Horeca Group De Rooster");
-    let n3 = name(2, "Chemieproductions Kempen BV");
-    let pc1 = pc(0, "PC 124 (Bouw)");
-    let pc2 = pc(1, "PC 302 (Horeca)");
-    let pc3 = pc(2, "PC 207 (Chemie)");
-
-    let calendar = vec![
-        item(
-            "MOCK-A1",
-            "agenda",
-            format!("Dossieroverleg {n1} — werkwijziging naar 36u/week"),
-            format!(
-                "Klant vraagt overgang naar 36u/week vanaf 01/11/2026. Het ondertekend contract in het dossier vermeldt nog steeds 38u/week. Joint committee: {pc1}. Bespreek impact op eindejaarspremie en terreintoeslag."
-            ),
-            "26/10/2026 09:30",
-            format!("Outlook agenda • deelnemers: Payroll Team, {n1}"),
-            None,
-        ),
-        item(
-            "MOCK-A2",
-            "agenda",
-            format!("Payroll review {n2}"),
-            format!(
-                "{pc2}: eindejaarspremie bij flexi-jobers, budgetimpact € 1.250,00. Deadline indiening 31/12/2026."
-            ),
-            "27/10/2026 14:00",
-            "Outlook agenda • deelnemers: HR De Rooster",
-            None,
-        ),
-        item(
-            "MOCK-A3",
-            "agenda",
-            "RSZ-inspectie — voorbereidend overleg".to_string(),
-            format!(
-                "Inspecteur vraagt opheldering over geregistreerde werkuren bij {n3}. Controlepunten: interim-uren en weekendpremies."
-            ),
-            "28/10/2026 11:00",
-            "Outlook agenda • deelnemers: Legal & Payroll",
-            Some("high".to_string()),
-        ),
-        item(
-            "MOCK-A4",
-            "agenda",
-            "Kwartaalafsluiting Q4 — payroll".to_string(),
-            "Afsluitronde: controle van openstaande dossiers en niet-beantwoorde tickets.".to_string(),
-            "30/10/2026 16:00",
-            "Outlook agenda • deelnemers: Operations",
-            None,
-        ),
-    ];
-
-    let mails = vec![
-        item(
-            "MOCK-M1",
-            "mail",
-            format!("KLACHT: laattijdige loonfiche {n1}"),
-            format!(
-                "Klant meldt dat de loonfiche van september ontbreekt en dreigt met een klacht bij de directie. Antwoord gevraagd voor 25/10/2026. Verwijs naar het dossier en de contractuele 38u/week regeling."
-            ),
-            "Gisteren 17:42",
-            format!("directie@{} — externe klant", n1.to_lowercase()),
-            Some("high".to_string()),
-        ),
-        item(
-            "MOCK-M2",
-            "mail",
-            format!("Vraag: overschakeling naar PC 124 — {n2}"),
-            format!(
-                "HR afdeling vraagt of {n2} kan overschakelen naar PC 124 vanaf volgend kwartaal. Huidig dossier toont een andere joint committee; graag juridisch advies."
-            ),
-            "Vandaag 08:15",
-            format!("hr@{}", n2.to_lowercase()),
-            None,
-        ),
-        item(
-            "MOCK-M3",
-            "mail",
-            "Document geüpload: addendum arbeidsovereenkomst".to_string(),
-            format!(
-                "{n3} uploadte een addendum met aangepaste prestaties: 40u/week met bijkomende ADV-dagen."
-            ),
-            "Vandaag 10:03",
-            "OneDrive notificatie",
-            None,
-        ),
-    ];
-
-    let minutes = vec![
-        item(
-            "MOCK-V1",
-            "verslag",
-            format!("Vergaderverslag — sociaal overlegcomité {n1}"),
-            format!(
-                "Bereikt akkoord: 36u/week geldig vanaf 01/01/2027; de contractuele basis van 38u/week blijft ongewijzigd tot het akkoord ondertekend is. {pc1} van toepassing. Actie: loonadministratie voorbereiden."
-            ),
-            "23/10/2026",
-            "Notulen • secretariaat",
-            None,
-        ),
-        item(
-            "MOCK-V2",
-            "verslag",
-            format!("Notulen werkgroep loonadministratie {n2}"),
-            format!(
-                "Actiehouder zorgt voor de indiening van de eindejaarspremie vóór 31/12/2026. {pc2} blijft van toepassing; wijziging naar PC 124 is juridisch nog niet onderbouwd."
-            ),
-            "22/10/2026",
-            "Notulen • payroll",
-            None,
-        ),
-    ];
-
+/// Geen echte bronnen beschikbaar: de analyse beperkt zich tot de dossierdata.
+pub fn empty_sources(warnings: Vec<String>) -> InsightSources {
     InsightSources {
-        origin: "mock".to_string(),
+        origin: "none".to_string(),
         obtained_at: Utc::now().to_rfc3339(),
-        calendar,
-        mails,
-        minutes,
-        warnings: vec![
-            "Demobronnen actief: configureer TENANT_ID/CLIENT_ID/CLIENT_SECRET en meld je opnieuw aan met Microsoft voor live Graph-data.".to_string(),
-        ],
+        calendar: Vec::new(),
+        mails: Vec::new(),
+        minutes: Vec::new(),
+        warnings,
     }
 }
-
 #[allow(clippy::too_many_arguments)]
 fn item(
     id: &str,
@@ -488,6 +354,16 @@ pub fn analyze(
         matched_customers.insert(f.to_string());
     }
 
+    // Zonder Graph-bronnen is er geen tekst om te matchen: analyseer dan alle
+    // zichtbare dossiers (of enkel het gefocuste dossier).
+    if all_items.is_empty() {
+        for c in customers {
+            if focus.map_or(true, |f| f == c.id) {
+                matched_customers.insert(c.id.clone());
+            }
+        }
+    }
+
     let mut findings: Vec<InsightFinding> = Vec::new();
     let mut conflict_count = 0usize;
     let mut seen_keys: HashSet<(String, String)> = HashSet::new();
@@ -616,6 +492,50 @@ pub fn analyze(
         }
     }
 
+    // Laag vertrouwen: documenten die de Trust Engine weinig betrouwbaarheid
+    // toekent (bv. een chatbericht of ticketcomment als enige bron).
+    let mut low_trust_added: HashMap<String, usize> = HashMap::new();
+    for d in all_docs {
+        if d.trust.overall_score >= 58.0 || !matched_customers.contains(&d.customer_id) {
+            continue;
+        }
+        let n = low_trust_added.entry(d.customer_id.clone()).or_insert(0);
+        if *n >= 2 {
+            continue;
+        }
+        *n += 1;
+        let cust_name = customers
+            .iter()
+            .find(|c| c.id == d.customer_id)
+            .map(|c| c.name.clone())
+            .unwrap_or_else(|| d.customer_id.clone());
+        findings.push(InsightFinding {
+            id: format!("F-TRU-{}", findings.len()),
+            severity: if d.trust.overall_score < 40.0 {
+                "medium"
+            } else {
+                "low"
+            }
+            .to_string(),
+            category: "Laag documentvertrouwen".to_string(),
+            title: format!(
+                "'{}' scoort {:.0}% op betrouwbaarheid",
+                d.title, d.trust.overall_score
+            ),
+            detail: format!(
+                "De Trust Engine geeft dit document {:.0}% vertrouwen op basis van bronhiërarchie, recency en feedback. Verifieer tegen het brondocument vóór payroll-verwerking.",
+                d.trust.overall_score
+            ),
+            customer_id: Some(d.customer_id.clone()),
+            customer_name: Some(cust_name),
+            evidence: vec![format!(
+                "Bron: {} • trust {:.0}%",
+                d.source_type.label(),
+                d.trust.overall_score
+            )],
+        });
+    }
+
     facts_extracted += matched_customers
         .iter()
         .map(|cid| {
@@ -676,16 +596,27 @@ pub fn analyze(
     });
     action_items.sort_by_key(|a| a.priority);
 
-    // --- Expert routing op basis van de geaggreerde broncontext ---
-    let query: String = all_items
-        .iter()
-        .take(4)
-        .map(|i| format!("{}. {}", i.title, i.body))
-        .collect::<Vec<_>>()
-        .join(" ")
-        .chars()
-        .take(1200)
-        .collect();
+    // --- Expert routing op basis van de bevindingen (bronnen of dossier) ---
+    let query: String = {
+        let from_sources: String = all_items
+            .iter()
+            .take(4)
+            .map(|i| format!("{}. {}", i.title, i.body))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let base = if from_sources.trim().is_empty() {
+            // Zonder bronnen: bouw de zoekvraag uit de bevindingen zelf.
+            findings
+                .iter()
+                .take(5)
+                .map(|f| format!("{}. {}", f.category, f.title))
+                .collect::<Vec<_>>()
+                .join(" ")
+        } else {
+            from_sources
+        };
+        base.chars().take(1200).collect()
+    };
     let routing_customer = focus
         .map(|s| s.to_string())
         .or_else(|| matched_customers.iter().next().cloned());
@@ -705,52 +636,51 @@ pub fn analyze(
             .collect()
     };
 
-    // --- Redeneringstappen (simulatie van AI-CoT) ---
+    // --- Redeneringstappen (eerlijke processtappen van de engine) ---
     let sources_total = all_items.len();
     let high = findings.iter().filter(|f| f.severity == "high").count();
     let medium = findings.iter().filter(|f| f.severity == "medium").count();
+    let has_graph = sources.origin == "microsoft-graph";
     let reasoning_steps = vec![
+        if has_graph {
+            format!(
+                "Microsoft Graph-bronnen verwerkt: {} agendapunten, {} mails, {} vergaderverslagen",
+                sources.calendar.len(),
+                sources.mails.len(),
+                sources.minutes.len()
+            )
+        } else {
+            "Geen Microsoft 365-bronnen beschikbaar — analyse uitgevoerd op dossierdocumenten"
+                .to_string()
+        },
         format!(
-            "Bronnen geïndexeerd: {} agendapunten, {} mails, {} vergaderverslagen [{}] — 120 ms",
-            sources.calendar.len(),
-            sources.mails.len(),
-            sources.minutes.len(),
-            sources.origin
-        ),
-        format!(
-            "{} sleutelfeiten geëxtraheerd (PC-codes, werkuren, termijnen, bedragen) — 240 ms",
+            "{} sleutelfeiten geëxtraheerd (PC-codes, werkuren, termijnen) uit bronnen en key_facts",
             facts_extracted
         ),
         format!(
-            "{} dossierdocumenten van {} klanten gekruist met bronnen — 310 ms",
+            "{} dossierdocumenten van {} klant(en) doorgerekend volgens de Trust Engine-hiërarchie",
             all_docs.len(),
             matched_customers.len()
         ),
         format!(
-            "{} bevindingen gevalideerd ({} kritiek, {} middel); {} bestaande conflicten hergebruikt — 180 ms",
+            "{} bevindingen gevalideerd ({} kritiek, {} middel), waaronder {} bestaande dossierconflicten",
             findings.len(),
             high,
             medium,
             conflict_count
         ),
         format!(
-            "{} expertopties gewogen op PC-expertise, klantkennis, dossierlast en beschikbaarheid — 95 ms",
+            "{} expertopties gewogen op domeinexpertise, klantkennis en dossierlast",
             routing.len()
         ),
-        "Rapport samengesteld met confidence-schatting — 60 ms".to_string(),
+        "Rapport opgesteld met bewijsgebaseerde confidence-inschatting".to_string(),
     ];
 
     // --- Headline & summary ---
+    // Enkel een focus vermelden wanneer die effectief gevraagd is.
     let focus_label = focus
         .and_then(|f| customers.iter().find(|c| c.id == f))
-        .map(|c| c.name.clone())
-        .or_else(|| {
-            matched_customers
-                .iter()
-                .next()
-                .and_then(|id| customers.iter().find(|c| &c.id == id))
-                .map(|c| c.name.clone())
-        });
+        .map(|c| c.name.clone());
     let headline = format!(
         "{} bevindingen over {} klantendossier{}{}",
         findings.len(),
@@ -761,10 +691,29 @@ pub fn analyze(
             .unwrap_or_default()
     );
     let summary = if findings.is_empty() {
+        if sources_total == 0 {
+            format!(
+                "Geen tegenstrijdigheden gevonden in {} geanalyseerde documenten. Er zijn geen Microsoft 365-bronnen beschikbaar (log in met Microsoft om agenda/mails mee te nemen); {} actiepunt(en) blijven staan voor opvolging.",
+                all_docs.len(),
+                action_items.len()
+            )
+        } else {
+            format!(
+                "Geen contradicties gevonden in {} bronnen. De geëxtraheerde feiten zijn consistent met de dossierdocumenten; {} actiepunt(en) blijven staan voor opvolging.",
+                sources_total,
+                action_items.len()
+            )
+        }
+    } else if sources_total == 0 {
         format!(
-            "Geen contradicties gevonden in {} bronnen. De geëxtraheerde feiten zijn consistent met de dossierdocumenten; {} actiepunt(en) blijven staan voor opvolging.",
-            sources_total,
-            action_items.len()
+            "Dossieranalyse over {} klant(en) en {} documenten: {} kritieke en {} middelmatige bevinding(en), waaronder '{}'. Aanbevolen: {} actiepunt(en) en doorverwijzing naar {} mogelijke expert(en).",
+            matched_customers.len(),
+            all_docs.len(),
+            high,
+            medium,
+            findings.first().map(|f| f.title.as_str()).unwrap_or("—"),
+            action_items.len(),
+            routing.len()
         )
     } else {
         format!(
@@ -785,20 +734,19 @@ pub fn analyze(
         )
     };
 
+    // Confidence = bewijsomvang (geen simulatie): bevindingen, dossierdekking
+    // en de aanwezigheid van echte Graph-bronnen.
     let confidence = {
-        let base = 0.62
-            + 0.04 * findings.len() as f64
-            + if routing.is_empty() { 0.0 } else { 0.05 };
-        if sources.origin == "mock" {
-            (base - 0.04).clamp(0.5, 0.97)
-        } else {
-            base.clamp(0.5, 0.97)
-        }
+        let base = 0.60
+            + 0.02 * findings.len() as f64
+            + 0.03 * matched_customers.len() as f64
+            + if sources_total > 0 { 0.05 } else { 0.0 };
+        base.clamp(0.5, 0.95)
     };
 
     InsightReport {
-        model: "tectonic-insight-1 (gesimuleerde AI)".to_string(),
-        simulated: true,
+        model: "TECTONIC Insight Engine (deterministische dossieranalyse)".to_string(),
+        simulated: false,
         origin: sources.origin.clone(),
         generated_at: Utc::now().to_rfc3339(),
         headline,
