@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronDown, FolderOpen, Plus, LogOut, Shield, Briefcase, Newspaper } from 'lucide-react';
+import { ChevronDown, FolderOpen, Plus, LogOut, Shield, Briefcase } from 'lucide-react';
 
 export default function Header({
   customers = [],
@@ -11,8 +11,6 @@ export default function Header({
   onLogout,
   isAdminView = false,
   onToggleAdminView,
-  onOpenInsights,
-  insightState = null,
 }) {
   const selectedCustomer = customers.find((c) => c.id === selectedCustomerId);
   const isAdmin = activeUser?.role === 'Admin' || activeUser?.clearance_level === 'Admin';
@@ -85,26 +83,6 @@ export default function Header({
 
           {/* Right section: mode switch, user & sign out */}
           <div className="flex items-center space-x-3 shrink-0">
-            {/* Briefing: quiet, background — icon + status dot only */}
-            {onOpenInsights && (
-              <button
-                onClick={onOpenInsights}
-                className="relative p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg border border-transparent hover:border-indigo-200 transition-colors focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
-                title="Briefing (updates are prepared in the background)"
-                aria-label="Open briefing"
-              >
-                <Newspaper className="w-4 h-4" />
-                {insightState === 'busy' && (
-                  <>
-                    <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-indigo-500 animate-ping" />
-                    <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-indigo-600" />
-                  </>
-                )}
-                {insightState === 'ready' && (
-                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-indigo-400" />
-                )}
-              </button>
-            )}
             {/* Admin panel / case view switch */}
             {isAdmin && onToggleAdminView && (
               <button

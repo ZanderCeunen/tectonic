@@ -19,6 +19,9 @@ export default function AiHelpModal({
   activeUser,
   onExecuteHandoff,
   authToken,
+  insight,
+  insightSources,
+  onRefreshInsights,
 }) {
   if (!isOpen) return null;
 
@@ -190,7 +193,8 @@ export default function AiHelpModal({
   // Generate colleague proposal (the help desk does NOT give the legal answer, only proposes the right colleague!)
   const generateColleagueProposal = (queryText, primaryExpert, secondaryExpert) => {
     const q = queryText.toLowerCase();
-    let topicDescription = 'dit dossier en deze specifieke materie';
+    let framework = 'Belgian labour law & social security provisions';
+    let text = '';
     let conflictNotice = null;
 
     if (customer && conflicts && conflicts.length > 0) {
@@ -239,7 +243,8 @@ export default function AiHelpModal({
     }
 
     return {
-      proposalText,
+      proposalText: text,
+      framework,
       conflictNotice,
       primaryExpert,
       secondaryExpert,
@@ -295,13 +300,25 @@ export default function AiHelpModal({
         // Fallback uses the calculated primary
       }
 
+      // Link relevant case findings from the background report to the question
+      const qLower = q.toLowerCase();
+      const queryTokens = qLower.split(/[^a-z0-9]+/).filter((t) => t.length >= 3);
+      const linkedFindings = (insight?.findings || [])
+        .filter((f) => {
+          const haystack = `${f.title || ''} ${f.detail || ''} ${f.customer_name || ''}`.toLowerCase();
+          return queryTokens.some((t) => haystack.includes(t));
+        })
+        .slice(0, 3);
+
       setTimeout(() => {
         const result = generateColleagueProposal(q, primary, secondary);
         const aiMsg = {
           id: Date.now() + 1,
           role: 'assistant',
           text: result.proposalText,
+          framework: result.framework,
           conflictNotice: result.conflictNotice,
+          linkedFindings,
           primaryExpert: result.primaryExpert,
           secondaryExpert: result.secondaryExpert,
         };
@@ -382,9 +399,60 @@ export default function AiHelpModal({
                   How can I help?
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Ask a social-law question or raise a case issue.
+                  Ask a social-law question or raise a case issue. We link the right case data
+                  and connect you with the right specialist.
                 </p>
               </div>
+
+              {/* Latest case updates (background report) */}
+              {insight && (insight.findings?.length > 0 || insight.action_items?.length > 0) && (
+                <div className="w-full text-left bg-slate-50 border border-slate-200 rounded-lg p-3.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-slate-800">Latest case updates</p>
+                    {onRefreshInsights && (
+                      <button
+                        onClick={onRefreshInsights}
+                        className="text-[11px] text-[#005FB8] hover:underline focus:outline-none focus:ring-2 focus:ring-[#005FB8] rounded px-1"
+                      >
+                        Refresh
+                      </button>
+                    )}
+                  </div>
+                  {insight.headline && (
+                    <p className="text-[11px] text-slate-600 leading-relaxed">{insight.headline}</p>
+                  )}
+                  {(insight.findings || []).slice(0, 3).map((f, idx) => (
+                    <p key={idx} className="text-[11px] text-slate-600 leading-relaxed flex items-start space-x-1.5">
+                      <AlertTriangle
+                        className={`w-3 h-3 shrink-0 mt-0.5 ${
+                          f.severity === 'high'
+                            ? 'text-red-500'
+                            : f.severity === 'medium'
+                            ? 'text-amber-500'
+                            : 'text-slate-400'
+                        }`}
+                      />
+                      <span>
+                        {f.title}
+                        {f.customer_name ? ` · ${f.customer_name}` : ''}
+                      </span>
+                    </p>
+                  ))}
+                  {(insight.action_items || []).length > 0 && (
+                    <p className="text-[11px] text-slate-500 pt-1 border-t border-slate-200">
+                      {insight.action_items.length} action item
+                      {insight.action_items.length === 1 ? '' : 's'} to review with a specialist.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {insightSources && insightSources.origin === 'none' && (
+                <p className="text-[11px] text-slate-400 max-w-xs">
+                  Case updates are compiled from your case documents. Sign in with Microsoft 365
+                  to also include your calendar and email.
+                </p>
+              )}
 
               <div className="w-full space-y-1.5 pt-2">
                 {samplePrompts.slice(0, 3).map((prompt, idx) => (
@@ -430,6 +498,32 @@ export default function AiHelpModal({
                     </p>
                   )}
 
+                  {/* Case data linked to this question */}
+                  {msg.linkedFindings?.length > 0 && (
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1.5">
+                      <p className="text-[11px] font-semibold text-slate-700">
+                        Linked case data
+                      </p>
+                      {msg.linkedFindings.map((f, idx) => (
+                        <p key={idx} className="text-[11px] text-slate-600 leading-relaxed">
+                          <span
+                            className={`font-semibold ${
+                              f.severity === 'high'
+                                ? 'text-red-700'
+                                : f.severity === 'medium'
+                                ? 'text-amber-700'
+                                : 'text-slate-700'
+                            }`}
+                          >
+                            {f.title}
+                          </span>
+                          {f.customer_name ? <span> · {f.customer_name}</span> : null}
+                          {f.detail ? <span className="text-slate-500"> — {f.detail}</span> : null}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+
                   {/* Clean specialist snippet */}
                   {msg.expert && (
                     <div className="mt-3 pt-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
@@ -460,14 +554,14 @@ export default function AiHelpModal({
                     </div>
                   )}
 
-                  {/* Optionele reserve collega */}
+                  {/* Optional second specialist */}
                   {msg.secondaryExpert && (
                     <p className="text-[11px] text-slate-500 pt-1">
-                      Alternatief:{' '}
+                      Alternative:{' '}
                       <strong className="text-slate-700 font-medium">
                         {msg.secondaryExpert.name}
                       </strong>{' '}
-                      ({msg.secondaryExpert.title} · toestel{' '}
+                      ({msg.secondaryExpert.title} · extension{' '}
                       {msg.secondaryExpert.extension || '4100'})
                     </p>
                   )}

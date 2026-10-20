@@ -4,7 +4,6 @@ import HomeDashboard from './components/HomeDashboard';
 import CustomerHub from './components/CustomerHub';
 import CustomerSearchModal from './components/CustomerSearchModal';
 import LoginScreen from './components/LoginScreen';
-import BriefingPanel from './components/BriefingPanel';
 import CustomerManagerModal from './components/CustomerManagerModal';
 import EmployeeManagerModal from './components/EmployeeManagerModal';
 import AdminConsole from './components/AdminConsole';
@@ -34,12 +33,11 @@ export default function App() {
 
   const [customerToEdit, setCustomerToEdit] = useState(null);
   const [employeeToEdit, setEmployeeToEdit] = useState(null);
-  const [isInsightOpen, setIsInsightOpen] = useState(false);
 
   // Error message from the Microsoft OAuth2 callback (URL fragment)
   const [authNotice, setAuthNotice] = useState('');
 
-  // Briefing: report from the silent background run
+  // Case updates report from the silent background run (shown in the help desk)
   const [insight, setInsight] = useState(null);
   const [insightSources, setInsightSources] = useState(null);
   const [insightBusy, setInsightBusy] = useState(false);
@@ -421,8 +419,6 @@ export default function App() {
         onLogout={handleLogout}
         isAdminView={isAdminView}
         onToggleAdminView={() => setIsAdminView(!isAdminView)}
-        onOpenInsights={() => setIsInsightOpen(true)}
-        insightState={insightBusy ? 'busy' : insight ? 'ready' : null}
       />
 
       {/* Main Content Area */}
@@ -481,6 +477,9 @@ export default function App() {
         activeUser={activeUser}
         onExecuteHandoff={handleExecuteHandoff}
         authToken={authToken}
+        insight={insight}
+        insightSources={insightSources}
+        onRefreshInsights={runBackgroundInsight}
       />
 
       {/* Modal: Customer Search & Filter */}
@@ -508,20 +507,6 @@ export default function App() {
         employeeToEdit={employeeToEdit}
         onSaveEmployee={handleSaveEmployee}
         authToken={authToken}
-      />
-
-      {/* Modal: Briefing (shows the background report) */}
-      <BriefingPanel
-        isOpen={isInsightOpen}
-        onClose={() => setIsInsightOpen(false)}
-        report={insight}
-        sources={insightSources}
-        busy={insightBusy}
-        onRefresh={runBackgroundInsight}
-        onOpenRouter={() => {
-          setIsInsightOpen(false);
-          setIsAiHelpOpen(true);
-        }}
       />
 
       {/* SD Worx Footer */}
