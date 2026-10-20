@@ -1,5 +1,14 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { X, PhoneCall, Check, AlertTriangle } from 'lucide-react';
+import {
+  X,
+  Send,
+  PhoneCall,
+  Check,
+  User,
+  AlertTriangle,
+  Building2,
+  Clock,
+} from 'lucide-react';
 
 export default function AiHelpModal({
   isOpen,
@@ -343,27 +352,103 @@ export default function AiHelpModal({
     <div
       role="dialog"
       aria-modal="false"
-      aria-label="Ask for help"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
+      aria-labelledby="connect-modal-title"
+      className="fixed bottom-4 right-4 left-4 sm:left-auto z-50 flex justify-end"
     >
-      <div className="pointer-events-auto relative bg-white rounded-xl w-full max-w-xl border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
-        {/* Close (only once there is a conversation) */}
-        {messages.length > 0 && (
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="absolute top-2 right-2 z-10 text-slate-400 hover:text-slate-700 p-2 rounded-lg hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-[#F58220]"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        )}
+      <div className="bg-white rounded-xl w-full sm:max-w-md border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[70vh]">
+        {/* Header: compact bar */}
+        <header className="px-4 py-3 border-b border-slate-200 flex items-center justify-between shrink-0 bg-white">
+          <div className="flex items-center space-x-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#F58220]" />
+            <h2 id="ai-help-title" className="text-sm font-bold text-slate-900">
+              Ask for help
+            </h2>
+            {customer && (
+              <span className="text-xs text-slate-500 font-medium truncate max-w-[140px]">
+                · {customer.name}
+              </span>
+            )}
+          </div>
 
-        {/* Chat window (hidden until there is a conversation) */}
-        <div
-          className={
-            messages.length > 0 ? 'flex-1 overflow-y-auto p-4 space-y-4' : 'hidden'
-          }
-        >
+          <div className="flex items-center space-x-1">
+            {messages.length > 0 && (
+              <button
+                onClick={() => setMessages([])}
+                className="text-xs text-slate-500 hover:text-slate-800 px-2 py-1 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-[#F58220]"
+                title="Clear"
+              >
+                Clear
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="text-slate-400 hover:text-slate-700 p-2 rounded-lg hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-[#F58220] min-w-[44px] min-h-[44px] flex items-center justify-center"
+              aria-label="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </header>
+
+        {/* Chat window */}
+        <div className="flex-1 overflow-y-auto p-3.5 space-y-4">
+          {/* Empty state: compact */}
+          {messages.length === 0 && (
+            <div className="space-y-3 py-2">
+              <p className="text-xs text-slate-500">
+                Ask a social-law question or raise a case issue. We link the right case data and
+                connect you with the right specialist.
+              </p>
+
+              {/* Latest case updates (background report) */}
+              {insight && (insight.findings?.length > 0 || insight.action_items?.length > 0) && (
+                <div className="text-left bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-slate-800">Latest case updates</p>
+                    {onRefreshInsights && (
+                      <button
+                        onClick={onRefreshInsights}
+                        className="text-[11px] text-[#005FB8] hover:underline focus:outline-none focus:ring-2 focus:ring-[#005FB8] rounded px-1"
+                      >
+                        Refresh
+                      </button>
+                    )}
+                  </div>
+                  {(insight.findings || []).slice(0, 3).map((f, idx) => (
+                    <p key={idx} className="text-[11px] text-slate-600 leading-relaxed flex items-start space-x-1.5">
+                      <AlertTriangle
+                        className={`w-3 h-3 shrink-0 mt-0.5 ${
+                          f.severity === 'high'
+                            ? 'text-red-500'
+                            : f.severity === 'medium'
+                            ? 'text-amber-500'
+                            : 'text-slate-400'
+                        }`}
+                      />
+                      <span>
+                        {f.title}
+                        {f.customer_name ? ` · ${f.customer_name}` : ''}
+                      </span>
+                    </p>
+                  ))}
+                  {(insight.action_items || []).length > 0 && (
+                    <p className="text-[11px] text-slate-500 pt-1 border-t border-slate-200">
+                      {insight.action_items.length} action item
+                      {insight.action_items.length === 1 ? '' : 's'} to review with a specialist.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {insightSources && insightSources.origin === 'none' && (
+                <p className="text-[11px] text-slate-400">
+                  Case updates are compiled from your case documents. Sign in with Microsoft 365
+                  to also include your calendar and email.
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Message list */}
           {messages.map((msg) => (
             <div key={msg.id} className="space-y-2">
@@ -490,12 +575,8 @@ export default function AiHelpModal({
           <div ref={messagesEndRef} />
         </div>
 
-        {/* The bar */}
-        <div
-          className={
-            messages.length > 0 ? 'p-3 border-t border-slate-200 bg-white shrink-0' : 'p-3'
-          }
-        >
+        {/* Input bar */}
+        <div className="p-3 border-t border-slate-200 bg-white shrink-0">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -510,7 +591,7 @@ export default function AiHelpModal({
                 value={inputQuery}
                 onChange={(e) => setInputQuery(e.target.value)}
                 disabled={isThinking}
-                placeholder="Ask for help…"
+                placeholder="Your question…"
                 aria-label="Ask for help"
                 className="flex-1 text-sm px-3.5 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#F58220] focus:border-[#F58220] disabled:bg-slate-50"
               />
