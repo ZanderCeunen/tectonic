@@ -129,6 +129,15 @@ npm run build
 ### Health
 - `GET /api/health` - Health check endpoint
 
+### Microsoft 365 Login (Entra ID, OAuth2 Authorization Code Flow)
+- `GET /api/auth/microsoft/login` - Redirect naar Entra authorize (of demo-flow als niet geconfigureerd)
+- `GET /api/auth/microsoft/callback` - Code-uitwisseling + Graph-profiel + rol overnemen + JWT + redirect naar SPA (`#ms_token=`)
+- `GET /api/auth/microsoft/status` - `{configured, mode: "entra"|"demo"}`
+
+### AI Insight Engine (agenda/mail/verslag-analyse)
+- `GET /api/insights/sources` - Bronnen: Graph agenda+mail+verslagen of demobronnen (PII-geredacteerd voor niet-senior)
+- `POST /api/insights/analyze` - Volledig analyse-rapport: findings, acties, reasoning steps, confidence, expert routing; body `{customer_id?}`
+
 ## Core Algorithms
 
 ### Trust Engine (`trust_engine.rs`)

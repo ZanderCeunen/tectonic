@@ -67,3 +67,32 @@ npm run dev
 
 > *Note: Seed passwords can be customized via `TECTONIC_ADMIN_PASSWORD` and `TECTONIC_CONSULTANT_PASSWORD`. Both username or email can be entered on the login screen.*
 
+
+---
+
+## 🔐 Microsoft 365 Login (Entra ID) — NIEUW
+
+Standaard loginpad: **Microsoft Entra ID** via OAuth2 Authorization Code Flow (confidential client) met Microsoft Graph. De klassieke portaallogin blijft parallel werken (secundair, knop "Portaalaccount") — bedoeld voor admins/demo.
+
+**Configuratie** (`backend/.env`):
+```
+TENANT_ID=<entra-tenant>
+CLIENT_ID=<app-client-id>
+CLIENT_SECRET=<app-client-secret>
+# optioneel: REDIRECT_URI, FRONTEND_URL, MS_ADMIN_GROUP_ID, MS_ROLE_GROUPS
+```
+
+- Registreer `http://127.0.0.1:8080/api/auth/microsoft/callback` als **redirect URI** in Entra (App registrations).
+- De rol uit het Microsoft-account (jobTitle/department of groepsmapping) wordt overgenomen in TECTONIC (Admin/Senior/Auditor/Legal Advisor); zonder declaratie erven bestaande portaalaccounts hun rol.
+- Endpoints: `GET /api/auth/microsoft/login`, `GET /api/auth/microsoft/callback`, `GET /api/auth/microsoft/status`.
+- Zonder configuratie draait de flow in **demomodus** (gesimuleerd Microsoft-profiel, volledig zelfde codepad).
+- Graph-scopes: `User.Read`, `Calendars.Read`, `Mail.Read` (delegated).
+
+## ✨ AI-analist — NIEUW
+
+Knop **"AI-analist"** in de header opent de Insight Analyst: analyse van **agenda-punten, mails en vergaderverslagen** (Microsoft Graph of demobronnen) tegen de bestaande dossiers:
+
+- Extractie van PC-codes, werkuren, termijnen en bedragen; kruiskoppeling met document-key_facts + Trust Engine-conflicten (tegenstrijdigheden bv. 36u/week in agenda vs 38u/week in contract).
+- Gestructureerde "AI"-output: redeneringstappen, bevindingen met ernst, geprioriteerde actiepunten, confidence-score en expert-routing (Expertise Graph).
+- PII-redactie voor niet-senior rollen; elke analyse wordt gelogd in de SHA-256 auditketen (`AI_ANALYSIS_RUN`).
+- Endpoints: `GET /api/insights/sources`, `POST /api/insights/analyze`.

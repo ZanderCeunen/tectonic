@@ -1,12 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 
-export default function LoginScreen({ onLoginSuccess }) {
+export default function LoginScreen({ onLoginSuccess, initialError }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [errorMsg, setErrorMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState(initialError || '');
   const [isLoading, setIsLoading] = useState(false);
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
+  const [isLocalOpen, setIsLocalOpen] = useState(false);
+  const [msInfo, setMsInfo] = useState(null);
+
+  // Microsoft login-status opvragen (Entra geconfigureerd of demo-modus)
+  useEffect(() => {
+    fetch('/api/auth/microsoft/status')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setMsInfo(d))
+      .catch(() => setMsInfo(null));
+  }, []);
 
   // Close modal on Escape key
   useEffect(() => {
@@ -62,7 +72,56 @@ export default function LoginScreen({ onLoginSuccess }) {
             </h1>
           </div>
 
-          {/* Login Form */}
+          {/* Microsoft 365 — standaard loginpad (parallel met portaallogin) */}
+          {errorMsg && !isLocalOpen && (
+            <div role="alert" className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-sm text-rose-800">
+              {errorMsg}
+            </div>
+          )}
+          <div className="space-y-2.5">
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = '/api/auth/microsoft/login';
+              }}
+              className="w-full min-h-[44px] px-4 py-2 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-slate-900 text-base font-medium transition-colors flex items-center justify-center gap-2.5 focus:outline-none focus:ring-2 focus:ring-[#005FB8] focus:border-transparent"
+            >
+              <svg viewBox="0 0 21 21" className="w-4 h-4 shrink-0" aria-hidden="true">
+                <rect x="1" y="1" width="9" height="9" fill="#F25022" />
+                <rect x="11" y="1" width="9" height="9" fill="#7FBA00" />
+                <rect x="1" y="11" width="9" height="9" fill="#00A4EF" />
+                <rect x="11" y="11" width="9" height="9" fill="#FFB900" />
+              </svg>
+              Doorgaan met Microsoft 365
+            </button>
+            <p className="text-xs text-slate-500 text-center leading-relaxed">
+              {msInfo?.configured
+                ? 'Standaard: veilig aanmelden via Microsoft Entra ID.'
+                : msInfo
+                ? 'Demomodus: geen Entra-tenant geconfigureerd — je logt in met een gesimuleerd Microsoft-account.'
+                : ' '}
+            </p>
+          </div>
+
+          {/* Scheiding */}
+          <div className="flex items-center gap-3 text-[11px] text-slate-400 uppercase tracking-wider">
+            <span className="h-px flex-1 bg-slate-200" />
+            <span>of</span>
+            <span className="h-px flex-1 bg-slate-200" />
+          </div>
+
+          {/* Portaalaccount — secundair (admins & demo) */}
+          {!isLocalOpen ? (
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => setIsLocalOpen(true)}
+                className="text-xs font-medium text-slate-500 hover:text-[#005FB8] underline underline-offset-4 focus:outline-none focus:ring-2 focus:ring-[#005FB8] rounded py-1 px-1.5 transition-colors"
+              >
+                Inloggen met portaalaccount (admins &amp; demo)
+              </button>
+            </div>
+          ) : (
           <form onSubmit={handleLogin} className="space-y-4" noValidate>
             <div className="space-y-1">
               <label
@@ -119,6 +178,7 @@ export default function LoginScreen({ onLoginSuccess }) {
               {isLoading ? 'Bezig met aanmelden...' : 'Inloggen'}
             </button>
           </form>
+          )}
 
           {/* Privacy Policy Link */}
           <div className="pt-2 text-center border-t border-slate-100">

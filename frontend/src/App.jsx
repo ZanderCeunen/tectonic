@@ -5,6 +5,7 @@ import CustomerHub from './components/CustomerHub';
 import SmartRouterModal from './components/SmartRouterModal';
 import CustomerSearchModal from './components/CustomerSearchModal';
 import LoginScreen from './components/LoginScreen';
+import AIInsightPanel from './components/AIInsightPanel';
 import CustomerManagerModal from './components/CustomerManagerModal';
 import EmployeeManagerModal from './components/EmployeeManagerModal';
 import AdminConsole from './components/AdminConsole';
@@ -35,6 +36,39 @@ export default function App() {
 
   const [customerToEdit, setCustomerToEdit] = useState(null);
   const [employeeToEdit, setEmployeeToEdit] = useState(null);
+  const [isInsightOpen, setIsInsightOpen] = useState(false);
+
+  // Foutmelding uit de Microsoft OAuth2-callback (URL-fragment)
+  const [authNotice, setAuthNotice] = useState('');
+
+  // Microsoft login-callback: token of fout uit de URL-fragment halen
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (!hash || hash.length < 2) return;
+    const params = new URLSearchParams(hash.slice(1));
+    const msToken = params.get('ms_token');
+    const msError = params.get('ms_error');
+    if (msToken) {
+      localStorage.setItem('tectonic_jwt', msToken);
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      setAuthToken(msToken);
+    } else if (msError) {
+      const messages = {
+        not_configured: 'Microsoft login is niet geconfigureerd op de server.',
+        invalid_state: 'Microsoft login-sessie verlopen of ongeldig. Probeer opnieuw.',
+        missing_code: 'Microsoft gaf geen autorisatiecode terug.',
+        token_exchange:
+          'Microsoft token-uitwisseling mislukt (controleer TENANT_ID, CLIENT_ID en CLIENT_SECRET in .env).',
+        graph_profile:
+          'Microsoft Graph profiel ophalen mislukt (controleer delegated permission User.Read).',
+        access_denied: 'Toegang geweigerd bij Microsoft.',
+        db_upsert: 'Kon je Microsoft-account niet koppelen aan het portaal.',
+        jwt: 'Sessietoken kon niet worden aangemaakt.',
+      };
+      setAuthNotice(messages[msError] || `Microsoft login-fout: ${msError}`);
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+  }, []);
 
   // Logout handler
   const handleLogout = async () => {
@@ -331,7 +365,7 @@ export default function App() {
 
   // AUTHGATE: If not logged in, render LoginScreen only with NO background fetching!
   if (!authToken || !activeUser) {
-    return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
+    return <LoginScreen onLoginSuccess={handleLoginSuccess} initialError={authNotice} />;
   }
 
   return (
@@ -353,6 +387,7 @@ export default function App() {
         onLogout={handleLogout}
         isAdminView={isAdminView}
         onToggleAdminView={() => setIsAdminView(!isAdminView)}
+        onOpenInsights={() => setIsInsightOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -449,6 +484,19 @@ export default function App() {
         employeeToEdit={employeeToEdit}
         onSaveEmployee={handleSaveEmployee}
         authToken={authToken}
+      />
+
+      {/* Modal: AI Insight Analyst (agenda/mail/verslag-analyse) */}
+      <AIInsightPanel
+        isOpen={isInsightOpen}
+        onClose={() => setIsInsightOpen(false)}
+        authToken={authToken}
+        customers={customers}
+        selectedCustomerId={selectedCustomerId}
+        onOpenRouter={() => {
+          setIsInsightOpen(false);
+          setIsRouterOpen(true);
+        }}
       />
 
       {/* SD Worx Footer */}

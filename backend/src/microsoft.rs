@@ -12,7 +12,7 @@ use crate::models::{UserAccount, UserRole};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-const GRAPH_BASE: &str = "https://graph.microsoft.com/v1.0";
+pub const GRAPH_BASE: &str = "https://graph.microsoft.com/v1.0";
 const SCOPE: &str = "openid profile email offline_access User.Read Calendars.Read Mail.Read";
 const DEFAULT_REDIRECT_URI: &str = "http://127.0.0.1:8080/api/auth/microsoft/callback";
 const DEFAULT_FRONTEND_URL: &str = "http://localhost:3000";
@@ -310,6 +310,16 @@ pub struct RoleDecision {
     /// `true` wanneer Microsoft expliciet een rol declarette (dan wint die).
     pub declared: bool,
     pub reason: String,
+}
+
+impl RoleDecision {
+    fn declared(role: UserRole, reason: String) -> Self {
+        Self {
+            role,
+            declared: true,
+            reason,
+        }
+    }
 }
 
 #[derive(Clone)]

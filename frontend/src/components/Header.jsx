@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronDown, FolderOpen, Plus, LogOut, Shield, Briefcase } from 'lucide-react';
+import { ChevronDown, FolderOpen, Plus, LogOut, Shield, Briefcase, Sparkles } from 'lucide-react';
 
 export default function Header({
   customers = [],
@@ -11,6 +11,7 @@ export default function Header({
   onLogout,
   isAdminView = false,
   onToggleAdminView,
+  onOpenInsights,
 }) {
   const selectedCustomer = customers.find((c) => c.id === selectedCustomerId);
   const isAdmin = activeUser?.role === 'Admin' || activeUser?.clearance_level === 'Admin';
@@ -83,6 +84,17 @@ export default function Header({
 
           {/* Rechtersectie: Modus-wissel, Gebruiker & Afmelden */}
           <div className="flex items-center space-x-3 shrink-0">
+            {/* AI-analist: agenda/mail/verslag-analyse */}
+            {onOpenInsights && (
+              <button
+                onClick={onOpenInsights}
+                className="inline-flex items-center space-x-1.5 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+                title="AI-analist: analyseer agenda-punten, mails en vergaderverslagen"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span className="hidden md:inline">AI-analist</span>
+              </button>
+            )}
             {/* Beheerderspaneel / Dossiers Wisselaar */}
             {isAdmin && onToggleAdminView && (
               <button

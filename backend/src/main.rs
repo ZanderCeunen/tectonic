@@ -2,17 +2,25 @@ mod auth;
 mod db;
 mod expertise_graph;
 mod handlers;
+mod insight_engine;
+mod microsoft;
 mod mock_data;
 mod models;
 mod rbac;
 mod security;
 mod trust_engine;
 
-use auth::{login_user, logout_user, get_current_user_profile, LoginLimiter};
+use auth::{
+    get_current_user_profile, login_user, logout_user, microsoft_callback, microsoft_login,
+    microsoft_status, LoginLimiter,
+};
 use db::Database;
-use handlers::{admin, customers, documents, routing};
+use handlers::{admin, customers, documents, insights, routing};
+use microsoft::MicrosoftConfig;
 use security::AuditChain;
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 use axum::{
     http::{header, HeaderValue, Method, StatusCode},
     response::IntoResponse,
@@ -29,6 +37,12 @@ pub struct AppState {
     pub jwt_secret: Vec<u8>,
     pub login_limiter: Arc<LoginLimiter>,
     pub dummy_password_hash: String,
+    /// Microsoft Entra ID / Graph-configuratie (TENANT_ID, CLIENT_ID, CLIENT_SECRET).
+    pub microsoft: MicrosoftConfig,
+    /// Single-use OAuth2 states (CSRF-bescherming) → creatietijd.
+    pub oauth_states: Arc<Mutex<HashMap<String, Instant>>>,
+    /// Microsoft Graph-tokens per gebruikerssessie (in-memory).
+    pub ms_tokens: Arc<Mutex<HashMap<String, microsoft::MsUserTokens>>>,
 }
 
 #[tokio::main]
@@ -98,12 +112,29 @@ async fn main() {
     )
     .unwrap_or_else(|_| "$2b$12$e9y.U725M.5Q3aH9eY8O9uB7l1J8q0W2k3L4m5N6o7P8q9R0S1T2U".to_string());
 
+    let microsoft = MicrosoftConfig::from_env();
+    if microsoft.is_configured() {
+        println!(
+            "🔐 Microsoft Entra ID login ACTIEF (tenant {})",
+            microsoft.tenant_id
+        );
+        println!(
+            "   Redirect URI: {} — registreer deze in Entra (App registrations).",
+            microsoft.redirect_uri
+        );
+    } else {
+        println!("🔐 Microsoft Entra ID niet geconfigureerd — demo-modus (TENANT_ID/CLIENT_ID/CLIENT_SECRET).");
+    }
+
     let state = AppState {
         db: Arc::new(Mutex::new(db)),
         audit_chain,
         jwt_secret,
         login_limiter: Arc::new(LoginLimiter::new()),
         dummy_password_hash,
+        microsoft,
+        oauth_states: Arc::new(Mutex::new(HashMap::new())),
+        ms_tokens: Arc::new(Mutex::new(HashMap::new())),
     };
 
     // 6. Configured CORS from environment allowlist (replacing permissive CORS)
@@ -129,7 +160,11 @@ async fn main() {
     // 7. Compose Public vs Protected Routers
     let public_routes = Router::new()
         .route("/api/health", get(health_check))
-        .route("/api/auth/login", post(login_user));
+        .route("/api/auth/login", post(login_user))
+        // Microsoft Entra ID (OAuth2 Authorization Code Flow) — default loginpad
+        .route("/api/auth/microsoft/login", get(microsoft_login))
+        .route("/api/auth/microsoft/callback", get(microsoft_callback))
+        .route("/api/auth/microsoft/status", get(microsoft_status));
 
     let protected_routes = Router::new()
         // Auth profile & logout
@@ -198,6 +233,15 @@ async fn main() {
         .route(
             "/api/security/verify",
             post(admin::verify_audit_integrity),
+        )
+        // AI Insight Engine: analyse van agenda, mails en vergaderverslagen
+        .route(
+            "/api/insights/sources",
+            get(insights::get_insight_sources),
+        )
+        .route(
+            "/api/insights/analyze",
+            post(insights::analyze_insights),
         );
 
     let app = Router::new()
