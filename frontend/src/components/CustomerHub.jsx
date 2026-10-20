@@ -116,7 +116,7 @@ export default function CustomerHub({
               title="Ask the help desk to find the right specialist for this case"
             >
               <Sparkles className="w-4 h-4 text-white" />
-              <span>Help desk</span>
+              <span>Connect</span>
             </button>
           </div>
         </div>

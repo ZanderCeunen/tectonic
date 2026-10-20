@@ -4,8 +4,10 @@ import {
   Send,
   PhoneCall,
   Check,
-  RotateCcw,
-  Sparkles,
+  User,
+  AlertTriangle,
+  Building2,
+  Clock,
 } from 'lucide-react';
 
 export default function AiHelpModal({
@@ -47,7 +49,7 @@ export default function AiHelpModal({
     }
   }, []);
 
-  // Minimal quick suggestion pills
+  // Quick suggestion pills for instant colleague routing
   const samplePrompts = [
     'A1 application for expat secondment to France',
     'Bad-weather allowance and mobility allowance in PC 124',
@@ -56,8 +58,8 @@ export default function AiHelpModal({
     'Structural teleworking and home-office allowance in PC 200',
   ];
 
-  // Background expert matcher (uses domain expertise, availability, and customer familiarity)
-  const findBestExpert = (queryText) => {
+  // Background colleague matching algorithm
+  const findBestColleague = (queryText) => {
     const qLower = queryText.toLowerCase();
     const tokens = qLower.split(/[^a-zA-Z0-9-]/).filter((t) => t.length >= 2);
     const custId = customer?.id || '';
@@ -65,6 +67,7 @@ export default function AiHelpModal({
 
     const scored = availableEmployees.map((emp) => {
       let domainScore = 0;
+      let matchedDomain = '';
       let hits = 0;
 
       for (const [dom, score] of Object.entries(emp.domain_expertise || {})) {
@@ -72,7 +75,10 @@ export default function AiHelpModal({
         for (const t of tokens) {
           if (dLow.includes(t)) {
             hits++;
-            if (score > domainScore) domainScore = score;
+            if (score > domainScore) {
+              domainScore = score;
+              matchedDomain = dom;
+            }
           }
         }
       }
@@ -80,33 +86,75 @@ export default function AiHelpModal({
       const has = (...words) =>
         tokens.some((t) => words.some((w) => t.includes(w) || w.includes(t)));
 
-      if (has('expat', 'a1', 'detachering', 'buitenland', 'grensarbeid', 'cross-border')) {
-        const s = emp.domain_expertise?.['Internationale Detachering & Expat'] || emp.domain_expertise?.['International Mobility & Expat'] || 0;
-        if (s > domainScore) domainScore = s;
+      if (has('expat', 'a1', 'detachering', 'buitenland', 'grensarbeid', 'cross-border', 'frankrijk')) {
+        const s =
+          emp.domain_expertise?.['Internationale Detachering & Expat'] ||
+          emp.domain_expertise?.['International Mobility & Expat'] ||
+          0;
+        if (s > domainScore) {
+          domainScore = s;
+          matchedDomain = 'Internationale Detachering & Expat';
+        }
       }
       if (has('bouw', '124', 'weerverlet', 'getrouwheid', 'mobiliteit', 'constructiv')) {
-        const s = emp.domain_expertise?.['Bouwbedrijf PC 124'] || emp.domain_expertise?.['Construction PC 124'] || 0;
-        if (s > domainScore) domainScore = s;
+        const s =
+          emp.domain_expertise?.['Bouwbedrijf PC 124'] ||
+          emp.domain_expertise?.['Construction PC 124'] ||
+          0;
+        if (s > domainScore) {
+          domainScore = s;
+          matchedDomain = 'Bouwsector PC 124';
+        }
       }
       if (has('horeca', '302', 'flexi', 'dimona', 'fli', 'student')) {
-        const s = emp.domain_expertise?.['Horeca PC 302 & Flexi-jobs'] || emp.domain_expertise?.['Hospitality PC 302 & Flexi-jobs'] || 0;
-        if (s > domainScore) domainScore = s;
+        const s =
+          emp.domain_expertise?.['Horeca PC 302 & Flexi-jobs'] ||
+          emp.domain_expertise?.['Hospitality PC 302 & Flexi-jobs'] ||
+          0;
+        if (s > domainScore) {
+          domainScore = s;
+          matchedDomain = 'Horeca & Flexi-jobs PC 302';
+        }
       }
       if (has('chemie', '207', 'volcontinu', 'ploeg', 'nacht', 'shift')) {
-        const s = emp.domain_expertise?.['Chemie & Petrochemie PC 207'] || emp.domain_expertise?.['Chemical Industry PC 207'] || 0;
-        if (s > domainScore) domainScore = s;
+        const s =
+          emp.domain_expertise?.['Chemie & Petrochemie PC 207'] ||
+          emp.domain_expertise?.['Chemical Industry PC 207'] ||
+          0;
+        if (s > domainScore) {
+          domainScore = s;
+          matchedDomain = 'Chemie & Ploegenarbeid PC 207';
+        }
       }
       if (has('cafetaria', 'fiets', 'lease', 'bonus', 'wagen', 'optie')) {
-        const s = emp.domain_expertise?.['Cafetariaplan & Flex Income'] || emp.domain_expertise?.['Flexible Benefits & Cafeteria Plan'] || 0;
-        if (s > domainScore) domainScore = s;
+        const s =
+          emp.domain_expertise?.['Cafetariaplan & Flex Income'] ||
+          emp.domain_expertise?.['Flexible Benefits & Cafeteria Plan'] ||
+          0;
+        if (s > domainScore) {
+          domainScore = s;
+          matchedDomain = 'Cafetariaplan & Flexibele Verloning';
+        }
       }
       if (has('200', 'bediende', 'arbeidsduur', '38u', 'telewerk', 'thuiswerk')) {
-        const s = emp.domain_expertise?.['CAO 200 & Bediendenstatuut'] || emp.domain_expertise?.['CBA 200 & White-Collar Status'] || 0;
-        if (s > domainScore) domainScore = s;
+        const s =
+          emp.domain_expertise?.['CAO 200 & Bediendenstatuut'] ||
+          emp.domain_expertise?.['CBA 200 & White-Collar Status'] ||
+          0;
+        if (s > domainScore) {
+          domainScore = s;
+          matchedDomain = 'CAO 200 & Bediendenstatuut';
+        }
       }
       if (has('zorg', '330', 'ific', 'ziekenhuis', 'barema')) {
-        const s = emp.domain_expertise?.['Zorgsector PC 330 & IFIC'] || emp.domain_expertise?.['Healthcare PC 330 & IFIC'] || 0;
-        if (s > domainScore) domainScore = s;
+        const s =
+          emp.domain_expertise?.['Zorgsector PC 330 & IFIC'] ||
+          emp.domain_expertise?.['Healthcare PC 330 & IFIC'] ||
+          0;
+        if (s > domainScore) {
+          domainScore = s;
+          matchedDomain = 'Zorgsector PC 330 & IFIC';
+        }
       }
 
       if (custPc && custPc.includes('124') && domainScore > 0) domainScore += 10;
@@ -114,39 +162,46 @@ export default function AiHelpModal({
 
       const custFamiliarity = custId ? emp.customer_familiarity?.[custId] || 10 : 20;
       const casesBonus = (emp.completed_cases || 0) * 0.4;
-      const availMultiplier = emp.availability === 'Available' ? 1.0 : emp.availability === 'InCall' ? 0.94 : 0.85;
+      const availMultiplier =
+        emp.availability === 'Available' ? 1.0 : emp.availability === 'InCall' ? 0.94 : 0.85;
 
       const baseScore = domainScore > 0 ? domainScore : hits > 0 ? 60 + hits * 8 : 45;
       const totalScore = Math.round(
-        Math.min(99, Math.max(30, (baseScore * 0.8 + custFamiliarity * 0.1 + casesBonus * 0.1) * availMultiplier))
+        Math.min(
+          99,
+          Math.max(30, (baseScore * 0.8 + custFamiliarity * 0.1 + casesBonus * 0.1) * availMultiplier)
+        )
       );
 
       return {
         ...emp,
         matchScore: totalScore,
+        matchedDomain: matchedDomain || emp.title,
       };
     });
 
     scored.sort((a, b) => b.matchScore - a.matchScore);
-    return scored[0] || availableEmployees[0];
+    return {
+      primary: scored[0] || availableEmployees[0],
+      secondary: scored[1] || null,
+    };
   };
 
-  // Generate clean, high-value legal synthesis
-  const generateCleanResponse = (queryText, expert) => {
+  // Generate colleague proposal (AI does NOT give the legal answer, only proposes the right colleague!)
+  const generateColleagueProposal = (queryText, primaryExpert, secondaryExpert) => {
     const q = queryText.toLowerCase();
-    let text = '';
-    let framework = '';
+    let topicDescription = 'dit dossier en deze specifieke materie';
     let conflictNotice = null;
 
     if (customer && conflicts && conflicts.length > 0) {
       const activeCustConflicts = conflicts.filter((c) => c.customer_id === customer.id);
       if (
         activeCustConflicts.length > 0 &&
-        (q.includes('uur') || q.includes('telewerk') || q.includes('contract') || q.includes('loon'))
+        (q.includes('uur') || q.includes('telewerk') || q.includes('contract') || q.includes('loon') || q.includes('schema'))
       ) {
         conflictNotice = `Warning: there is an unresolved case conflict for ${customer.name} regarding "${
           activeCustConflicts[0].field_label || activeCustConflicts[0].field
-        }".`;
+        }". Stem dit rechtstreeks af met de specialist.`;
       }
     }
 
@@ -184,10 +239,10 @@ export default function AiHelpModal({
     }
 
     return {
-      text,
-      framework,
+      proposalText,
       conflictNotice,
-      expert,
+      primaryExpert,
+      secondaryExpert,
     };
   };
 
@@ -206,7 +261,7 @@ export default function AiHelpModal({
     setIsThinking(true);
 
     try {
-      let matchedExpert = findBestExpert(q);
+      let { primary, secondary } = findBestColleague(q);
 
       // Backend routing call if available
       try {
@@ -224,29 +279,35 @@ export default function AiHelpModal({
         if (res.ok) {
           const apiRecs = await res.json();
           if (apiRecs && apiRecs.length > 0) {
-            matchedExpert = {
+            primary = {
               ...apiRecs[0].employee,
               matchScore: Math.round(apiRecs[0].overall_match),
             };
+            if (apiRecs.length > 1) {
+              secondary = {
+                ...apiRecs[1].employee,
+                matchScore: Math.round(apiRecs[1].overall_match),
+              };
+            }
           }
         }
       } catch {
-        // Fallback already assigned
+        // Fallback uses the calculated primary
       }
 
       setTimeout(() => {
-        const cleanResult = generateCleanResponse(q, matchedExpert);
+        const result = generateColleagueProposal(q, primary, secondary);
         const aiMsg = {
           id: Date.now() + 1,
           role: 'assistant',
-          text: cleanResult.text,
-          framework: cleanResult.framework,
-          conflictNotice: cleanResult.conflictNotice,
-          expert: cleanResult.expert,
+          text: result.proposalText,
+          conflictNotice: result.conflictNotice,
+          primaryExpert: result.primaryExpert,
+          secondaryExpert: result.secondaryExpert,
         };
         setMessages((prev) => [...prev, aiMsg]);
         setIsThinking(false);
-      }, 700);
+      }, 550);
     } catch {
       setIsThinking(false);
     }
@@ -273,7 +334,7 @@ export default function AiHelpModal({
     <div
       role="dialog"
       aria-modal="true"
-      aria-labelledby="ai-help-title"
+      aria-labelledby="connect-modal-title"
       className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4"
     >
       <div className="bg-white rounded-xl max-w-2xl w-full border border-slate-200 shadow-xl overflow-hidden flex flex-col h-[85vh] max-h-[720px]">
@@ -353,9 +414,10 @@ export default function AiHelpModal({
                 /* Answer: clear typography, no unnecessary frames */
                 <div className="space-y-3 py-1 max-w-xl">
                   {msg.conflictNotice && (
-                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2.5 py-1.5 font-medium">
-                      {msg.conflictNotice}
-                    </p>
+                    <div className="flex items-start space-x-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2.5 font-medium">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                      <span>{msg.conflictNotice}</span>
+                    </div>
                   )}
 
                   <p className="text-xs sm:text-sm text-slate-800 leading-relaxed whitespace-pre-line">
@@ -388,21 +450,33 @@ export default function AiHelpModal({
                         </span>
                       ) : (
                         <button
-                          onClick={() => handleHandoff(msg.expert)}
+                          onClick={() => handleHandoff(msg.primaryExpert)}
                           disabled={isCalling}
-                          className="min-h-[44px] px-3.5 py-2 bg-[#F58220] hover:bg-[#E07110] text-white font-semibold rounded-lg text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-[#F58220]"
+                          className="min-h-[44px] px-4 py-2 bg-[#F58220] hover:bg-[#e07116] text-white font-semibold rounded-lg text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-[#F58220] flex items-center space-x-1.5"
                         >
                           {isCalling ? 'Connecting...' : 'Transfer'}
                         </button>
                       )}
                     </div>
                   )}
+
+                  {/* Optionele reserve collega */}
+                  {msg.secondaryExpert && (
+                    <p className="text-[11px] text-slate-500 pt-1">
+                      Alternatief:{' '}
+                      <strong className="text-slate-700 font-medium">
+                        {msg.secondaryExpert.name}
+                      </strong>{' '}
+                      ({msg.secondaryExpert.title} · toestel{' '}
+                      {msg.secondaryExpert.extension || '4100'})
+                    </p>
+                  )}
                 </div>
               )}
             </div>
           ))}
 
-          {/* Simple thinking status */}
+          {/* Eenvoudige denkstatus */}
           {isThinking && (
             <div className="text-xs text-slate-500 py-2 flex items-center space-x-2">
               <span className="w-1.5 h-1.5 bg-[#F58220] rounded-full animate-pulse" />
@@ -423,7 +497,7 @@ export default function AiHelpModal({
             className="space-y-1.5"
           >
             <label
-              htmlFor="ai-clean-query"
+              htmlFor="connect-query-input"
               className="block text-xs font-semibold text-slate-700"
             >
               Ask for help
@@ -431,7 +505,7 @@ export default function AiHelpModal({
 
             <div className="flex items-center space-x-2">
               <input
-                id="ai-clean-query"
+                id="connect-query-input"
                 ref={inputRef}
                 type="text"
                 value={inputQuery}
@@ -443,9 +517,10 @@ export default function AiHelpModal({
               <button
                 type="submit"
                 disabled={isThinking || !inputQuery.trim()}
-                className="min-h-[44px] px-4 py-2 bg-[#F58220] hover:bg-[#E07110] disabled:bg-slate-200 disabled:text-slate-400 text-white font-semibold text-xs rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[#F58220] shrink-0"
+                className="min-h-[44px] px-4 py-2 bg-[#F58220] hover:bg-[#e07116] disabled:bg-slate-200 disabled:text-slate-400 text-white font-semibold text-xs rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[#F58220] shrink-0"
               >
                 Ask
+                Connect
               </button>
             </div>
           </form>
