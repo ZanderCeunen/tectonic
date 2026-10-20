@@ -108,15 +108,15 @@ export default function CustomerHub({
             </div>
           </div>
 
-          {/* Primaire Actie: AI Hulp & Expert Routering voor dit dossier */}
+          {/* Primaire Actie: AI Connect voor dit dossier */}
           <div className="shrink-0">
             <button
               onClick={onOpenAiHelp}
               className="min-h-[44px] px-5 py-2.5 bg-[#F58220] hover:bg-[#e07116] active:bg-[#c96210] text-white text-sm font-semibold rounded-lg transition-colors flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-[#F58220] focus:ring-offset-2 shadow-xs"
-              title="Vraag de AI om direct de juiste specialist voor dit dossier aan te duiden"
+              title="Laat de AI direct de juiste collega voor dit dossier voorstellen"
             >
               <Sparkles className="w-4 h-4 text-white" />
-              <span>Hulp?</span>
+              <span>Connect</span>
             </button>
           </div>
         </div>
