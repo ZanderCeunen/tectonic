@@ -16,7 +16,6 @@ export default function HomeDashboard({
   conflicts = [],
   activeUser,
   onSelectCustomer,
-  onOpenRouter,
   onOpenAiHelp,
 }) {
   const [filterQuery, setFilterQuery] = useState('');
@@ -92,25 +91,15 @@ export default function HomeDashboard({
             </button>
           )}
 
-          {/* Oranje Hulp? Knop met AI assistent */}
+          {/* Oranje Hulp? Knop met AI assistent & Expert Routering */}
           <button
             type="button"
             onClick={onOpenAiHelp}
-            className="min-h-[44px] px-4 py-2 bg-[#F58220] hover:bg-[#e07116] active:bg-[#c96210] text-white text-sm font-semibold rounded-lg transition-colors flex items-center space-x-1.5 focus:outline-none focus:ring-2 focus:ring-[#F58220] focus:ring-offset-2 shadow-xs"
+            className="min-h-[44px] px-5 py-2 bg-[#F58220] hover:bg-[#e07116] active:bg-[#c96210] text-white text-sm font-semibold rounded-lg transition-colors flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-[#F58220] focus:ring-offset-2 shadow-xs"
             title="Vraag de AI om direct de juiste specialist aan te duiden"
           >
             <Sparkles className="w-4 h-4 text-white" />
             <span>Hulp?</span>
-          </button>
-
-          {/* Primaire Actie van het scherm: Routeer naar Expert */}
-          <button
-            onClick={onOpenRouter}
-            className="min-h-[44px] px-4 py-2 bg-[#005FB8] hover:bg-[#004b93] active:bg-[#003c75] text-white text-sm font-medium rounded-lg transition-colors flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-[#005FB8] focus:ring-offset-2"
-          >
-            <PhoneForwarded className="w-4 h-4" />
-            <span className="hidden sm:inline">Routeer naar expert</span>
-            <span className="sm:hidden">Expert</span>
           </button>
         </div>
       </section>

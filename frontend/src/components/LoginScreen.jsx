@@ -7,10 +7,9 @@ export default function LoginScreen({ onLoginSuccess, initialError }) {
   const [errorMsg, setErrorMsg] = useState(initialError || '');
   const [isLoading, setIsLoading] = useState(false);
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
-  const [isLocalOpen, setIsLocalOpen] = useState(false);
   const [msInfo, setMsInfo] = useState(null);
 
-  // Microsoft login-status opvragen (Entra geconfigureerd of demo-modus)
+  // Check Microsoft login status
   useEffect(() => {
     fetch('/api/auth/microsoft/status')
       .then((r) => (r.ok ? r.json() : null))
@@ -47,10 +46,10 @@ export default function LoginScreen({ onLoginSuccess, initialError }) {
         onLoginSuccess(data.user, data.token);
       } else {
         const errData = await res.json().catch(() => null);
-        setErrorMsg(errData?.error || 'Ongeldige combinatie van e-mail en wachtwoord.');
+        setErrorMsg(errData?.error || 'Invalid email or password.');
       }
     } catch {
-      setErrorMsg('Kan geen verbinding maken met de authenticatieserver.');
+      setErrorMsg('Cannot connect to auth server.');
     } finally {
       setIsLoading(false);
     }
@@ -65,70 +64,55 @@ export default function LoginScreen({ onLoginSuccess, initialError }) {
             <img
               src="/logo.png"
               alt="SD Worx"
-              className="h-8 w-auto mx-auto object-contain"
+              className="h-12 w-auto mx-auto object-contain"
             />
             <h1 className="text-xl font-semibold text-slate-900 tracking-tight">
-              Aanmelden
+              Sign in
             </h1>
           </div>
 
-          {/* Microsoft 365 — standaard loginpad (parallel met portaallogin) */}
-          {errorMsg && !isLocalOpen && (
+          {/* Microsoft 365 login */}
+          {errorMsg && (
             <div role="alert" className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-sm text-rose-800">
               {errorMsg}
             </div>
           )}
-          <div className="space-y-2.5">
-            <button
-              type="button"
-              onClick={() => {
-                window.location.href = '/api/auth/microsoft/login';
-              }}
-              className="w-full min-h-[44px] px-4 py-2 bg-white hover:bg-slate-50 border border-slate-300 rounded-lg text-slate-900 text-base font-medium transition-colors flex items-center justify-center gap-2.5 focus:outline-none focus:ring-2 focus:ring-[#005FB8] focus:border-transparent"
-            >
-              <svg viewBox="0 0 21 21" className="w-4 h-4 shrink-0" aria-hidden="true">
-                <rect x="1" y="1" width="9" height="9" fill="#F25022" />
-                <rect x="11" y="1" width="9" height="9" fill="#7FBA00" />
-                <rect x="1" y="11" width="9" height="9" fill="#00A4EF" />
-                <rect x="11" y="11" width="9" height="9" fill="#FFB900" />
-              </svg>
-              Doorgaan met Microsoft 365
-            </button>
-            <p className="text-xs text-slate-500 text-center leading-relaxed">
-              {msInfo?.configured
-                ? 'Standaard: veilig aanmelden via Microsoft Entra ID.'
-                : msInfo
-                ? 'Demomodus: geen Entra-tenant geconfigureerd — je logt in met een gesimuleerd Microsoft-account.'
-                : ' '}
-            </p>
-          </div>
+          {msInfo?.configured && (
+            <>
+              <div className="space-y-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.href = '/api/auth/microsoft/login';
+                  }}
+                  className="w-full min-h-[44px] px-4 py-2 bg-white hover:bg-slate-100 border border-slate-300 hover:border-slate-400 rounded-lg text-slate-900 text-base font-medium transition-all duration-200 flex items-center justify-center gap-2.5 focus:outline-none focus:ring-2 focus:ring-[#005FB8] focus:border-transparent shadow-sm hover:shadow"
+                >
+                  <svg viewBox="0 0 21 21" className="w-4 h-4 shrink-0" aria-hidden="true">
+                    <rect x="1" y="1" width="9" height="9" fill="#F25022" />
+                    <rect x="11" y="1" width="9" height="9" fill="#7FBA00" />
+                    <rect x="1" y="11" width="9" height="9" fill="#00A4EF" />
+                    <rect x="11" y="11" width="9" height="9" fill="#FFB900" />
+                  </svg>
+                  Continue with Microsoft 365
+                </button>
+              </div>
 
-          {/* Scheiding */}
-          <div className="flex items-center gap-3 text-[11px] text-slate-400 uppercase tracking-wider">
-            <span className="h-px flex-1 bg-slate-200" />
-            <span>of</span>
-            <span className="h-px flex-1 bg-slate-200" />
-          </div>
+              {/* Divider */}
+              <div className="flex items-center gap-3 text-[11px] text-slate-400 uppercase tracking-wider">
+                <span className="h-px flex-1 bg-slate-200" />
+                <span>or</span>
+                <span className="h-px flex-1 bg-slate-200" />
+              </div>
+            </>
+          )}
 
-          {/* Portaalaccount — secundair (admins & demo) */}
-          {!isLocalOpen ? (
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={() => setIsLocalOpen(true)}
-                className="text-xs font-medium text-slate-500 hover:text-[#005FB8] underline underline-offset-4 focus:outline-none focus:ring-2 focus:ring-[#005FB8] rounded py-1 px-1.5 transition-colors"
-              >
-                Inloggen met portaalaccount (admins &amp; demo)
-              </button>
-            </div>
-          ) : (
           <form onSubmit={handleLogin} className="space-y-4" noValidate>
             <div className="space-y-1">
               <label
                 htmlFor="username"
                 className="block text-sm font-medium text-slate-700"
               >
-                E-mail
+                Email
               </label>
               <input
                 id="username"
@@ -147,7 +131,7 @@ export default function LoginScreen({ onLoginSuccess, initialError }) {
                 htmlFor="password"
                 className="block text-sm font-medium text-slate-700"
               >
-                Wachtwoord
+                Password
               </label>
               <input
                 id="password"
@@ -175,10 +159,9 @@ export default function LoginScreen({ onLoginSuccess, initialError }) {
               disabled={isLoading}
               className="w-full min-h-[44px] px-4 py-2 bg-[#005FB8] hover:bg-[#004b93] active:bg-[#003c75] text-white text-base font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#005FB8] disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {isLoading ? 'Bezig met aanmelden...' : 'Inloggen'}
+              {isLoading ? 'Signing in...' : 'Sign in'}
             </button>
           </form>
-          )}
 
           {/* Privacy Policy Link */}
           <div className="pt-2 text-center border-t border-slate-100">
@@ -187,13 +170,13 @@ export default function LoginScreen({ onLoginSuccess, initialError }) {
               onClick={() => setIsPrivacyOpen(true)}
               className="text-xs text-slate-500 hover:text-slate-800 underline underline-offset-4 focus:outline-none focus:ring-2 focus:ring-[#005FB8] rounded py-1 px-1.5 transition-colors"
             >
-              Privacybeleid
+              Privacy Policy
             </button>
           </div>
         </div>
       </main>
 
-      {/* Accessible Privacy Policy Modal */}
+      {/* Privacy Policy Modal */}
       {isPrivacyOpen && (
         <div
           role="dialog"
@@ -206,19 +189,19 @@ export default function LoginScreen({ onLoginSuccess, initialError }) {
             className="bg-white rounded-xl max-w-lg w-full max-h-[85vh] flex flex-col border border-slate-200 shadow-xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Modal Header */}
+            {/* Header */}
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
               <h2
                 id="privacy-dialog-title"
                 className="text-base font-semibold text-slate-900"
               >
-                Privacybeleid &amp; Gegevensbescherming
+                Privacy Policy
               </h2>
               <button
                 type="button"
                 onClick={() => setIsPrivacyOpen(false)}
                 className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
-                aria-label="Sluit privacybeleid"
+                aria-label="Close privacy policy"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -227,46 +210,46 @@ export default function LoginScreen({ onLoginSuccess, initialError }) {
             {/* Modal Content */}
             <div className="px-6 py-5 overflow-y-auto text-sm text-slate-700 space-y-4 leading-relaxed">
               <p>
-                SD Worx TECTONIC verwerkt persoonsgegevens en loongegevens in overeenstemming met de Algemene Verordening Gegevensbescherming (AVG / GDPR, Verordening EU 2016/679).
+                SD Worx TECTONIC processes personal and payroll data in compliance with GDPR (EU 2016/679).
               </p>
 
               <div className="space-y-1">
-                <h3 className="font-semibold text-slate-900">1. Toegangsbeheer &amp; Autorisatie (RBAC)</h3>
+                <h3 className="font-semibold text-slate-900">1. Access Control (RBAC)</h3>
                 <p className="text-slate-600">
-                  Toegang tot klantendossiers is strikt beperkt op basis van functierollen en actieve klanttoewijzingen. Medewerkers hebben uitsluitend toegang tot dossiers die noodzakelijk zijn voor de uitvoering van hun specifieke taken.
+                  Access to customer files is strictly limited by role and assignment. Staff only access files needed for their tasks.
                 </p>
               </div>
 
               <div className="space-y-1">
-                <h3 className="font-semibold text-slate-900">2. Pseudonimisering &amp; PII-afscherming</h3>
+                <h3 className="font-semibold text-slate-900">2. Data Masking</h3>
                 <p className="text-slate-600">
-                  Gevoelige identificatiegegevens (zoals Belgische Rijksregisternummers en IBAN-bankrekeningen) en salarisbedragen worden conform Art. 32 AVG standaard gemaskeerd en worden uitsluitend ontsleuteld voor geautoriseerde Senior Payroll Officers en Legal Advisors.
+                  Sensitive data (national IDs, IBANs, salaries) is masked by default and only decrypted for authorized senior staff.
                 </p>
               </div>
 
               <div className="space-y-1">
-                <h3 className="font-semibold text-slate-900">3. Cryptografische Audit Logging</h3>
+                <h3 className="font-semibold text-slate-900">3. Audit Logging</h3>
                 <p className="text-slate-600">
-                  Elke handeling, inclusief aanmeldingen, raadplegingen van documenten en wijzigingen in dossiers, wordt geregistreerd in een onweerlegbare SHA-256 cryptografische hash-chain ter waarborging van integriteit en traceerbaarheid.
+                  All actions are logged in an immutable SHA-256 hash chain for integrity and traceability.
                 </p>
               </div>
 
               <div className="space-y-1">
-                <h3 className="font-semibold text-slate-900">4. Bewaartermijnen &amp; Contact</h3>
+                <h3 className="font-semibold text-slate-900">4. Retention & Contact</h3>
                 <p className="text-slate-600">
-                  Gegevens worden niet langer bewaard dan wettelijk verplicht voor sociale en fiscale administratie. Voor vragen of de uitoefening van uw rechten (inzage, rectificatie) kunt u contact opnemen met de SD Worx Data Protection Officer.
+                  Data is kept only as legally required. Contact the SD Worx Data Protection Officer for questions or rights requests.
                 </p>
               </div>
             </div>
 
-            {/* Modal Footer */}
+            {/* Footer */}
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end">
               <button
                 type="button"
                 onClick={() => setIsPrivacyOpen(false)}
                 className="min-h-[44px] px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
               >
-                Sluiten
+                Close
               </button>
             </div>
           </div>

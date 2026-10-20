@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import ConflictBanner from './ConflictBanner';
 import DocumentCard from './DocumentCard';
-import { Phone, Mail, User, PhoneCall, ArrowLeft, Building2 } from 'lucide-react';
+import { Phone, Mail, User, PhoneCall, ArrowLeft, Building2, Sparkles } from 'lucide-react';
 
 export default function CustomerHub({
   customer,
@@ -10,7 +10,7 @@ export default function CustomerHub({
   activeUser,
   onFeedback,
   onResolveConflict,
-  onOpenRouter,
+  onOpenAiHelp,
   onOpenCustomerSearch,
   onBackToHome,
 }) {
@@ -108,14 +108,15 @@ export default function CustomerHub({
             </div>
           </div>
 
-          {/* Primaire Actie: Raadpleeg een interne collega / expert */}
+          {/* Primaire Actie: AI Hulp & Expert Routering voor dit dossier */}
           <div className="shrink-0">
             <button
-              onClick={onOpenRouter}
-              className="min-h-[44px] px-5 py-2.5 bg-[#005FB8] hover:bg-[#004b93] active:bg-[#003c75] text-white text-sm font-medium rounded-lg transition-colors flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-[#005FB8] focus:ring-offset-2"
+              onClick={onOpenAiHelp}
+              className="min-h-[44px] px-5 py-2.5 bg-[#F58220] hover:bg-[#e07116] active:bg-[#c96210] text-white text-sm font-semibold rounded-lg transition-colors flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-[#F58220] focus:ring-offset-2 shadow-xs"
+              title="Vraag de AI om direct de juiste specialist voor dit dossier aan te duiden"
             >
-              <PhoneCall className="w-4 h-4" />
-              <span>Raadpleeg expert voor dit dossier</span>
+              <Sparkles className="w-4 h-4 text-white" />
+              <span>Hulp?</span>
             </button>
           </div>
         </div>
