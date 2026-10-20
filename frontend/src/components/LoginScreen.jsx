@@ -157,7 +157,7 @@ export default function LoginScreen({ onLoginSuccess, initialError }) {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full min-h-[44px] px-4 py-2 bg-[#005FB8] hover:bg-[#004b93] active:bg-[#003c75] text-white text-base font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#005FB8] disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full min-h-[44px] px-4 py-2 bg-[#005FB8] hover:bg-[#004b93] active:bg-[#003c75] text-white text-base font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#005FB8] disabled:opacity-60 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
             >
               {isLoading ? 'Signing in...' : 'Sign in'}
             </button>
@@ -168,7 +168,7 @@ export default function LoginScreen({ onLoginSuccess, initialError }) {
             <button
               type="button"
               onClick={() => setIsPrivacyOpen(true)}
-              className="text-xs text-slate-500 hover:text-slate-800 underline underline-offset-4 focus:outline-none focus:ring-2 focus:ring-[#005FB8] rounded py-1 px-1.5 transition-colors"
+              className="text-xs text-slate-500 hover:text-slate-800 underline underline-offset-4 focus:outline-none focus:ring-2 focus:ring-[#005FB8] rounded py-1 px-1.5 transition-colors duration-200"
             >
               Privacy Policy
             </button>
@@ -200,7 +200,7 @@ export default function LoginScreen({ onLoginSuccess, initialError }) {
               <button
                 type="button"
                 onClick={() => setIsPrivacyOpen(false)}
-                className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+                className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
                 aria-label="Close privacy policy"
               >
                 <X className="w-5 h-5" />
@@ -247,7 +247,7 @@ export default function LoginScreen({ onLoginSuccess, initialError }) {
               <button
                 type="button"
                 onClick={() => setIsPrivacyOpen(false)}
-                className="min-h-[44px] px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+                className="min-h-[44px] px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#005FB8] shadow-md hover:shadow-lg"
               >
                 Close
               </button>
