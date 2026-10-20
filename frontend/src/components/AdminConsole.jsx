@@ -976,14 +976,14 @@ export default function AdminConsole({
                           </div>
 
                           <div className="flex items-center justify-between text-slate-500 pt-1">
-                            <span>Huidige Blok SHA-256 Hash:</span>
+                            <span>Current Block SHA-256 Hash:</span>
                             <button
                               type="button"
                               onClick={() => handleCopy(entry.hash)}
                               className="text-xs text-[#005FB8] hover:underline flex items-center space-x-1"
                             >
                               <Copy className="w-3.5 h-3.5" />
-                              <span>{isCopied ? 'Gekopieerd!' : 'Kopieer Hash'}</span>
+                              <span>{isCopied ? 'Copied!' : 'Copy hash'}</span>
                             </button>
                           </div>
                           <div className="text-slate-900 font-bold break-all bg-white p-2 rounded border border-slate-200 select-all">
@@ -1000,12 +1000,12 @@ export default function AdminConsole({
         );
       })()}
 
-      {/* TAB 5: SYSTEEMSTATUS */}
+      {/* TAB 5: SYSTEM STATUS */}
       {activeTab === 'status' && (
         <div className="space-y-4">
           <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-xs space-y-5">
             <h2 className="text-sm font-bold text-slate-900">
-              TECTONIC Systeemstatus &amp; Beveiligingsparameters
+              TECTONIC System Status &amp; Security Parameters
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
@@ -1016,40 +1016,40 @@ export default function AdminConsole({
                   <span className="font-mono text-slate-900 text-xs">http://127.0.0.1:8080/api/health</span>
                 </div>
                 <p className="text-xs text-slate-500 pt-1">
-                  {healthStatus?.ok ? healthStatus.message : 'Verbinding controleren...'}
+                  {healthStatus?.ok ? healthStatus.message : 'Checking connection...'}
                 </p>
               </div>
 
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
-                <div className="font-bold text-slate-800">Authenticatie &amp; Toegangsbeheer</div>
+                <div className="font-bold text-slate-800">Authentication &amp; Access Management</div>
                 <div className="flex items-center space-x-2">
                   <Lock className="w-4 h-4 text-[#005FB8]" />
-                  <span className="text-slate-900 font-semibold text-xs">HS256 JWT met Verloopvalidatie</span>
+                  <span className="text-slate-900 font-semibold text-xs">HS256 JWT with expiry validation</span>
                 </div>
                 <p className="text-xs text-slate-500 pt-1">
-                  Bcrypt factor 12 • Rate-limiting (5 pogingen per 15 min) • Geen ontwikkel-fallbacks.
+                  Bcrypt factor 12 • Rate limiting (5 attempts per 15 min) • No development fallbacks.
                 </p>
               </div>
 
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
-                <div className="font-bold text-slate-800">Databaseschema &amp; Microsoft Graph Voorbereiding</div>
+                <div className="font-bold text-slate-800">Database schema &amp; Microsoft Graph readiness</div>
                 <div className="flex items-center space-x-2">
                   <Database className="w-4 h-4 text-indigo-600" />
                   <span className="text-slate-900 font-semibold text-xs">SQLite tectonic.db</span>
                 </div>
                 <p className="text-xs text-slate-500 pt-1">
-                  Optionele kolommen <code className="font-mono text-indigo-600">external_provider</code> en <code className="font-mono text-indigo-600">external_id</code> gereserveerd voor toekomstige OneDrive/SharePoint integratie.
+                  Optional columns <code className="font-mono text-indigo-600">external_provider</code> and <code className="font-mono text-indigo-600">external_id</code> reserved for future OneDrive/SharePoint integration.
                 </p>
               </div>
 
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
-                <div className="font-bold text-slate-800">Audit Keten Status</div>
+                <div className="font-bold text-slate-800">Audit Chain Status</div>
                 <div className="flex items-center space-x-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span className="text-slate-900 font-semibold text-xs">Cryptografische Genesis Keten Actief</span>
+                  <span className="text-slate-900 font-semibold text-xs">Cryptographic genesis chain active</span>
                 </div>
                 <p className="text-xs text-slate-500 pt-1">
-                  Totaal aantal registraties: {auditChain.total_entries || auditChain.entries?.length || 0}
+                  Total number of records: {auditChain.total_entries || auditChain.entries?.length || 0}
                 </p>
               </div>
             </div>

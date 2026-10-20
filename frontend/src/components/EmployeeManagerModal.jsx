@@ -77,7 +77,7 @@ export default function EmployeeManagerModal({ isOpen, onClose, employeeToEdit, 
         'CAO 200 & Bediendenstatuut': formData.domain_cao200,
         'Werkregime & Arbeidstijd': formData.domain_time,
       },
-      recent_activity: employeeToEdit?.recent_activity || 'Nieuw expertprofiel aangemaakt in het kennisportaal.',
+      recent_activity: employeeToEdit?.recent_activity || 'New expert profile created in the Knowledge Portal.',
     };
 
     try {
@@ -117,7 +117,7 @@ export default function EmployeeManagerModal({ isOpen, onClose, employeeToEdit, 
       className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4"
     >
       <div className="bg-white rounded-xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-        {/* Kopbalk */}
+        {/* Header bar */}
         <div className="bg-[#005FB8] text-white px-6 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
             <UserPlus className="w-5 h-5 text-white" />
@@ -134,11 +134,11 @@ export default function EmployeeManagerModal({ isOpen, onClose, employeeToEdit, 
           </button>
         </div>
 
-        {/* Formulier in 1 kolom volgens ontwerprichtlijn */}
+        {/* Single-column form per design guideline */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 text-sm overflow-y-auto flex-1">
           <div className="space-y-1">
             <label htmlFor="emp-name" className="block text-xs font-semibold text-slate-700">
-              Volledige naam van de expert *
+              Full name of the expert *
             </label>
             <input
               id="emp-name"
@@ -152,7 +152,7 @@ export default function EmployeeManagerModal({ isOpen, onClose, employeeToEdit, 
 
           <div className="space-y-1">
             <label htmlFor="emp-title" className="block text-xs font-semibold text-slate-700">
-              Functietitel binnen SD Worx *
+              Job title at SD Worx *
             </label>
             <input
               id="emp-title"
@@ -166,7 +166,7 @@ export default function EmployeeManagerModal({ isOpen, onClose, employeeToEdit, 
 
           <div className="space-y-1">
             <label htmlFor="emp-dept" className="block text-xs font-semibold text-slate-700">
-              Afdeling of praktijkgroep *
+              Department or practice group *
             </label>
             <input
               id="emp-dept"
@@ -180,7 +180,7 @@ export default function EmployeeManagerModal({ isOpen, onClose, employeeToEdit, 
 
           <div className="space-y-1">
             <label htmlFor="emp-ext" className="block text-xs font-semibold text-slate-700">
-              Intern toestelnummer *
+              Internal extension number *
             </label>
             <input
               id="emp-ext"
@@ -194,7 +194,7 @@ export default function EmployeeManagerModal({ isOpen, onClose, employeeToEdit, 
 
           <div className="space-y-1">
             <label htmlFor="emp-phone" className="block text-xs font-semibold text-slate-700">
-              Direct extern telefoonnummer
+              Direct external phone number
             </label>
             <input
               id="emp-phone"
@@ -207,7 +207,7 @@ export default function EmployeeManagerModal({ isOpen, onClose, employeeToEdit, 
 
           <div className="space-y-1">
             <label htmlFor="emp-availability" className="block text-xs font-semibold text-slate-700">
-              Beschikbaarheid voor telefonische routering
+              Availability for phone routing
             </label>
             <select
               id="emp-availability"
@@ -215,21 +215,21 @@ export default function EmployeeManagerModal({ isOpen, onClose, employeeToEdit, 
               onChange={(e) => setFormData({ ...formData, availability: e.target.value })}
               className="w-full min-h-[44px] px-3.5 py-2 text-base bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
             >
-              <option value="Available">Beschikbaar</option>
-              <option value="InCall">In gesprek</option>
-              <option value="Busy">Bezet / Niet storen</option>
-              <option value="Away">Afwezig</option>
+              <option value="Available">Available</option>
+              <option value="InCall">In a call</option>
+              <option value="Busy">Busy / Do not disturb</option>
+              <option value="Away">Away</option>
             </select>
           </div>
 
           <div className="pt-2 border-t border-slate-200 space-y-3">
             <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">
-              Domeinexpertise Scores (0 - 100)
+              Domain expertise scores (0 - 100)
             </span>
 
             <div className="space-y-1">
               <label htmlFor="emp-expat" className="block text-xs font-medium text-slate-700">
-                Internationale Detachering &amp; Expat: {formData.domain_expat}%
+                International Mobility &amp; Expat: {formData.domain_expat}%
               </label>
               <input
                 id="emp-expat"
@@ -244,7 +244,7 @@ export default function EmployeeManagerModal({ isOpen, onClose, employeeToEdit, 
 
             <div className="space-y-1">
               <label htmlFor="emp-cao" className="block text-xs font-medium text-slate-700">
-                CAO 200 &amp; Bediendenstatuut: {formData.domain_cao200}%
+                CBA 200 &amp; White-Collar Status: {formData.domain_cao200}%
               </label>
               <input
                 id="emp-cao"
@@ -259,7 +259,7 @@ export default function EmployeeManagerModal({ isOpen, onClose, employeeToEdit, 
 
             <div className="space-y-1">
               <label htmlFor="emp-time" className="block text-xs font-medium text-slate-700">
-                Werkregime &amp; Arbeidstijd: {formData.domain_time}%
+                Work Schedule &amp; Working Time: {formData.domain_time}%
               </label>
               <input
                 id="emp-time"
@@ -279,7 +279,7 @@ export default function EmployeeManagerModal({ isOpen, onClose, employeeToEdit, 
               onClick={onClose}
               className="min-h-[44px] px-5 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
             >
-              Annuleren
+              Cancel
             </button>
             <button
               type="submit"
@@ -287,7 +287,7 @@ export default function EmployeeManagerModal({ isOpen, onClose, employeeToEdit, 
               className="min-h-[44px] px-6 py-2 bg-[#005FB8] hover:bg-[#004b93] active:bg-[#003c75] text-white text-sm font-medium rounded-lg transition-colors flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-[#005FB8] focus:ring-offset-2 disabled:opacity-60"
             >
               <Save className="w-4 h-4" />
-              <span>{isSubmitting ? 'Bezig met opslaan...' : 'Expert opslaan'}</span>
+              <span>{isSubmitting ? 'Saving...' : 'Save expert'}</span>
             </button>
           </div>
         </form>

@@ -49,7 +49,7 @@ export default function SmartRouterModal({
             ...emp,
             overallMatch: matchPercent,
             domainDisplay: emp.title,
-            explanation: `${emp.name} heeft ${casesCount} dossiers behandeld en kent ${customer?.name || 'deze sector'}.`,
+            explanation: `${emp.name} has handled ${casesCount} case files and knows ${customer?.name || 'this sector'}.`,
           };
         }
 
@@ -83,39 +83,39 @@ export default function SmartRouterModal({
 
         if (has('expat', 'posting', 'detachering', 'abroad', 'international', 'a1', 'cross-border', 'grensarbeid')) {
           const s = emp.domain_expertise?.['Internationale Detachering & Expat'] || emp.domain_expertise?.['International Mobility & Expat'] || 0;
-          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Internationale Detachering & Expat'; }
+          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'International Secondment & Expat'; }
         }
         if (has('bouw', 'construction', '124', 'weerverlet', 'bad-weather', 'mobility', 'mobiliteit')) {
           const s = emp.domain_expertise?.['Bouwbedrijf PC 124'] || emp.domain_expertise?.['Construction PC 124'] || 0;
-          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Bouwsector PC 124'; }
+          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Construction PC 124'; }
         }
         if (has('horeca', 'hospitality', '302', 'flexi', 'flexijob', 'flexi-job', 'dimona', 'student')) {
           const s = emp.domain_expertise?.['Horeca PC 302 & Flexi-jobs'] || emp.domain_expertise?.['Hospitality PC 302 & Flexi-jobs'] || 0;
-          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Horeca PC 302 & Flexi-jobs'; }
+          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Hospitality PC 302 & Flexi-jobs'; }
         }
         if (has('chemie', 'chemical', '207', 'shift', 'ploeg', 'nacht', 'volcontinu', 'continuous')) {
           const s = emp.domain_expertise?.['Chemie & Petrochemie PC 207'] || emp.domain_expertise?.['Chemical Industry PC 207'] || 0;
-          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Chemie PC 207'; }
+          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Chemical Industry PC 207'; }
         }
         if (has('200', 'bediende', 'white-collar', 'arbeidsduur', 'working-hours', '38h', '38u', 'telework', 'thuiswerk')) {
           const s = emp.domain_expertise?.['CAO 200 & Bediendenstatuut'] || emp.domain_expertise?.['CBA 200 & White-Collar Status'] || 0;
-          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'CAO 200 Bediendenstatuut'; }
+          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'CBA 200 White-Collar Status'; }
         }
         if (has('cafetaria', 'cafeteria', 'benefit', 'bonus', 'wagen', 'company-car', 'tax', 'fisc')) {
           const s = emp.domain_expertise?.['Cafetariaplan & Flex Income'] || emp.domain_expertise?.['Flexible Benefits & Cafeteria Plan'] || 0;
-          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Cafetariaplan & Flexible Benefits'; }
+          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Cafeteria Plan & Flexible Benefits'; }
         }
         if (has('zorg', 'healthcare', '330', 'ific', 'ziekenhuis', 'hospital', 'rusthuis')) {
           const s = emp.domain_expertise?.['Zorgsector PC 330 & IFIC'] || emp.domain_expertise?.['Healthcare PC 330 & IFIC'] || 0;
-          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Zorgsector PC 330 & IFIC'; }
+          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Healthcare PC 330 & IFIC'; }
         }
         if (has('food', 'voeding', '118')) {
           const s = emp.domain_expertise?.['Voedingsnijverheid PC 118'] || emp.domain_expertise?.['Food Industry PC 118'] || 0;
-          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Voedingsnijverheid PC 118'; }
+          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Food Industry PC 118'; }
         }
         if (has('metal', 'metaal', '111')) {
           const s = emp.domain_expertise?.['Metaalsector PC 111'] || emp.domain_expertise?.['Metal Industry PC 111'] || 0;
-          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Metaalsector PC 111'; }
+          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Metal Industry PC 111'; }
         }
 
         let calculatedScore = bestDomainScore > 0 ? bestDomainScore : keywordHits > 0 ? 60 + keywordHits * 10 : 25;
@@ -127,7 +127,7 @@ export default function SmartRouterModal({
           ...emp,
           overallMatch: matchPercent,
           domainDisplay,
-          explanation: `${emp.name} is gespecialiseerd in '${domainDisplay}' met ${casesCount} voltooide dossiers.`,
+          explanation: `${emp.name} specialises in '${domainDisplay}' with ${casesCount} completed cases.`,
         };
       })
       .sort((a, b) => b.overallMatch - a.overallMatch);
@@ -139,8 +139,8 @@ export default function SmartRouterModal({
       onExecuteHandoff({
         customer_id: customer?.id || 'CUST-001',
         employee_id: expert.id,
-        caller_name: customer?.primary_contact || 'Klantvertegenwoordiger',
-        inquiry_summary: searchQuery || `Warme overdracht voor ${customer?.name || 'Klantendossier'}`,
+        caller_name: customer?.primary_contact || 'Customer representative',
+        inquiry_summary: searchQuery || `Warm handover for ${customer?.name || 'customer case'}`,
         expert_name: expert.name,
       });
       setIsCalling(false);
@@ -164,17 +164,17 @@ export default function SmartRouterModal({
             </div>
             <div>
               <h2 id="router-modal-title" className="text-base font-bold text-white">
-                Intelligente Expert Routering
+                Smart Expert Routing
               </h2>
               <p className="text-xs text-blue-100">
-                {customer ? `${customer.name} (${customer.joint_committee?.split(' - ')[0] || 'Dossier'})` : 'SD Worx Interne Specialisten'}
+                {customer ? `${customer.name} (${customer.joint_committee?.split(' - ')[0] || 'Case'})` : 'SD Worx Internal Specialists'}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
             className="text-blue-100 hover:text-white p-2 rounded-lg hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-white"
-            aria-label="Sluit router"
+            aria-label="Close router"
           >
             <X className="w-5 h-5" />
           </button>
@@ -192,7 +192,7 @@ export default function SmartRouterModal({
               }`}
             >
               <PhoneCall className="w-4 h-4" />
-              <span>Aanbevolen Experts</span>
+              <span>Recommended Experts</span>
             </button>
             <button
               onClick={() => setActiveTab('graph')}
@@ -203,11 +203,11 @@ export default function SmartRouterModal({
               }`}
             >
               <Network className="w-4 h-4" />
-              <span>Expertisematrix</span>
+              <span>Expertise Matrix</span>
             </button>
           </div>
           <span className="text-xs text-slate-500 font-medium">
-            {availableEmployees.length} collega's beschikbaar
+            {availableEmployees.length} colleagues available
           </span>
         </div>
 
@@ -219,11 +219,11 @@ export default function SmartRouterModal({
                 <Check className="w-7 h-7" />
               </div>
               <h3 className="text-base font-bold text-slate-900">
-                Verbonden met {callSuccess.name}
+                Connected to {callSuccess.name}
               </h3>
               <p className="text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
-                De oproep is doorgeschakeld naar <strong className="text-[#005FB8] font-mono">toestel {callSuccess.extension || '4102'}</strong>.
-                {customer && <span> Het dossier voor <strong>{customer.name}</strong> en de samenvatting van de vraag zijn automatisch klaargezet voor uw collega.</span>}
+                The call has been forwarded to <strong className="text-[#005FB8] font-mono">extension {callSuccess.extension || '4102'}</strong>.
+                {customer && <span> The case file for <strong>{customer.name}</strong> and the question summary have been prepared automatically for your colleague.</span>}
               </p>
               <div className="pt-2">
                 <button
@@ -233,7 +233,7 @@ export default function SmartRouterModal({
                   }}
                   className="min-h-[44px] px-6 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
                 >
-                  Oproep afronden &amp; Venster sluiten
+                  End call &amp; close window
                 </button>
               </div>
             </div>
@@ -245,10 +245,10 @@ export default function SmartRouterModal({
             />
           ) : (
             <>
-              {/* Zoekinvoer zonder placeholder */}
+              {/* Search input (no placeholder) */}
               <div className="space-y-1.5">
                 <label htmlFor="expert-query" className="block text-sm font-medium text-slate-700">
-                  Zoek collega op expertisegebied, paritair comité of specifieke vraag
+                  Find a colleague by expertise, joint committee or specific question
                 </label>
                 <div className="relative">
                   <input
@@ -264,7 +264,7 @@ export default function SmartRouterModal({
                       type="button"
                       onClick={() => setSearchQuery('')}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
-                      aria-label="Zoekopdracht wissen"
+                      aria-label="Clear search query"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -275,7 +275,7 @@ export default function SmartRouterModal({
               {/* Aanbevolen Experts Lijst */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between text-xs text-slate-500 font-semibold px-0.5">
-                  <span>Collega &amp; Specialisatie</span>
+                  <span>Colleague &amp; Specialisation</span>
                   <span>Match Score</span>
                 </div>
 
@@ -305,7 +305,7 @@ export default function SmartRouterModal({
                                     : 'bg-slate-100 text-slate-700'
                                 }`}
                               >
-                                {isAvailable ? 'Beschikbaar' : expert.availability}
+                                {isAvailable ? 'Available' : expert.availability}
                               </span>
                             </div>
                             <div className="text-xs text-slate-500 font-medium">
@@ -323,7 +323,7 @@ export default function SmartRouterModal({
                               {expert.overallMatch}%
                             </div>
                             <div className="text-[11px] text-slate-500">
-                              toestel {expert.extension}
+                              ext. {expert.extension}
                             </div>
                           </div>
 
@@ -334,7 +334,7 @@ export default function SmartRouterModal({
                             className="min-h-[40px] px-4 py-2 bg-[#005FB8] hover:bg-[#004b93] active:bg-[#003c75] text-white text-xs font-semibold rounded-lg transition-colors flex items-center space-x-1.5 focus:outline-none focus:ring-2 focus:ring-[#005FB8] disabled:opacity-60"
                           >
                             <PhoneCall className="w-3.5 h-3.5" />
-                            <span>Doorschakelen</span>
+                            <span>Transfer</span>
                           </button>
                         </div>
                       </div>

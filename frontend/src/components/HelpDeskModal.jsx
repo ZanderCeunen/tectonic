@@ -187,7 +187,7 @@ export default function AiHelpModal({
     };
   };
 
-  // Generate colleague proposal (AI does NOT give the legal answer, only proposes the right colleague!)
+  // Generate colleague proposal (the help desk does NOT give the legal answer, only proposes the right colleague!)
   const generateColleagueProposal = (queryText, primaryExpert, secondaryExpert) => {
     const q = queryText.toLowerCase();
     let topicDescription = 'dit dossier en deze specifieke materie';
@@ -201,7 +201,7 @@ export default function AiHelpModal({
       ) {
         conflictNotice = `Warning: there is an unresolved case conflict for ${customer.name} regarding "${
           activeCustConflicts[0].field_label || activeCustConflicts[0].field
-        }". Stem dit rechtstreeks af met de specialist.`;
+        }". Discuss this directly with the specialist.`;
       }
     }
 

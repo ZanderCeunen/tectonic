@@ -116,7 +116,7 @@ export default function CustomerManagerModal({ isOpen, onClose, customerToEdit, 
       className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4"
     >
       <div className="bg-white rounded-xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-        {/* Kopbalk */}
+        {/* Header bar */}
         <div className="bg-[#005FB8] text-white px-6 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
             <Building2 className="w-5 h-5 text-white" />
@@ -133,11 +133,11 @@ export default function CustomerManagerModal({ isOpen, onClose, customerToEdit, 
           </button>
         </div>
 
-        {/* Formulier in 1 kolom volgens ontwerprichtlijn */}
+        {/* Single-column form per design guideline */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 text-sm overflow-y-auto flex-1">
           <div className="space-y-1">
             <label htmlFor="cust-name" className="block text-xs font-semibold text-slate-700">
-              Bedrijfsnaam *
+              Company name *
             </label>
             <input
               id="cust-name"
@@ -151,7 +151,7 @@ export default function CustomerManagerModal({ isOpen, onClose, customerToEdit, 
 
           <div className="space-y-1">
             <label htmlFor="cust-enterprise-nr" className="block text-xs font-semibold text-slate-700">
-              KBO-ondernemingsnummer (bv. BE 0459.123.456) *
+              KBO enterprise number (e.g. BE 0459.123.456) *
             </label>
             <input
               id="cust-enterprise-nr"
@@ -165,7 +165,7 @@ export default function CustomerManagerModal({ isOpen, onClose, customerToEdit, 
 
           <div className="space-y-1">
             <label htmlFor="cust-pc" className="block text-xs font-semibold text-slate-700">
-              Paritair Comité Code (bv. 200, 124, 302, 207) *
+              Joint Committee (PC) code (e.g. 200, 124, 302, 207) *
             </label>
             <input
               id="cust-pc"
@@ -179,7 +179,7 @@ export default function CustomerManagerModal({ isOpen, onClose, customerToEdit, 
 
           <div className="space-y-1">
             <label htmlFor="cust-contact" className="block text-xs font-semibold text-slate-700">
-              Primaire contactpersoon (HR Manager / Zaakvoerder) *
+              Primary contact person (HR Manager / Managing Director) *
             </label>
             <input
               id="cust-contact"
@@ -193,7 +193,7 @@ export default function CustomerManagerModal({ isOpen, onClose, customerToEdit, 
 
           <div className="space-y-1">
             <label htmlFor="cust-email" className="block text-xs font-semibold text-slate-700">
-              E-mailadres contactpersoon *
+              Contact person email address *
             </label>
             <input
               id="cust-email"
@@ -207,7 +207,7 @@ export default function CustomerManagerModal({ isOpen, onClose, customerToEdit, 
 
           <div className="space-y-1">
             <label htmlFor="cust-phone" className="block text-xs font-semibold text-slate-700">
-              Telefoonnummer contactpersoon
+              Contact person phone number
             </label>
             <input
               id="cust-phone"
@@ -220,7 +220,7 @@ export default function CustomerManagerModal({ isOpen, onClose, customerToEdit, 
 
           <div className="space-y-1">
             <label htmlFor="cust-location" className="block text-xs font-semibold text-slate-700">
-              Vestigingsplaats / Stad
+              Location / City
             </label>
             <input
               id="cust-location"
@@ -233,7 +233,7 @@ export default function CustomerManagerModal({ isOpen, onClose, customerToEdit, 
 
           <div className="space-y-1">
             <label htmlFor="cust-manager" className="block text-xs font-semibold text-slate-700">
-              Toegewezen SD Worx dossierbeheerder
+              Assigned SD Worx case manager
             </label>
             <input
               id="cust-manager"
@@ -250,7 +250,7 @@ export default function CustomerManagerModal({ isOpen, onClose, customerToEdit, 
               onClick={onClose}
               className="min-h-[44px] px-5 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
             >
-              Annuleren
+              Cancel
             </button>
             <button
               type="submit"
@@ -258,7 +258,7 @@ export default function CustomerManagerModal({ isOpen, onClose, customerToEdit, 
               className="min-h-[44px] px-6 py-2 bg-[#005FB8] hover:bg-[#004b93] active:bg-[#003c75] text-white text-sm font-medium rounded-lg transition-colors flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-[#005FB8] focus:ring-offset-2 disabled:opacity-60"
             >
               <Save className="w-4 h-4" />
-              <span>{isSubmitting ? 'Bezig met opslaan...' : 'Klantendossier opslaan'}</span>
+              <span>{isSubmitting ? 'Saving...' : 'Save case'}</span>
             </button>
           </div>
         </form>

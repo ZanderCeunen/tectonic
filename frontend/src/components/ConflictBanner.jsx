@@ -44,14 +44,14 @@ export default function ConflictBanner({ conflicts, customerId, onResolveConflic
           <div className="min-w-0">
             <div className="flex items-center space-x-2">
               <span className="font-bold text-sm text-amber-950">
-                Tegenstrijdigheid gedetecteerd:
+                Contradiction detected:
               </span>
               <span className="text-xs font-semibold px-2 py-0.5 bg-amber-200 text-amber-900 rounded">
-                Aandacht vereist
+                Attention required
               </span>
             </div>
             <p className="text-xs text-amber-900 mt-1 leading-relaxed">
-              {conflict.explanation || `Verschillende documenten in dit dossier bevatten tegenstrijdige waarden voor '${conflict.topic}'.`}
+              {conflict.explanation || `Several documents in this case contain conflicting values for '${conflict.topic}'.`}
             </p>
           </div>
         </div>
@@ -61,7 +61,7 @@ export default function ConflictBanner({ conflicts, customerId, onResolveConflic
             onClick={() => setShowResolver(!showResolver)}
             className="min-h-[38px] px-4 py-1.5 bg-amber-700 hover:bg-amber-800 active:bg-amber-900 text-white text-xs font-semibold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500"
           >
-            Conflict oplossen
+            Resolve conflict
           </button>
 
           <button

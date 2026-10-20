@@ -61,7 +61,7 @@ export default function ExpertiseGraphView({ employees, customers, selectedCusto
                         <div>{emp.name}</div>
                         {isPrimary && (
                           <span className="text-[10px] font-normal text-[#005FB8]">
-                            Vaste dossierbeheerder
+                            Dedicated case manager
                           </span>
                         )}
                       </div>
