@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { X, Check, Phone, PhoneCall, Search, Sparkles, HelpCircle, Network, Users } from 'lucide-react';
+import { X, Check, PhoneCall, Network, Users } from 'lucide-react';
 import ExpertiseGraphView from './ExpertiseGraphView';
 
 export default function SmartRouterModal({
@@ -49,7 +49,7 @@ export default function SmartRouterModal({
             ...emp,
             overallMatch: matchPercent,
             domainDisplay: emp.title,
-            explanation: `${emp.name} has completed ${casesCount} cases and is familiar with ${customer?.name || 'this domain'}.`,
+            explanation: `${emp.name} heeft ${casesCount} dossiers behandeld en kent ${customer?.name || 'deze sector'}.`,
           };
         }
 
@@ -58,7 +58,6 @@ export default function SmartRouterModal({
         let matchedDomainName = '';
         let keywordHits = 0;
 
-        // A. Match domain expertise keys
         for (const [domain, score] of Object.entries(emp.domain_expertise || {})) {
           const dLower = domain.toLowerCase();
           for (const token of tokens) {
@@ -72,7 +71,6 @@ export default function SmartRouterModal({
           }
         }
 
-        // B. Match name, title, department, recent activity
         const fullBio = `${emp.name} ${emp.title} ${emp.department || ''} ${emp.recent_activity || ''}`.toLowerCase();
         for (const token of tokens) {
           if (fullBio.includes(token)) {
@@ -81,44 +79,43 @@ export default function SmartRouterModal({
           }
         }
 
-        // C. Synonyms mapping
         const has = (...terms) => tokens.some((t) => terms.some((term) => t.includes(term) || term.includes(t)));
 
         if (has('expat', 'posting', 'detachering', 'abroad', 'international', 'a1', 'cross-border', 'grensarbeid')) {
-          const s = emp.domain_expertise?.['International Mobility & Expat'] || emp.domain_expertise?.['Internationale Detachering & Expat'] || 0;
-          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'International Mobility & Expat'; }
+          const s = emp.domain_expertise?.['Internationale Detachering & Expat'] || emp.domain_expertise?.['International Mobility & Expat'] || 0;
+          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Internationale Detachering & Expat'; }
         }
         if (has('bouw', 'construction', '124', 'weerverlet', 'bad-weather', 'mobility', 'mobiliteit')) {
-          const s = emp.domain_expertise?.['Construction PC 124'] || emp.domain_expertise?.['Bouwbedrijf PC 124'] || 0;
-          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Construction PC 124'; }
+          const s = emp.domain_expertise?.['Bouwbedrijf PC 124'] || emp.domain_expertise?.['Construction PC 124'] || 0;
+          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Bouwsector PC 124'; }
         }
         if (has('horeca', 'hospitality', '302', 'flexi', 'flexijob', 'flexi-job', 'dimona', 'student')) {
-          const s = emp.domain_expertise?.['Hospitality PC 302 & Flexi-jobs'] || emp.domain_expertise?.['Horeca PC 302 & Flexi-jobs'] || 0;
-          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Hospitality PC 302 & Flexi-jobs'; }
+          const s = emp.domain_expertise?.['Horeca PC 302 & Flexi-jobs'] || emp.domain_expertise?.['Hospitality PC 302 & Flexi-jobs'] || 0;
+          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Horeca PC 302 & Flexi-jobs'; }
         }
         if (has('chemie', 'chemical', '207', 'shift', 'ploeg', 'nacht', 'volcontinu', 'continuous')) {
-          const s = emp.domain_expertise?.['Chemical Industry PC 207'] || emp.domain_expertise?.['Chemie & Petrochemie PC 207'] || 0;
-          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Chemical Industry PC 207'; }
+          const s = emp.domain_expertise?.['Chemie & Petrochemie PC 207'] || emp.domain_expertise?.['Chemical Industry PC 207'] || 0;
+          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Chemie PC 207'; }
         }
         if (has('200', 'bediende', 'white-collar', 'arbeidsduur', 'working-hours', '38h', '38u', 'telework', 'thuiswerk')) {
-          const s = emp.domain_expertise?.['CBA 200 & White-Collar Status'] || emp.domain_expertise?.['CAO 200 & Bediendenstatuut'] || 0;
-          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'CBA 200 & White-Collar Status'; }
+          const s = emp.domain_expertise?.['CAO 200 & Bediendenstatuut'] || emp.domain_expertise?.['CBA 200 & White-Collar Status'] || 0;
+          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'CAO 200 Bediendenstatuut'; }
         }
         if (has('cafetaria', 'cafeteria', 'benefit', 'bonus', 'wagen', 'company-car', 'tax', 'fisc')) {
-          const s = emp.domain_expertise?.['Flexible Benefits & Cafeteria Plan'] || emp.domain_expertise?.['Cafetariaplan & Flex Income'] || 0;
-          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Flexible Benefits & Cafeteria Plan'; }
+          const s = emp.domain_expertise?.['Cafetariaplan & Flex Income'] || emp.domain_expertise?.['Flexible Benefits & Cafeteria Plan'] || 0;
+          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Cafetariaplan & Flexible Benefits'; }
         }
         if (has('zorg', 'healthcare', '330', 'ific', 'ziekenhuis', 'hospital', 'rusthuis')) {
-          const s = emp.domain_expertise?.['Healthcare PC 330 & IFIC'] || emp.domain_expertise?.['Zorgsector PC 330 & IFIC'] || 0;
-          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Healthcare PC 330 & IFIC'; }
+          const s = emp.domain_expertise?.['Zorgsector PC 330 & IFIC'] || emp.domain_expertise?.['Healthcare PC 330 & IFIC'] || 0;
+          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Zorgsector PC 330 & IFIC'; }
         }
         if (has('food', 'voeding', '118')) {
-          const s = emp.domain_expertise?.['Food Industry PC 118'] || emp.domain_expertise?.['Voedingsnijverheid PC 118'] || 0;
-          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Food Industry PC 118'; }
+          const s = emp.domain_expertise?.['Voedingsnijverheid PC 118'] || emp.domain_expertise?.['Food Industry PC 118'] || 0;
+          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Voedingsnijverheid PC 118'; }
         }
         if (has('metal', 'metaal', '111')) {
-          const s = emp.domain_expertise?.['Metal Industry PC 111'] || emp.domain_expertise?.['Metaalsector PC 111'] || 0;
-          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Metal Industry PC 111'; }
+          const s = emp.domain_expertise?.['Metaalsector PC 111'] || emp.domain_expertise?.['Metal Industry PC 111'] || 0;
+          if (s > bestDomainScore) { bestDomainScore = s; matchedDomainName = 'Metaalsector PC 111'; }
         }
 
         let calculatedScore = bestDomainScore > 0 ? bestDomainScore : keywordHits > 0 ? 60 + keywordHits * 10 : 25;
@@ -130,7 +127,7 @@ export default function SmartRouterModal({
           ...emp,
           overallMatch: matchPercent,
           domainDisplay,
-          explanation: `${emp.name} specializes in '${domainDisplay}' with ${casesCount} cases completed.`,
+          explanation: `${emp.name} is gespecialiseerd in '${domainDisplay}' met ${casesCount} voltooide dossiers.`,
         };
       })
       .sort((a, b) => b.overallMatch - a.overallMatch);
@@ -142,8 +139,8 @@ export default function SmartRouterModal({
       onExecuteHandoff({
         customer_id: customer?.id || 'CUST-001',
         employee_id: expert.id,
-        caller_name: customer?.primary_contact || 'Client Representative',
-        inquiry_summary: searchQuery || `Internal inquiry transfer for ${customer?.name || 'General Case'}`,
+        caller_name: customer?.primary_contact || 'Klantvertegenwoordiger',
+        inquiry_summary: searchQuery || `Warme overdracht voor ${customer?.name || 'Klantendossier'}`,
         expert_name: expert.name,
       });
       setIsCalling(false);
@@ -152,75 +149,81 @@ export default function SmartRouterModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className={`bg-white rounded-xl w-full border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 ${activeTab === 'graph' ? 'max-w-3xl' : 'max-w-xl'}`}>
-        {/* Header */}
-        <div className="bg-[#005FB8] text-white px-5 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-2.5">
-            <div className="p-1.5 bg-white/15 rounded-lg text-white">
-              <PhoneCall className="w-4 h-4" />
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="router-modal-title"
+      className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4"
+    >
+      <div className={`bg-white rounded-xl w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh] ${activeTab === 'graph' ? 'max-w-4xl' : 'max-w-2xl'}`}>
+        {/* Kopbalk */}
+        <div className="bg-[#005FB8] text-white px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-white/15 rounded-lg text-white">
+              <PhoneCall className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-white flex items-center space-x-1.5">
-                <span>Expert Router & Case Assistant</span>
-              </h3>
-              <p className="text-[11px] text-blue-100">
-                {customer ? `${customer.name} (${customer.joint_committee?.split(' - ')[0] || 'Customer Case'})` : 'SD Worx Internal Colleagues'}
+              <h2 id="router-modal-title" className="text-base font-bold text-white">
+                Intelligente Expert Routering
+              </h2>
+              <p className="text-xs text-blue-100">
+                {customer ? `${customer.name} (${customer.joint_committee?.split(' - ')[0] || 'Dossier'})` : 'SD Worx Interne Specialisten'}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-blue-100 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
+            className="text-blue-100 hover:text-white p-2 rounded-lg hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-white"
+            aria-label="Sluit router"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* View Switcher Tabs */}
-        <div className="bg-slate-50 px-5 py-2 border-b border-slate-200 flex items-center justify-between">
-          <div className="flex items-center space-x-1">
+        {/* Tabbladen */}
+        <div className="bg-slate-50 px-6 py-2.5 border-b border-slate-200 flex items-center justify-between">
+          <div className="flex items-center space-x-2">
             <button
               onClick={() => setActiveTab('match')}
-              className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors flex items-center space-x-1.5 ${
+              className={`min-h-[38px] px-4 py-1.5 text-xs font-semibold rounded-lg transition-colors flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-[#005FB8] ${
                 activeTab === 'match'
-                  ? 'bg-white text-[#005FB8] shadow-2xs border border-slate-200'
+                  ? 'bg-white text-[#005FB8] border border-slate-300 shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <PhoneCall className="w-3.5 h-3.5" />
-              <span>Ranked Experts</span>
+              <PhoneCall className="w-4 h-4" />
+              <span>Aanbevolen Experts</span>
             </button>
             <button
               onClick={() => setActiveTab('graph')}
-              className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors flex items-center space-x-1.5 ${
+              className={`min-h-[38px] px-4 py-1.5 text-xs font-semibold rounded-lg transition-colors flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-[#005FB8] ${
                 activeTab === 'graph'
-                  ? 'bg-white text-[#005FB8] shadow-2xs border border-slate-200'
+                  ? 'bg-white text-[#005FB8] border border-slate-300 shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Network className="w-3.5 h-3.5" />
-              <span>Expertise Matrix</span>
+              <Network className="w-4 h-4" />
+              <span>Expertisematrix</span>
             </button>
           </div>
-          <span className="text-[11px] text-slate-500">
-            {availableEmployees.length} Colleagues Available
+          <span className="text-xs text-slate-500 font-medium">
+            {availableEmployees.length} collega's beschikbaar
           </span>
         </div>
 
-        {/* Modal Content */}
-        <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+        {/* Inhoud */}
+        <div className="p-6 space-y-5 overflow-y-auto flex-1">
           {callSuccess ? (
-            <div className="py-6 text-center space-y-3">
-              <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto border border-emerald-200">
-                <Check className="w-6 h-6" />
+            <div className="py-8 text-center space-y-4">
+              <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto border border-emerald-200">
+                <Check className="w-7 h-7" />
               </div>
-              <h4 className="text-sm font-bold text-slate-900">
-                Connected with {callSuccess.name}
-              </h4>
-              <p className="text-xs text-slate-600 max-w-sm mx-auto leading-relaxed">
-                Call transferred to <strong className="text-[#005FB8] font-mono">ext. {callSuccess.extension || '4102'}</strong>.
-                {customer && <span> The case file for <strong>{customer.name}</strong> and your inquiry context have been automatically loaded for your colleague.</span>}
+              <h3 className="text-base font-bold text-slate-900">
+                Verbonden met {callSuccess.name}
+              </h3>
+              <p className="text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
+                De oproep is doorgeschakeld naar <strong className="text-[#005FB8] font-mono">toestel {callSuccess.extension || '4102'}</strong>.
+                {customer && <span> Het dossier voor <strong>{customer.name}</strong> en de samenvatting van de vraag zijn automatisch klaargezet voor uw collega.</span>}
               </p>
               <div className="pt-2">
                 <button
@@ -228,9 +231,9 @@ export default function SmartRouterModal({
                     setCallSuccess(null);
                     onClose();
                   }}
-                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg transition-colors"
+                  className="min-h-[44px] px-6 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
                 >
-                  End Call / Close Window
+                  Oproep afronden &amp; Venster sluiten
                 </button>
               </div>
             </div>
@@ -242,111 +245,96 @@ export default function SmartRouterModal({
             />
           ) : (
             <>
-              {/* Question & Keyword Search Input */}
+              {/* Zoekinvoer zonder placeholder */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-800">
-                  Search colleague by expertise or question:
+                <label htmlFor="expert-query" className="block text-sm font-medium text-slate-700">
+                  Zoek collega op expertisegebied, paritair comité of specifieke vraag
                 </label>
                 <div className="relative">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
+                    id="expert-query"
                     type="text"
-                    placeholder="Type a topic or question (e.g. Expat, Construction PC 124, Flexi-jobs, IFIC, Overtime...)"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#005FB8] focus:bg-white transition-all shadow-2xs font-medium"
+                    className="w-full min-h-[44px] px-3.5 py-2 text-base bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8] focus:border-transparent transition-colors"
                     autoFocus
                   />
                   {searchQuery && (
                     <button
+                      type="button"
                       onClick={() => setSearchQuery('')}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                      aria-label="Zoekopdracht wissen"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <X className="w-4 h-4" />
                     </button>
                   )}
                 </div>
               </div>
 
-              {/* Ranked Matches List */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-[11px] text-slate-500 font-semibold px-0.5">
-                  <span>Colleague & Specialization</span>
+              {/* Aanbevolen Experts Lijst */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-xs text-slate-500 font-semibold px-0.5">
+                  <span>Collega &amp; Specialisatie</span>
                   <span>Match Score</span>
                 </div>
 
-                <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
-                  {rankedMatches.map((expert, idx) => {
-                    const isTop = idx === 0;
+                <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
+                  {rankedMatches.map((expert) => {
+                    const isAvailable = expert.availability === 'Available';
                     return (
                       <div
                         key={expert.id}
-                        className={`p-3 rounded-xl border transition-all flex items-center justify-between ${
-                          isTop
-                            ? 'bg-blue-50/50 border-[#005FB8] shadow-2xs'
-                            : 'bg-white border-slate-200 hover:border-slate-300'
-                        }`}
+                        className="p-4 rounded-xl border border-slate-200 bg-white hover:border-[#005FB8] hover:shadow-xs transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                       >
-                        <div className="flex items-start space-x-3 min-w-0 flex-1">
+                        <div className="flex items-start space-x-3 min-w-0">
                           <img
-                            src={expert.avatar_url || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150'}
-                            alt={expert.name}
-                            className="w-9 h-9 rounded-full object-cover shrink-0 border border-slate-200 mt-0.5"
+                            src={expert.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
+                            alt=""
+                            className="w-11 h-11 rounded-full object-cover border border-slate-200 shrink-0 mt-0.5"
                           />
-
-                          <div className="min-w-0 flex-1 space-y-0.5">
-                            <div className="flex items-center space-x-1.5 flex-wrap">
-                              <span className="text-xs font-bold text-slate-900 truncate">
+                          <div className="min-w-0">
+                            <div className="flex items-center space-x-2 flex-wrap">
+                              <h3 className="text-sm font-bold text-slate-900 truncate">
                                 {expert.name}
-                              </span>
-                              {isTop && (
-                                <span className="inline-flex items-center space-x-0.5 px-1.5 py-0.2 rounded text-[10px] font-bold bg-[#005FB8] text-white">
-                                  <Sparkles className="w-2.5 h-2.5" />
-                                  <span>Best Match</span>
-                                </span>
-                              )}
-                              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-700">
-                                {expert.overallMatch}% Match
+                              </h3>
+                              <span
+                                className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                                  isAvailable
+                                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                    : 'bg-slate-100 text-slate-700'
+                                }`}
+                              >
+                                {isAvailable ? 'Beschikbaar' : expert.availability}
                               </span>
                             </div>
-
-                            <p className="text-[11px] text-slate-600">
-                              {expert.title} • <span className="font-mono text-slate-800 font-bold">ext. {expert.extension || '4100'}</span>
-                            </p>
-
-                            <p className="text-[11px] text-slate-500 leading-tight pt-0.5">
-                              {expert.recent_activity ? (
-                                <span>Recent: {expert.recent_activity}</span>
-                              ) : (
-                                <span>{expert.explanation}</span>
-                              )}
+                            <div className="text-xs text-slate-500 font-medium">
+                              {expert.title} • {expert.department}
+                            </div>
+                            <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                              {expert.explanation}
                             </p>
                           </div>
                         </div>
 
-                        {/* Call Action */}
-                        <div className="flex flex-col items-end space-y-1.5 shrink-0 ml-2">
-                          <span
-                            className={`text-[10px] font-bold ${
-                              expert.availability === 'Available'
-                                ? 'text-emerald-700'
-                                : 'text-slate-400'
-                            }`}
-                          >
-                            {expert.availability === 'Available' ? '● Available' : '● In Call'}
-                          </span>
+                        <div className="flex items-center space-x-3 shrink-0 self-end sm:self-center">
+                          <div className="text-right">
+                            <div className="text-sm font-bold text-[#005FB8]">
+                              {expert.overallMatch}%
+                            </div>
+                            <div className="text-[11px] text-slate-500">
+                              toestel {expert.extension}
+                            </div>
+                          </div>
 
                           <button
+                            type="button"
                             onClick={() => handleCall(expert)}
                             disabled={isCalling}
-                            className={`px-3 py-1.5 text-xs font-bold rounded-lg flex items-center space-x-1.5 transition-all shadow-2xs ${
-                              isTop
-                                ? 'bg-[#005FB8] hover:bg-[#004b93] text-white'
-                                : 'bg-slate-900 hover:bg-slate-800 text-white'
-                            }`}
+                            className="min-h-[40px] px-4 py-2 bg-[#005FB8] hover:bg-[#004b93] active:bg-[#003c75] text-white text-xs font-semibold rounded-lg transition-colors flex items-center space-x-1.5 focus:outline-none focus:ring-2 focus:ring-[#005FB8] disabled:opacity-60"
                           >
-                            <Phone className="w-3.5 h-3.5" />
-                            <span>Call</span>
+                            <PhoneCall className="w-3.5 h-3.5" />
+                            <span>Doorschakelen</span>
                           </button>
                         </div>
                       </div>

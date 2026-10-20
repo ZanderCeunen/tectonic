@@ -137,6 +137,15 @@ pub async fn login_user(
 
     let limit_key = format!("{}:{}", addr.ip(), clean_username.to_lowercase());
     if state.login_limiter.is_blocked(&limit_key) {
+        let entry = state.audit_chain.append(
+            clean_username,
+            "Anonymous",
+            "LOGIN_RATE_LIMITED",
+            "AUTH_SERVICE",
+            &format!("Aanmeldpoging tijdelijk geblokkeerd wegens overschrijding limiet vanaf {}", addr.ip()),
+        );
+        let db = state.db.lock().unwrap();
+        db.insert_audit_entry(&entry).ok();
         return Err(StatusCode::TOO_MANY_REQUESTS);
     }
 
@@ -146,6 +155,14 @@ pub async fn login_user(
         _ => {
             let _ = bcrypt::verify(clean_password, &state.dummy_password_hash);
             state.login_limiter.register_failure(&limit_key);
+            let entry = state.audit_chain.append(
+                clean_username,
+                "Anonymous",
+                "LOGIN_FAILED_UNKNOWN_USER",
+                "AUTH_SERVICE",
+                &format!("Mislukte aanmeldpoging voor onbekend account '{}' vanaf {}", clean_username, addr.ip()),
+            );
+            db.insert_audit_entry(&entry).ok();
             eprintln!(
                 "Login failed for unknown account ({})",
                 sanitize_log(&clean_username.chars().take(2).collect::<String>())
@@ -157,6 +174,14 @@ pub async fn login_user(
     let valid = bcrypt::verify(clean_password, &user.password_hash).unwrap_or(false);
     if !valid {
         state.login_limiter.register_failure(&limit_key);
+        let entry = state.audit_chain.append(
+            &user.username,
+            user.role.as_str(),
+            "LOGIN_FAILED_INVALID_PASSWORD",
+            &user.id,
+            &format!("Mislukte aanmeldpoging met onjuist wachtwoord voor '{}' vanaf {}", user.username, addr.ip()),
+        );
+        db.insert_audit_entry(&entry).ok();
         eprintln!(
             "Login failed for account prefix {}",
             sanitize_log(&clean_username.chars().take(2).collect::<String>())
@@ -185,9 +210,9 @@ pub async fn login_user(
     let entry = state.audit_chain.append(
         &user.username,
         user.role.as_str(),
-        "USER_LOGIN_SUCCESS",
+        "LOGIN_SUCCESS",
         &user.id,
-        "User logged in",
+        &format!("Succesvolle aanmelding van {} ({}) vanaf {}", user.name, user.role.as_str(), addr.ip()),
     );
     db.insert_audit_entry(&entry).ok();
 
@@ -198,6 +223,23 @@ pub async fn login_user(
         token,
         user: safe_user,
     }))
+}
+
+pub async fn logout_user(
+    auth: AuthUser,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    State(state): State<AppState>,
+) -> Result<StatusCode, StatusCode> {
+    let entry = state.audit_chain.append(
+        &auth.username,
+        auth.role_label(),
+        "USER_LOGOUT",
+        &auth.id,
+        &format!("Gebruiker '{}' ({}) heeft zich afgemeld vanaf {}", auth.username, auth.role_label(), addr.ip()),
+    );
+    let db = state.db.lock().unwrap();
+    db.insert_audit_entry(&entry).ok();
+    Ok(StatusCode::OK)
 }
 
 pub async fn get_current_user_profile(

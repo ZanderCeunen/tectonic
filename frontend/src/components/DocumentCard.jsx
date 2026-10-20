@@ -1,15 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import {
   FileText,
-  Calendar,
-  User,
   ChevronDown,
   ChevronUp,
   Check,
   Flag,
-  Lock,
   Download,
-  ShieldCheck,
 } from 'lucide-react';
 
 export default function DocumentCard({ doc, activeUser, onFeedback }) {
@@ -62,7 +58,7 @@ export default function DocumentCard({ doc, activeUser, onFeedback }) {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!res.ok) {
-        alert('File download not permitted or file not found.');
+        alert('Bestandsdownload niet toegestaan of bestand niet gevonden.');
         return;
       }
       const blob = await res.blob();
@@ -84,49 +80,45 @@ export default function DocumentCard({ doc, activeUser, onFeedback }) {
   const getSourceBadge = (type) => {
     switch (type) {
       case 'SignedContract':
-        return 'bg-slate-100 text-slate-800 border-slate-300 font-bold';
+        return 'bg-slate-100 text-slate-900 border-slate-300 font-semibold';
       case 'OfficialTemplate':
-        return 'bg-blue-50 text-[#005FB8] border-blue-200 font-bold';
+        return 'bg-blue-50 text-[#005FB8] border-blue-200 font-semibold';
       case 'CrmNote':
-        return 'bg-slate-50 text-slate-700 border-slate-200 font-medium';
+        return 'bg-slate-50 text-slate-700 border-slate-300 font-medium';
       default:
-        return 'bg-slate-50 text-slate-600 border-slate-200 font-medium';
+        return 'bg-slate-50 text-slate-700 border-slate-300 font-medium';
     }
   };
 
   return (
-    <div
+    <article
       className={`bg-white rounded-xl border transition-all ${
         doc.trust?.conflict_flag
-          ? 'border-amber-300 bg-amber-50/15'
-          : 'border-slate-200 hover:border-slate-300 hover:shadow-xs'
+          ? 'border-amber-300 bg-amber-50/20'
+          : 'border-slate-200 hover:border-slate-300'
       }`}
     >
-      <div className="p-4 sm:p-5">
-        {/* Top bar: Source label, Date, Author, Trust Score */}
-        <div className="flex items-center justify-between gap-3 text-xs mb-2">
+      <div className="p-5 sm:p-6 space-y-3.5">
+        {/* Bovenbalk: Brontype, Datum, Auteur & Betrouwbaarheidsscore */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
           <div className="flex items-center space-x-2 flex-wrap gap-y-1">
-            <span
-              className={`px-2 py-0.5 rounded text-[11px] border ${getSourceBadge(
-                doc.source_type
-              )}`}
-            >
+            <span className={`px-2.5 py-1 rounded-md text-xs border ${getSourceBadge(doc.source_type)}`}>
               {doc.source_label}
             </span>
             <span className="text-slate-300">•</span>
-            <span className="text-slate-500 text-[11px] font-medium">{doc.date}</span>
+            <span className="text-slate-600 font-medium">{doc.date}</span>
             <span className="text-slate-300">•</span>
-            <span className="text-slate-500 text-[11px]">Author: {doc.author}</span>
+            <span className="text-slate-600">Auteur: {doc.author}</span>
           </div>
 
-          <div className="flex items-center space-x-1.5 shrink-0">
-            <span className="text-[11px] text-slate-500 font-medium">Trust Score:</span>
+          <div className="flex items-center space-x-2 self-start sm:self-center">
+            <span className="text-xs text-slate-500 font-medium">Betrouwbaarheid:</span>
             <span
-              className={`font-bold text-xs px-2 py-0.5 rounded border ${
+              className={`font-semibold text-xs px-2.5 py-0.5 rounded-md border ${
                 trustScore >= 85
                   ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
                   : trustScore >= 60
-                  ? 'bg-slate-100 text-slate-800 border-slate-200'
+                  ? 'bg-slate-100 text-slate-800 border-slate-300'
                   : 'bg-amber-50 text-amber-800 border-amber-300'
               }`}
             >
@@ -135,20 +127,24 @@ export default function DocumentCard({ doc, activeUser, onFeedback }) {
           </div>
         </div>
 
-        {/* Document Title */}
-        <h4 className="text-sm font-bold text-slate-900 mb-1.5 leading-snug">{doc.title}</h4>
+        {/* Document Titel */}
+        <h2 className="text-base font-bold text-slate-900 leading-snug">
+          {doc.title}
+        </h2>
 
-        {/* Summary */}
-        <p className="text-xs text-slate-600 leading-relaxed mb-3">{doc.summary}</p>
+        {/* Samenvatting */}
+        <p className="text-sm text-slate-600 leading-relaxed">
+          {doc.summary}
+        </p>
 
-        {/* Key Extracted Facts */}
-        <div className="flex flex-wrap items-center gap-2 mb-3.5">
+        {/* Geëxtraheerde Kernfeiten */}
+        <div className="flex flex-wrap items-center gap-2 pt-1">
           {doc.key_facts?.map((fact, idx) => (
             <span
               key={idx}
-              className={`text-[11px] px-2 py-1 rounded border font-medium ${
+              className={`text-xs px-3 py-1.5 rounded-md border font-medium ${
                 fact.is_conflicting
-                  ? 'bg-amber-100/80 text-amber-950 border-amber-400 font-semibold'
+                  ? 'bg-amber-100 text-amber-950 border-amber-400 font-semibold'
                   : 'bg-slate-50 text-slate-800 border-slate-200'
               }`}
             >
@@ -160,106 +156,92 @@ export default function DocumentCard({ doc, activeUser, onFeedback }) {
           ))}
         </div>
 
-        {/* Collapsible Source Document Viewer (Safe by default) */}
+        {/* Uitklapbare Document Inhoud (Veilig & afgeschermd volgens GDPR) */}
         {expanded && (
-          <div className="my-3 pt-3 border-t border-slate-200 space-y-2.5 animate-in fade-in duration-100">
-            <div className="bg-slate-50 rounded-lg border border-slate-200 p-3.5 font-mono text-xs text-slate-800 relative">
-              <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-200 text-[11px] text-slate-500 font-sans">
-                <span className="flex items-center space-x-1.5 font-medium text-slate-700">
-                  <FileText className="w-3.5 h-3.5 text-[#005FB8]" />
-                  <span>Document Text</span>
-                </span>
-                <span
-                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                    isSeniorClearance
-                      ? 'bg-blue-100 text-blue-900 border border-blue-200'
-                      : 'bg-emerald-100 text-emerald-900 border border-emerald-200'
-                  }`}
-                >
-                  {isSeniorClearance ? 'Senior Legal Unmask Active' : 'GDPR Redacted Safe View'}
-                </span>
-              </div>
-              <p className="whitespace-pre-wrap leading-relaxed text-slate-800 bg-white p-3 rounded border border-slate-200">
-                {doc.raw_content}
-              </p>
+          <div className="pt-3 border-t border-slate-200 space-y-2">
+            <div className="flex items-center justify-between text-xs text-slate-600 pb-1">
+              <span className="flex items-center space-x-1.5 font-medium text-slate-800">
+                <FileText className="w-4 h-4 text-[#005FB8]" />
+                <span>Tekstinhoud van het brondocument</span>
+              </span>
+              <span
+                className={`px-2.5 py-0.5 rounded text-xs font-semibold ${
+                  isSeniorClearance
+                    ? 'bg-blue-100 text-blue-900 border border-blue-200'
+                    : 'bg-emerald-100 text-emerald-900 border border-emerald-200'
+                }`}
+              >
+                {isSeniorClearance ? 'Senior Legal: Geautoriseerde volledige weergave' : 'AVG / GDPR Veilig Gemaskeerd'}
+              </span>
             </div>
+            <pre className="whitespace-pre-wrap font-sans text-sm text-slate-800 bg-slate-50 p-4 rounded-lg border border-slate-200 leading-relaxed overflow-x-auto">
+              {doc.raw_content}
+            </pre>
           </div>
         )}
 
-        {/* Action Footer */}
-        <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2.5">
-          {/* Button: View Document Excerpt & Download File (if authorized) */}
+        {/* Actiebalk onderaan */}
+        <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+          {/* Documenttekst inzien & Download */}
           <div className="flex items-center space-x-2">
             <button
               onClick={() => setExpanded(!expanded)}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors flex items-center space-x-1.5 ${
-                expanded
-                  ? 'bg-slate-800 text-white border-slate-800'
-                  : 'bg-white hover:bg-slate-100 text-slate-800 border-slate-300'
-              }`}
+              className="min-h-[40px] px-3.5 py-1.5 text-xs font-semibold rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 transition-colors flex items-center space-x-1.5 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
             >
-              <FileText className="w-3.5 h-3.5 text-[#005FB8]" />
-              <span>{expanded ? 'Hide document text' : 'View document text'}</span>
-              {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              <FileText className="w-4 h-4 text-[#005FB8]" />
+              <span>{expanded ? 'Verberg documenttekst' : 'Bekijk documenttekst'}</span>
+              {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>
 
             {doc.file_name && (
               <button
                 onClick={handleDownloadFile}
                 disabled={isDownloading}
-                className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 flex items-center space-x-1.5 transition-colors"
-                title={`Download original file: ${doc.file_name}`}
+                className="min-h-[40px] px-3.5 py-1.5 text-xs font-semibold rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 flex items-center space-x-1.5 transition-colors focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+                title={`Origineel downloaden: ${doc.file_name}`}
               >
-                <Download className="w-3.5 h-3.5 text-slate-500" />
-                <span>{isDownloading ? 'Downloading...' : 'Download File'}</span>
+                <Download className="w-4 h-4 text-slate-500" />
+                <span>{isDownloading ? 'Bezig met downloaden...' : 'Download origineel bestand'}</span>
               </button>
             )}
           </div>
 
-          {/* Validation Buttons: Verify or Flag Outdated with User Feedback */}
+          {/* Feedback & Verificatie Knoppen */}
           <div className="flex items-center space-x-2">
             <button
               onClick={() => handleVote('VERIFIED')}
-              className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors flex items-center space-x-1 ${
+              className={`min-h-[40px] px-3.5 py-1.5 text-xs font-medium rounded-lg border transition-colors flex items-center space-x-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                 userVote === 'VERIFIED'
-                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
+                  ? 'bg-emerald-600 text-white border-emerald-600'
                   : 'border-emerald-300 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-900'
               }`}
-              title="Confirm that the provisions in this document are currently active and authoritative"
+              title="Bevestig dat deze bepalingen actueel en rechtsgeldig zijn"
             >
-              <Check className="w-3.5 h-3.5" />
-              <span>{userVote === 'VERIFIED' ? 'Verified by you' : 'Confirm as Active'}</span>
-              <span
-                className={`ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                  userVote === 'VERIFIED' ? 'bg-white/20 text-white' : 'bg-emerald-200/80 text-emerald-900'
-                }`}
-              >
+              <Check className="w-4 h-4" />
+              <span>{userVote === 'VERIFIED' ? 'Geverifieerd door u' : 'Bevestig als actueel'}</span>
+              <span className="ml-1 px-1.5 py-0.5 rounded-full text-xs font-bold bg-white/20">
                 {localFeedback.verified_count}
               </span>
             </button>
 
             <button
               onClick={() => handleVote('OUTDATED')}
-              className={`px-2.5 py-1 text-xs font-medium rounded-lg border transition-colors flex items-center space-x-1 ${
+              className={`min-h-[40px] px-3.5 py-1.5 text-xs font-medium rounded-lg border transition-colors flex items-center space-x-1.5 focus:outline-none focus:ring-2 focus:ring-rose-500 ${
                 userVote === 'OUTDATED'
-                  ? 'bg-rose-600 text-white border-rose-600 shadow-2xs'
-                  : 'border-slate-300 bg-slate-50 hover:bg-rose-50 hover:border-rose-300 hover:text-rose-900 text-slate-700'
+                  ? 'bg-rose-600 text-white border-rose-600'
+                  : 'border-slate-300 bg-white hover:bg-rose-50 hover:border-rose-300 text-slate-700 hover:text-rose-900'
               }`}
-              title="Flag that this document has been superseded by a more recent agreement"
+              title="Meld dat dit document is achterhaald door recentere afspraken"
             >
-              <Flag className="w-3 h-3" />
-              <span>{userVote === 'OUTDATED' ? 'Marked outdated by you' : 'Mark Outdated'}</span>
-              <span
-                className={`ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                  userVote === 'OUTDATED' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
-                }`}
-              >
+              <Flag className="w-3.5 h-3.5" />
+              <span>{userVote === 'OUTDATED' ? 'Gemarkeerd als verouderd' : 'Markeer als verouderd'}</span>
+              <span className="ml-1 px-1.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700">
                 {localFeedback.outdated_count}
               </span>
             </button>
           </div>
         </div>
       </div>
-    </div>
+    </article>
   );
 }

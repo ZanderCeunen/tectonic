@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Shield,
   Users,
@@ -6,16 +6,20 @@ import {
   UserCheck,
   Database,
   CheckCircle2,
-  AlertTriangle,
   RefreshCw,
   Plus,
   Trash2,
-  FileKey,
-  KeyRound,
-  ExternalLink,
   Activity,
-  Layers,
   Lock,
+  Copy,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  LogIn,
+  LogOut,
+  Download,
+  AlertCircle,
+  Sparkles,
 } from 'lucide-react';
 
 export default function AdminConsole({
@@ -51,9 +55,14 @@ export default function AdminConsole({
     customer_id: '',
   });
 
-  // Audit verify state
+  // Audit verify & filter state
   const [isVerifying, setIsVerifying] = useState(false);
   const [verifyStatus, setVerifyStatus] = useState(null);
+  const [auditCategory, setAuditCategory] = useState('ALL'); // 'ALL' | 'LOGINS' | 'DOCUMENTS' | 'CONFLICTS' | 'ROUTING' | 'ADMIN'
+  const [auditSearch, setAuditSearch] = useState('');
+  const [auditLimit, setAuditLimit] = useState(100);
+  const [copiedHash, setCopiedHash] = useState(null);
+  const [expandedHashIndex, setExpandedHashIndex] = useState(null);
 
   const fetchUsers = async () => {
     try {
@@ -65,7 +74,7 @@ export default function AdminConsole({
         setUsers(data);
       }
     } catch (e) {
-      console.error('Failed to load users:', e);
+      console.error('Laden van gebruikers mislukt:', e);
     }
   };
 
@@ -79,13 +88,13 @@ export default function AdminConsole({
         setAssignments(data);
       }
     } catch (e) {
-      console.error('Failed to load assignments:', e);
+      console.error('Laden van toewijzingen mislukt:', e);
     }
   };
 
-  const fetchAuditChain = async () => {
+  const fetchAuditChain = async (limit = auditLimit) => {
     try {
-      const res = await fetch('/api/security/audit-chain?limit=50', {
+      const res = await fetch(`/api/security/audit-chain?limit=${limit}`, {
         headers: { Authorization: `Bearer ${authToken}` },
       });
       if (res.ok) {
@@ -93,7 +102,7 @@ export default function AdminConsole({
         setAuditChain(data);
       }
     } catch (e) {
-      console.error('Failed to load audit chain:', e);
+      console.error('Laden van audit trail mislukt:', e);
     }
   };
 
@@ -104,7 +113,7 @@ export default function AdminConsole({
         const text = await res.text();
         setHealthStatus({ ok: true, message: text });
       } else {
-        setHealthStatus({ ok: false, message: `Status code ${res.status}` });
+        setHealthStatus({ ok: false, message: `Statuscode ${res.status}` });
       }
     } catch (e) {
       setHealthStatus({ ok: false, message: e.message });
@@ -113,10 +122,10 @@ export default function AdminConsole({
 
   useEffect(() => {
     setIsLoading(true);
-    Promise.all([fetchUsers(), fetchAssignments(), fetchAuditChain(), checkHealth()]).finally(() => {
+    Promise.all([fetchUsers(), fetchAssignments(), fetchAuditChain(auditLimit), checkHealth()]).finally(() => {
       setIsLoading(false);
     });
-  }, [authToken]);
+  }, [authToken, auditLimit]);
 
   const handleCreateUser = async (e) => {
     e.preventDefault();
@@ -136,7 +145,7 @@ export default function AdminConsole({
       });
 
       if (res.ok) {
-        setActionMessage({ type: 'success', text: `User ${newUser.username} successfully created.` });
+        setActionMessage({ type: 'success', text: `Gebruiker ${newUser.username} succesvol aangemaakt.` });
         setNewUser({
           username: '',
           name: '',
@@ -149,7 +158,7 @@ export default function AdminConsole({
         fetchUsers();
       } else {
         const err = await res.text();
-        setActionMessage({ type: 'error', text: `Failed to create user: ${err || res.status}` });
+        setActionMessage({ type: 'error', text: `Aanmaken mislukt: ${err || res.status}` });
       }
     } catch (e) {
       setActionMessage({ type: 'error', text: e.message });
@@ -171,12 +180,12 @@ export default function AdminConsole({
       });
 
       if (res.ok) {
-        setActionMessage({ type: 'success', text: 'Customer dossier assigned.' });
+        setActionMessage({ type: 'success', text: 'Klantendossier succesvol toegewezen.' });
         setNewAssignment({ user_id: '', customer_id: '' });
         fetchAssignments();
         if (onRefreshData) onRefreshData();
       } else {
-        setActionMessage({ type: 'error', text: 'Failed to assign customer.' });
+        setActionMessage({ type: 'error', text: 'Toewijzen van dossier mislukt.' });
       }
     } catch (e) {
       setActionMessage({ type: 'error', text: e.message });
@@ -190,9 +199,11 @@ export default function AdminConsole({
         headers: { Authorization: `Bearer ${authToken}` },
       });
       if (res.ok) {
-        setActionMessage({ type: 'success', text: 'Assignment removed.' });
+        setActionMessage({ type: 'success', text: 'Toewijzing ingetrokken.' });
         fetchAssignments();
         if (onRefreshData) onRefreshData();
+      } else {
+        setActionMessage({ type: 'error', text: 'Intrekken van toewijzing mislukt.' });
       }
     } catch (e) {
       setActionMessage({ type: 'error', text: e.message });
@@ -228,25 +239,25 @@ export default function AdminConsole({
   };
 
   return (
-    <div className="space-y-5 animate-in fade-in duration-150">
-      {/* Admin Header Banner */}
-      <div className="bg-slate-900 text-white rounded-2xl p-5 border border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-6">
+      {/* Beheerder Kopbalk */}
+      <section className="bg-slate-900 text-white rounded-xl p-5 sm:p-6 border border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center space-x-2 text-blue-400 text-xs font-bold uppercase tracking-wider mb-1">
+          <div className="flex items-center space-x-2 text-blue-400 text-xs font-semibold uppercase tracking-wider mb-1">
             <Shield className="w-4 h-4" />
-            <span>Administrative Control & Compliance Surface</span>
+            <span>Beheerderspaneel &amp; Veiligheidstoezicht</span>
           </div>
-          <h2 className="text-xl font-black tracking-tight text-white">
-            TECTONIC System Oversight & Security Governance
-          </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            Manage user roles, customer dossier assignments, routing experts, and verify the cryptographic SHA-256 audit ledger.
+          <h1 className="text-xl font-bold tracking-tight text-white">
+            TECTONIC Systeembeheer &amp; Autorisaties
+          </h1>
+          <p className="text-sm text-slate-400 mt-1 max-w-2xl leading-relaxed">
+            Beheer gebruikersrollen, dossierautorisaties per consulent en valideer het cryptografische SHA-256 auditlogboek.
           </p>
         </div>
 
-        <div className="flex items-center space-x-2 text-xs">
+        <div className="flex items-center space-x-3 text-xs self-start md:self-center">
           <span className="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 font-mono">
-            Clearance: <strong className="text-emerald-400">{activeUser?.clearance_level || 'Admin'}</strong>
+            Machtiging: <strong className="text-emerald-400">{activeUser?.clearance_level || 'Admin'}</strong>
           </span>
           <button
             onClick={() => {
@@ -255,161 +266,179 @@ export default function AdminConsole({
               fetchAuditChain();
               checkHealth();
             }}
-            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition-colors"
-            title="Refresh Admin Data"
+            className="min-h-[38px] p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition-colors focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+            title="Gegevens verversen"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
           </button>
         </div>
-      </div>
+      </section>
 
+      {/* Meldingen */}
       {actionMessage && (
         <div
-          className={`p-3 rounded-xl text-xs font-medium flex items-center justify-between ${
+          role="alert"
+          className={`p-4 rounded-xl text-sm font-medium flex items-center justify-between ${
             actionMessage.type === 'success'
-              ? 'bg-emerald-50 border border-emerald-300 text-emerald-800'
-              : 'bg-rose-50 border border-rose-300 text-rose-800'
+              ? 'bg-emerald-50 border border-emerald-300 text-emerald-900'
+              : 'bg-rose-50 border border-rose-300 text-rose-900'
           }`}
         >
           <span>{actionMessage.text}</span>
-          <button onClick={() => setActionMessage(null)} className="text-xs font-bold underline ml-2">
-            Dismiss
+          <button
+            onClick={() => setActionMessage(null)}
+            className="text-xs font-semibold underline ml-4 hover:opacity-80"
+          >
+            Sluiten
           </button>
         </div>
       )}
 
-      {/* Admin Navigation Tabs */}
-      <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-200 pb-2">
+      {/* Navigatietabbladen */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
         <button
           onClick={() => setActiveTab('assignments')}
-          className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center space-x-1.5 ${
+          className={`min-h-[40px] px-4 py-2 text-xs font-semibold rounded-lg transition-colors flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-[#005FB8] ${
             activeTab === 'assignments' ? 'bg-[#005FB8] text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
-          <Building2 className="w-3.5 h-3.5" />
-          <span>Dossier Assignments ({assignments.length})</span>
+          <Building2 className="w-4 h-4" />
+          <span>Dossiertoewijzingen ({assignments.length})</span>
         </button>
 
         <button
           onClick={() => setActiveTab('users')}
-          className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center space-x-1.5 ${
+          className={`min-h-[40px] px-4 py-2 text-xs font-semibold rounded-lg transition-colors flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-[#005FB8] ${
             activeTab === 'users' ? 'bg-[#005FB8] text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
-          <Users className="w-3.5 h-3.5" />
-          <span>User Accounts & RBAC ({users.length})</span>
+          <Users className="w-4 h-4" />
+          <span>Gebruikers &amp; Rollen ({users.length})</span>
         </button>
 
         <button
           onClick={() => setActiveTab('employees')}
-          className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center space-x-1.5 ${
+          className={`min-h-[40px] px-4 py-2 text-xs font-semibold rounded-lg transition-colors flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-[#005FB8] ${
             activeTab === 'employees' ? 'bg-[#005FB8] text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
-          <UserCheck className="w-3.5 h-3.5" />
-          <span>Routing Employees ({employees.length})</span>
+          <UserCheck className="w-4 h-4" />
+          <span>Routing Specialisten ({employees.length})</span>
         </button>
 
         <button
           onClick={() => setActiveTab('audit')}
-          className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center space-x-1.5 ${
+          className={`min-h-[40px] px-4 py-2 text-xs font-semibold rounded-lg transition-colors flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-[#005FB8] ${
             activeTab === 'audit' ? 'bg-[#005FB8] text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
-          <Database className="w-3.5 h-3.5" />
-          <span>Cryptographic Audit Ledger ({auditChain.total_entries || auditChain.entries?.length || 0})</span>
+          <Database className="w-4 h-4" />
+          <span>Cryptografisch Auditlogboek ({auditChain.total_entries || auditChain.entries?.length || 0})</span>
         </button>
 
         <button
           onClick={() => setActiveTab('status')}
-          className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-colors flex items-center space-x-1.5 ${
+          className={`min-h-[40px] px-4 py-2 text-xs font-semibold rounded-lg transition-colors flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-[#005FB8] ${
             activeTab === 'status' ? 'bg-[#005FB8] text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
-          <Activity className="w-3.5 h-3.5" />
-          <span>System Health & Status</span>
+          <Activity className="w-4 h-4" />
+          <span>Systeemstatus</span>
         </button>
       </div>
 
-      {/* TAB 1: CUSTOMER ASSIGNMENTS */}
+      {/* TAB 1: DOSSIER TOEWIJZINGEN */}
       {activeTab === 'assignments' && (
         <div className="space-y-4">
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-2xs">
-            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2">
-              Assign Customer Dossier Access
-            </h3>
-            <p className="text-xs text-slate-500 mb-3">
-              Consultants and Senior Officers may only view dossiers they are explicitly assigned to.
-            </p>
-            <form onSubmit={handleAddAssignment} className="flex flex-wrap items-end gap-3">
-              <div className="flex-1 min-w-[200px]">
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">User Account</label>
-                <select
-                  value={newAssignment.user_id}
-                  onChange={(e) => setNewAssignment({ ...newAssignment, user_id: e.target.value })}
-                  className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-1 focus:ring-blue-500"
-                  required
-                >
-                  <option value="">Select a user...</option>
-                  {users.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name} (@{u.username}) — {u.role}
-                    </option>
-                  ))}
-                </select>
+          <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs space-y-4">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">
+                Klantendossier Toewijzen aan Medewerker
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Consulenten en Senior Officers kunnen uitsluitend dossiers inzien waartoe zij expliciet bevoegd zijn verklaard.
+              </p>
+            </div>
+
+            <form onSubmit={handleAddAssignment} className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label htmlFor="assign-user" className="block text-xs font-semibold text-slate-700">
+                    Gebruikersaccount
+                  </label>
+                  <select
+                    id="assign-user"
+                    value={newAssignment.user_id}
+                    onChange={(e) => setNewAssignment({ ...newAssignment, user_id: e.target.value })}
+                    className="w-full min-h-[44px] px-3.5 py-2 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+                    required
+                  >
+                    <option value="">Selecteer medewerker...</option>
+                    {users.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} (@{u.username}) — {u.role}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label htmlFor="assign-customer" className="block text-xs font-semibold text-slate-700">
+                    Klantendossier
+                  </label>
+                  <select
+                    id="assign-customer"
+                    value={newAssignment.customer_id}
+                    onChange={(e) => setNewAssignment({ ...newAssignment, customer_id: e.target.value })}
+                    className="w-full min-h-[44px] px-3.5 py-2 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+                    required
+                  >
+                    <option value="">Selecteer klant...</option>
+                    {customers.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.id} - {c.joint_committee?.split(' - ')[0]})
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              <div className="flex-1 min-w-[200px]">
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">Customer Case</label>
-                <select
-                  value={newAssignment.customer_id}
-                  onChange={(e) => setNewAssignment({ ...newAssignment, customer_id: e.target.value })}
-                  className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-1 focus:ring-blue-500"
-                  required
+              <div className="flex justify-end pt-1">
+                <button
+                  type="submit"
+                  className="min-h-[44px] px-6 py-2 bg-[#005FB8] hover:bg-[#004b93] active:bg-[#003c75] text-white text-sm font-semibold rounded-lg transition-colors flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
                 >
-                  <option value="">Select customer dossier...</option>
-                  {customers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.id} - {c.joint_committee?.split(' - ')[0]})
-                    </option>
-                  ))}
-                </select>
+                  <Plus className="w-4 h-4" />
+                  <span>Toewijzing toevoegen</span>
+                </button>
               </div>
-
-              <button
-                type="submit"
-                className="px-4 py-2 bg-[#005FB8] hover:bg-[#004b93] text-white text-xs font-bold rounded-lg shadow-xs flex items-center space-x-1.5 transition-colors"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Assign Dossier</span>
-              </button>
             </form>
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
-            <div className="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-800">Current Assignments ({assignments.length})</span>
-              <span className="text-[11px] text-slate-500">Unassigned users receive a 404 on unassigned dossiers</span>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+              <span className="text-sm font-bold text-slate-800">Actieve toewijzingen ({assignments.length})</span>
+              <span className="text-xs text-slate-500">Niet-toegewezen dossiers geven een 404 (geen datalek)</span>
             </div>
             <div className="divide-y divide-slate-100">
               {assignments.length === 0 ? (
-                <div className="p-6 text-center text-xs text-slate-500">No active assignments recorded.</div>
+                <div className="p-8 text-center text-sm text-slate-500">Geen actieve toewijzingen geregistreerd.</div>
               ) : (
                 assignments.map((a) => (
-                  <div key={`${a.user_id}-${a.customer_id}`} className="p-3 flex items-center justify-between hover:bg-slate-50 text-xs">
+                  <div key={`${a.user_id}-${a.customer_id}`} className="p-4 flex items-center justify-between hover:bg-slate-50">
                     <div className="flex items-center space-x-3">
-                      <div className="p-1.5 rounded-lg bg-blue-50 text-[#005FB8]">
-                        <UserCheck className="w-4 h-4" />
+                      <div className="p-2 rounded-lg bg-blue-50 text-[#005FB8]">
+                        <UserCheck className="w-5 h-5" />
                       </div>
                       <div>
-                        <div className="font-bold text-slate-900">{getUserLabel(a.user_id)}</div>
-                        <div className="text-slate-500 text-[11px]">Authorized Case: {getCustomerLabel(a.customer_id)}</div>
+                        <div className="font-semibold text-slate-900 text-sm">{getUserLabel(a.user_id)}</div>
+                        <div className="text-slate-500 text-xs mt-0.5">Gemachtigd voor: {getCustomerLabel(a.customer_id)}</div>
                       </div>
                     </div>
                     <button
                       onClick={() => handleRemoveAssignment(a.user_id, a.customer_id)}
-                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                      title="Revoke Assignment"
+                      className="min-h-[38px] p-2 text-slate-400 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-rose-500"
+                      title="Toewijzing intrekken"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -421,123 +450,142 @@ export default function AdminConsole({
         </div>
       )}
 
-      {/* TAB 2: USER MANAGEMENT */}
+      {/* TAB 2: GEBRUIKERS & ROLLEN */}
       {activeTab === 'users' && (
         <div className="space-y-4">
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-2xs">
-            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-2">
-              Create New User Account
-            </h3>
-            <form onSubmit={handleCreateUser} className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">Username</label>
-                <input
-                  type="text"
-                  placeholder="e.g. j.smith"
-                  value={newUser.username}
-                  onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
-                  className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-1 focus:ring-blue-500"
-                  required
-                />
+          <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs space-y-4">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">
+                Nieuw Gebruikersaccount Aanmaken
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Stel de juiste functierol en veiligheidsmachtiging in conform de beleidsregels.
+              </p>
+            </div>
+
+            <form onSubmit={handleCreateUser} className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label htmlFor="new-user-username" className="block text-xs font-semibold text-slate-700">
+                    Gebruikersnaam *
+                  </label>
+                  <input
+                    id="new-user-username"
+                    type="text"
+                    required
+                    value={newUser.username}
+                    onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
+                    className="w-full min-h-[44px] px-3.5 py-2 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label htmlFor="new-user-name" className="block text-xs font-semibold text-slate-700">
+                    Volledige naam *
+                  </label>
+                  <input
+                    id="new-user-name"
+                    type="text"
+                    required
+                    value={newUser.name}
+                    onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                    className="w-full min-h-[44px] px-3.5 py-2 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label htmlFor="new-user-email" className="block text-xs font-semibold text-slate-700">
+                    E-mailadres *
+                  </label>
+                  <input
+                    id="new-user-email"
+                    type="email"
+                    required
+                    value={newUser.email}
+                    onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                    className="w-full min-h-[44px] px-3.5 py-2 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label htmlFor="new-user-password" className="block text-xs font-semibold text-slate-700">
+                    Wachtwoord (minimaal 8 tekens) *
+                  </label>
+                  <input
+                    id="new-user-password"
+                    type="password"
+                    required
+                    minLength={8}
+                    value={newUser.password}
+                    onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                    className="w-full min-h-[44px] px-3.5 py-2 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label htmlFor="new-user-role" className="block text-xs font-semibold text-slate-700">
+                    Functierol &amp; Toegangsrechten
+                  </label>
+                  <select
+                    id="new-user-role"
+                    value={newUser.role}
+                    onChange={(e) => {
+                      const r = e.target.value;
+                      const clearance = r === 'Admin' ? 'Admin' : r === 'SeniorPayrollOfficer' || r === 'LegalAdvisor' ? 'Senior' : 'Standard';
+                      setNewUser({ ...newUser, role: r, clearance_level: clearance });
+                    }}
+                    className="w-full min-h-[44px] px-3.5 py-2 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+                  >
+                    <option value="Consultant">Consultant (Gemaskeerde dossiers, standaard)</option>
+                    <option value="SeniorPayrollOfficer">SeniorPayrollOfficer (Volledige tekst, dossierbeheer)</option>
+                    <option value="LegalAdvisor">LegalAdvisor (Juridische beslissingsbevoegdheid)</option>
+                    <option value="Auditor">Auditor (Alleen-lezen inspectie &amp; auditlogboek)</option>
+                    <option value="Admin">Admin (Onderhoud &amp; gebruikersbeheer)</option>
+                  </select>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">Full Name</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Jan Smith"
-                  value={newUser.name}
-                  onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
-                  className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-1 focus:ring-blue-500"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">Email</label>
-                <input
-                  type="email"
-                  placeholder="j.smith@sdworx.com"
-                  value={newUser.email}
-                  onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                  className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-1 focus:ring-blue-500"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">Password (min 8 chars)</label>
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  value={newUser.password}
-                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                  className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-1 focus:ring-blue-500"
-                  required
-                  minLength={8}
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 mb-1">Role</label>
-                <select
-                  value={newUser.role}
-                  onChange={(e) => {
-                    const r = e.target.value;
-                    const clearance = r === 'Admin' ? 'Admin' : r === 'SeniorPayrollOfficer' || r === 'LegalAdvisor' ? 'Senior' : 'Standard';
-                    setNewUser({ ...newUser, role: r, clearance_level: clearance });
-                  }}
-                  className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-1 focus:ring-blue-500"
-                >
-                  <option value="Consultant">Consultant (Redacted dossiers)</option>
-                  <option value="SeniorPayrollOfficer">SeniorPayrollOfficer (Full dossier text)</option>
-                  <option value="LegalAdvisor">LegalAdvisor (Legal authority & full text)</option>
-                  <option value="Auditor">Auditor (Read-only audit & dossier review)</option>
-                  <option value="Admin">Admin (Maintenance & oversight only)</option>
-                </select>
-              </div>
-
-              <div className="flex items-end">
+              <div className="flex justify-end pt-2">
                 <button
                   type="submit"
-                  className="w-full py-2 bg-[#005FB8] hover:bg-[#004b93] text-white text-xs font-bold rounded-lg shadow-xs flex items-center justify-center space-x-1.5 transition-colors"
+                  className="min-h-[44px] px-6 py-2 bg-[#005FB8] hover:bg-[#004b93] active:bg-[#003c75] text-white text-sm font-semibold rounded-lg transition-colors flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
                 >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Create User</span>
+                  <Plus className="w-4 h-4" />
+                  <span>Gebruiker registreren</span>
                 </button>
               </div>
             </form>
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
-            <div className="p-3 bg-slate-50 border-b border-slate-200">
-              <span className="text-xs font-bold text-slate-800">User Accounts Directory ({users.length})</span>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+            <div className="p-4 bg-slate-50 border-b border-slate-200">
+              <span className="text-sm font-bold text-slate-800">Gebruikerslijst ({users.length})</span>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50/50 text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-200">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-600 border-b border-slate-200">
                   <tr>
-                    <th className="p-3">User</th>
-                    <th className="p-3">Role</th>
-                    <th className="p-3">Clearance</th>
-                    <th className="p-3">Email</th>
-                    <th className="p-3">Linked Employee</th>
+                    <th className="p-4 font-semibold">Gebruiker</th>
+                    <th className="p-4 font-semibold">Rol</th>
+                    <th className="p-4 font-semibold">Machtiging</th>
+                    <th className="p-4 font-semibold">E-mail</th>
+                    <th className="p-4 font-semibold">Expert-ID</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {users.map((u) => (
                     <tr key={u.id} className="hover:bg-slate-50">
-                      <td className="p-3 font-semibold text-slate-900">
+                      <td className="p-4 font-semibold text-slate-900">
                         {u.name} <span className="text-slate-400 font-mono font-normal">(@{u.username})</span>
                       </td>
-                      <td className="p-3">
-                        <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-800">
+                      <td className="p-4">
+                        <span className="px-2.5 py-1 rounded text-xs font-semibold bg-slate-100 text-slate-800">
                           {u.role}
                         </span>
                       </td>
-                      <td className="p-3">
+                      <td className="p-4">
                         <span
-                          className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                          className={`px-2.5 py-1 rounded text-xs font-semibold ${
                             u.clearance_level === 'Admin'
                               ? 'bg-rose-100 text-rose-800'
                               : u.clearance_level === 'Senior'
@@ -548,8 +596,8 @@ export default function AdminConsole({
                           {u.clearance_level}
                         </span>
                       </td>
-                      <td className="p-3 text-slate-500">{u.email}</td>
-                      <td className="p-3 font-mono text-slate-500">{u.employee_id || '—'}</td>
+                      <td className="p-4 text-slate-600">{u.email}</td>
+                      <td className="p-4 font-mono text-slate-500 text-xs">{u.employee_id || '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -559,61 +607,61 @@ export default function AdminConsole({
         </div>
       )}
 
-      {/* TAB 3: ROUTING EMPLOYEES */}
+      {/* TAB 3: ROUTING SPECIALISTEN */}
       {activeTab === 'employees' && (
         <div className="space-y-4">
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-2xs flex items-center justify-between">
+          <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs flex items-center justify-between">
             <div>
-              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                Expert Routing Directory
-              </h3>
-              <p className="text-xs text-slate-500">
-                Colleagues with specialized domain knowledge used by the Smart Router.
+              <h2 className="text-sm font-bold text-slate-900">
+                SD Worx Interne Specialisten
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Collega's met gespecialiseerde domeinkennis voor de Smart Router.
               </p>
             </div>
             {onOpenEmployeeModal && (
               <button
                 onClick={() => onOpenEmployeeModal(null)}
-                className="px-3 py-1.5 bg-[#005FB8] hover:bg-[#004b93] text-white text-xs font-bold rounded-lg shadow-xs flex items-center space-x-1.5 transition-colors"
+                className="min-h-[44px] px-5 py-2 bg-[#005FB8] hover:bg-[#004b93] active:bg-[#003c75] text-white text-sm font-semibold rounded-lg transition-colors flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
               >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Employee</span>
+                <Plus className="w-4 h-4" />
+                <span>Specialist toevoegen</span>
               </button>
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {employees.map((emp) => (
-              <div key={emp.id} className="bg-white rounded-xl p-3.5 border border-slate-200 shadow-2xs space-y-2">
+              <div key={emp.id} className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs space-y-3">
                 <div className="flex items-center space-x-3">
                   <img
                     src={emp.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}
                     alt={emp.name}
-                    className="w-10 h-10 rounded-full object-cover border border-slate-200"
+                    className="w-12 h-12 rounded-full object-cover border border-slate-200 shrink-0"
                   />
                   <div className="min-w-0 flex-1">
-                    <div className="text-xs font-bold text-slate-900 truncate">{emp.name}</div>
-                    <div className="text-[11px] text-slate-500 truncate">{emp.title}</div>
-                    <div className="text-[10px] text-blue-600 font-mono">ext. {emp.extension || '4100'}</div>
+                    <div className="text-sm font-bold text-slate-900 truncate">{emp.name}</div>
+                    <div className="text-xs text-slate-500 truncate">{emp.title}</div>
+                    <div className="text-xs text-[#005FB8] font-mono">toestel {emp.extension || '4100'}</div>
                   </div>
                   {onOpenEmployeeModal && (
                     <button
                       onClick={() => onOpenEmployeeModal(emp)}
-                      className="p-1 text-slate-400 hover:text-slate-800 rounded transition-colors text-xs font-medium underline"
+                      className="p-1.5 text-slate-500 hover:text-slate-900 rounded transition-colors text-xs font-semibold underline"
                     >
-                      Edit
+                      Bewerken
                     </button>
                   )}
                 </div>
 
-                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-600">
-                  <span>Resolved Cases: <strong className="text-slate-800">{emp.completed_cases}</strong></span>
+                <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs text-slate-600">
+                  <span>Dossiers voltooid: <strong className="text-slate-900">{emp.completed_cases}</strong></span>
                   <span
                     className={`font-semibold ${
                       emp.availability === 'Available' ? 'text-emerald-700' : 'text-slate-500'
                     }`}
                   >
-                    ● {emp.availability}
+                    ● {emp.availability === 'Available' ? 'Beschikbaar' : emp.availability}
                   </span>
                 </div>
               </div>
@@ -622,125 +670,386 @@ export default function AdminConsole({
         </div>
       )}
 
-      {/* TAB 4: AUDIT TRAIL */}
-      {activeTab === 'audit' && (
-        <div className="space-y-4">
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center space-x-2">
-                <Database className="w-4 h-4 text-emerald-600" />
-                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                  Cryptographic SHA-256 Audit Ledger
-                </h3>
+      {/* TAB 4: CRYPTOGRAFISCH AUDITLOGBOEK */}
+      {activeTab === 'audit' && (() => {
+        const getActionBadge = (action) => {
+          if (action === 'LOGIN_SUCCESS') {
+            return (
+              <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-emerald-100 text-emerald-900 border border-emerald-300">
+                <LogIn className="w-3.5 h-3.5 text-emerald-700" />
+                <span>Aanmelding geslaagd</span>
+              </span>
+            );
+          }
+          if (action.includes('LOGIN_FAILED')) {
+            return (
+              <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-rose-100 text-rose-900 border border-rose-300">
+                <AlertCircle className="w-3.5 h-3.5 text-rose-700" />
+                <span>Aanmeldpoging mislukt</span>
+              </span>
+            );
+          }
+          if (action === 'LOGIN_RATE_LIMITED') {
+            return (
+              <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-amber-100 text-amber-900 border border-amber-300">
+                <AlertCircle className="w-3.5 h-3.5 text-amber-700" />
+                <span>Aanmeldlimiet overschreden</span>
+              </span>
+            );
+          }
+          if (action === 'USER_LOGOUT') {
+            return (
+              <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-300">
+                <LogOut className="w-3.5 h-3.5 text-slate-600" />
+                <span>Afgemeld</span>
+              </span>
+            );
+          }
+          if (action === 'DOWNLOAD_DOCUMENT_FILE') {
+            return (
+              <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-blue-100 text-blue-900 border border-blue-300">
+                <Download className="w-3.5 h-3.5 text-[#005FB8]" />
+                <span>Bestand gedownload</span>
+              </span>
+            );
+          }
+          if (action.includes('CONFLICT')) {
+            return (
+              <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-purple-100 text-purple-900 border border-purple-300">
+                <Sparkles className="w-3.5 h-3.5 text-purple-700" />
+                <span>Conflict opgelost</span>
+              </span>
+            );
+          }
+          if (action.includes('DOCUMENT')) {
+            return (
+              <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-cyan-100 text-cyan-900 border border-cyan-300">
+                <Database className="w-3.5 h-3.5 text-cyan-700" />
+                <span>Documentactie</span>
+              </span>
+            );
+          }
+          if (action.includes('HANDOFF') || action.includes('ROUTING')) {
+            return (
+              <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Expert Routing</span>
+              </span>
+            );
+          }
+          return (
+            <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-200">
+              <Shield className="w-3.5 h-3.5 text-slate-600" />
+              <span>{action}</span>
+            </span>
+          );
+        };
+
+        const filteredEntries = (auditChain.entries || []).filter((entry) => {
+          const q = auditSearch.trim().toLowerCase();
+          const matchesQuery =
+            !q ||
+            entry.actor.toLowerCase().includes(q) ||
+            entry.actor_role.toLowerCase().includes(q) ||
+            entry.action.toLowerCase().includes(q) ||
+            entry.details.toLowerCase().includes(q) ||
+            entry.resource.toLowerCase().includes(q) ||
+            entry.hash.toLowerCase().includes(q);
+
+          if (!matchesQuery) return false;
+
+          if (auditCategory === 'LOGINS') {
+            return entry.action.includes('LOGIN') || entry.action.includes('LOGOUT');
+          }
+          if (auditCategory === 'DOCUMENTS') {
+            return (
+              entry.action.includes('DOCUMENT') ||
+              entry.action.includes('CUSTOMER') ||
+              entry.action.includes('DOWNLOAD') ||
+              entry.action.includes('ASSIGN')
+            );
+          }
+          if (auditCategory === 'CONFLICTS') {
+            return entry.action.includes('CONFLICT');
+          }
+          if (auditCategory === 'ROUTING') {
+            return entry.action.includes('ROUTING') || entry.action.includes('HANDOFF');
+          }
+          if (auditCategory === 'ADMIN') {
+            return (
+              entry.action.includes('USER') ||
+              entry.action.includes('EMPLOYEE') ||
+              entry.action.includes('GENESIS')
+            );
+          }
+          return true;
+        });
+
+        const handleCopy = (text) => {
+          navigator.clipboard.writeText(text);
+          setCopiedHash(text);
+          setTimeout(() => setCopiedHash(null), 2000);
+        };
+
+        return (
+          <div className="space-y-5">
+            {/* Kopsectie met integriteitsstatus & verificatie */}
+            <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center space-x-2">
+                  <Database className="w-5 h-5 text-emerald-600" />
+                  <h2 className="text-base font-bold text-slate-900">
+                    Cryptografisch SHA-256 Auditlogboek
+                  </h2>
+                  <span className="px-2 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-900 border border-emerald-300">
+                    Onweerlegbaar
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">
+                  Elke aanmelding, mislukte inlogpoging, documentdownload en juridische resolutie wordt chronologisch en cryptografisch vastgelegd in een SHA-256 hash-chain.
+                </p>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Tamper-evident log of all sensitive user actions, access decisions, and handoffs.
-              </p>
+
+              <div className="flex items-center space-x-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleVerifyIntegrity}
+                  disabled={isVerifying}
+                  className="min-h-[44px] px-5 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-sm font-semibold rounded-lg transition-colors flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-60"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isVerifying ? 'animate-spin' : ''}`} />
+                  <span>Valideer ketenintegriteit</span>
+                </button>
+              </div>
             </div>
 
-            <button
-              onClick={handleVerifyIntegrity}
-              disabled={isVerifying}
-              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-xs flex items-center space-x-1.5 transition-colors self-start sm:self-auto"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isVerifying ? 'animate-spin' : ''}`} />
-              <span>Verify Chain Integrity</span>
-            </button>
-          </div>
-
-          {verifyStatus && (
-            <div
-              className={`p-3 rounded-xl text-xs font-semibold flex items-center space-x-2 ${
-                verifyStatus.is_valid
-                  ? 'bg-emerald-50 border border-emerald-300 text-emerald-900'
-                  : 'bg-rose-50 border border-rose-300 text-rose-900'
-              }`}
-            >
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
-              <span>{verifyStatus.status}</span>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            {auditChain.entries?.map((entry, idx) => (
+            {/* Verificatiemelding */}
+            {verifyStatus && (
               <div
-                key={entry.index || idx}
-                className="bg-white rounded-xl p-3 border border-slate-200 shadow-2xs font-mono text-[11px] space-y-1.5"
+                role="status"
+                className={`p-4 rounded-xl text-sm font-semibold flex items-center space-x-2.5 ${
+                  verifyStatus.is_valid
+                    ? 'bg-emerald-50 border border-emerald-300 text-emerald-900'
+                    : 'bg-rose-50 border border-rose-300 text-rose-900'
+                }`}
               >
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-1.5 font-sans">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-800 text-[10px]">
-                      #{entry.index}
-                    </span>
-                    <span className="font-bold text-[#005FB8] text-xs">{entry.action}</span>
-                  </div>
-                  <div className="text-[10px] text-slate-400">
-                    {new Date(entry.timestamp).toLocaleString()} ({entry.actor} - {entry.actor_role})
-                  </div>
+                <CheckCircle2 className="w-5 h-5 shrink-0" />
+                <span>{verifyStatus.status} (Alle eerdere blokhashes kloppen wiskundig).</span>
+              </div>
+            )}
+
+            {/* Filter- en zoekbalk zonder placeholders */}
+            <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs space-y-4">
+              <div>
+                <label htmlFor="audit-filter-search" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Doorzoek het auditlogboek (gebruikersnaam, rol, IP-adres, actie of toelichting)
+                </label>
+                <input
+                  id="audit-filter-search"
+                  type="text"
+                  value={auditSearch}
+                  onChange={(e) => setAuditSearch(e.target.value)}
+                  className="w-full min-h-[44px] px-3.5 py-2 text-base bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8] focus:border-transparent transition-colors"
+                />
+              </div>
+
+              {/* Categoriefilters & Aantal selectie */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1 border-t border-slate-100">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {[
+                    { id: 'ALL', label: 'Alle gebeurtenissen' },
+                    { id: 'LOGINS', label: 'Aanmeldingen & Logins' },
+                    { id: 'DOCUMENTS', label: 'Dossiers & Documenten' },
+                    { id: 'CONFLICTS', label: 'Conflictoplossingen' },
+                    { id: 'ROUTING', label: 'Expert Routing' },
+                    { id: 'ADMIN', label: 'Beheerder' },
+                  ].map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setAuditCategory(cat.id)}
+                      className={`min-h-[38px] px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[#005FB8] ${
+                        auditCategory === cat.id
+                          ? 'bg-slate-900 text-white'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
                 </div>
 
-                <div className="text-slate-700 font-sans text-xs">{entry.details}</div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-1 text-[10px] text-slate-400 pt-0.5 truncate">
-                  <div className="truncate">Prev: {entry.prev_hash}</div>
-                  <div className="truncate text-slate-600 font-bold">Hash: {entry.hash}</div>
+                <div className="flex items-center space-x-2 shrink-0">
+                  <label htmlFor="audit-limit-select" className="text-xs text-slate-600 font-medium">
+                    Weergave:
+                  </label>
+                  <select
+                    id="audit-limit-select"
+                    value={auditLimit}
+                    onChange={(e) => {
+                      const l = Number(e.target.value);
+                      setAuditLimit(l);
+                      fetchAuditChain(l);
+                    }}
+                    className="min-h-[38px] px-2.5 py-1 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+                  >
+                    <option value={25}>Laatste 25</option>
+                    <option value={50}>Laatste 50</option>
+                    <option value={100}>Laatste 100</option>
+                    <option value={200}>Laatste 200</option>
+                  </select>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+            </div>
 
-      {/* TAB 5: SYSTEM HEALTH */}
+            {/* Audit Logs Lijst */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between text-xs text-slate-500 px-1 font-semibold">
+                <span>Geregistreerde Audit Transacties ({filteredEntries.length} van {auditChain.total_entries || auditChain.entries?.length || 0})</span>
+                <span>SHA-256 Verankerd</span>
+              </div>
+
+              {filteredEntries.length === 0 ? (
+                <div className="text-center py-12 bg-white rounded-xl border border-slate-200 text-sm text-slate-500">
+                  Geen audit entries gevonden die voldoen aan de zoekcriteria.
+                </div>
+              ) : (
+                filteredEntries.map((entry, idx) => {
+                  const isHashOpen = expandedHashIndex === entry.index;
+                  const isCopied = copiedHash === entry.hash;
+
+                  return (
+                    <article
+                      key={entry.index ?? idx}
+                      className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs space-y-3 hover:border-slate-300 transition-colors"
+                    >
+                      {/* Bovenste rij: Block index, Actiebadge, Tijdstempel & Actor */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                        <div className="flex items-center space-x-2.5 flex-wrap gap-y-1">
+                          <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+                            Blok #{entry.index}
+                          </span>
+                          {getActionBadge(entry.action)}
+                          <span className="text-slate-400">•</span>
+                          <span className="text-xs font-semibold text-slate-800">
+                            {entry.actor}
+                          </span>
+                          <span className="text-xs text-slate-500 font-medium">
+                            ({entry.actor_role})
+                          </span>
+                        </div>
+
+                        <div className="text-xs text-slate-500 font-mono">
+                          {new Date(entry.timestamp).toLocaleString('nl-BE')}
+                        </div>
+                      </div>
+
+                      {/* Details tekst */}
+                      <div className="text-sm text-slate-800 leading-relaxed">
+                        {entry.details}
+                      </div>
+
+                      {/* Doelbron & Cryptografische Hash toggle */}
+                      <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <div className="text-slate-500 font-mono">
+                          Bron: <strong className="text-slate-700">{entry.resource}</strong>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setExpandedHashIndex(isHashOpen ? null : entry.index)}
+                          className="text-xs font-semibold text-[#005FB8] hover:underline flex items-center space-x-1 focus:outline-none focus:ring-2 focus:ring-[#005FB8] rounded px-1.5 py-0.5"
+                        >
+                          <span>{isHashOpen ? 'Verberg SHA-256 hashes' : 'Toon SHA-256 hashes'}</span>
+                          {isHashOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+
+                      {/* Uitgeklapte Cryptografische Details */}
+                      {isHashOpen && (
+                        <div className="mt-3 p-3.5 bg-slate-50 rounded-lg border border-slate-200 font-mono text-xs space-y-2">
+                          <div className="flex items-center justify-between text-slate-500">
+                            <span>Vorige Blok Hash (Parent):</span>
+                          </div>
+                          <div className="text-slate-600 break-all bg-white p-2 rounded border border-slate-200 select-all">
+                            {entry.prev_hash}
+                          </div>
+
+                          <div className="flex items-center justify-between text-slate-500 pt-1">
+                            <span>Huidige Blok SHA-256 Hash:</span>
+                            <button
+                              type="button"
+                              onClick={() => handleCopy(entry.hash)}
+                              className="text-xs text-[#005FB8] hover:underline flex items-center space-x-1"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                              <span>{isCopied ? 'Gekopieerd!' : 'Kopieer Hash'}</span>
+                            </button>
+                          </div>
+                          <div className="text-slate-900 font-bold break-all bg-white p-2 rounded border border-slate-200 select-all">
+                            {entry.hash}
+                          </div>
+                        </div>
+                      )}
+                    </article>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* TAB 5: SYSTEEMSTATUS */}
       {activeTab === 'status' && (
         <div className="space-y-4">
-          <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-2xs space-y-4">
-            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              TECTONIC Core Health Status
-            </h3>
+          <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-xs space-y-5">
+            <h2 className="text-sm font-bold text-slate-900">
+              TECTONIC Systeemstatus &amp; Beveiligingsparameters
+            </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
-                <div className="font-bold text-slate-700">Backend API Endpoint</div>
-                <div className="flex items-center space-x-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  <span className="font-mono text-slate-900">http://127.0.0.1:8080/api/health</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                <div className="font-bold text-slate-800">Backend API Endpoint</div>
+                <div className="flex items-center space-x-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                  <span className="font-mono text-slate-900 text-xs">http://127.0.0.1:8080/api/health</span>
                 </div>
-                <p className="text-[11px] text-slate-500 pt-1">
-                  {healthStatus?.ok ? healthStatus.message : 'Checking backend status...'}
+                <p className="text-xs text-slate-500 pt-1">
+                  {healthStatus?.ok ? healthStatus.message : 'Verbinding controleren...'}
                 </p>
               </div>
 
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
-                <div className="font-bold text-slate-700">Authentication & RBAC</div>
-                <div className="flex items-center space-x-1.5">
-                  <Lock className="w-3.5 h-3.5 text-blue-600" />
-                  <span className="text-slate-900 font-semibold">HS256 JWT with Expiry Validation</span>
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                <div className="font-bold text-slate-800">Authenticatie &amp; Toegangsbeheer</div>
+                <div className="flex items-center space-x-2">
+                  <Lock className="w-4 h-4 text-[#005FB8]" />
+                  <span className="text-slate-900 font-semibold text-xs">HS256 JWT met Verloopvalidatie</span>
                 </div>
-                <p className="text-[11px] text-slate-500 pt-1">
-                  bcrypt cost 12 • In-memory rate limiting (5 attempts / 15m) • Zero dev fallbacks.
+                <p className="text-xs text-slate-500 pt-1">
+                  Bcrypt factor 12 • Rate-limiting (5 pogingen per 15 min) • Geen ontwikkel-fallbacks.
                 </p>
               </div>
 
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
-                <div className="font-bold text-slate-700">Database Schema & Microsoft Graph Hook</div>
-                <div className="flex items-center space-x-1.5">
-                  <Database className="w-3.5 h-3.5 text-indigo-600" />
-                  <span className="text-slate-900 font-semibold">SQLite tectonic.db (Migrated)</span>
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                <div className="font-bold text-slate-800">Databaseschema &amp; Microsoft Graph Voorbereiding</div>
+                <div className="flex items-center space-x-2">
+                  <Database className="w-4 h-4 text-indigo-600" />
+                  <span className="text-slate-900 font-semibold text-xs">SQLite tectonic.db</span>
                 </div>
-                <p className="text-[11px] text-slate-500 pt-1">
-                  Nullable columns <code className="font-mono text-indigo-600">external_provider</code> and <code className="font-mono text-indigo-600">external_id</code> reserved for future OneDrive & SharePoint integration.
+                <p className="text-xs text-slate-500 pt-1">
+                  Optionele kolommen <code className="font-mono text-indigo-600">external_provider</code> en <code className="font-mono text-indigo-600">external_id</code> gereserveerd voor toekomstige OneDrive/SharePoint integratie.
                 </p>
               </div>
 
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1">
-                <div className="font-bold text-slate-700">Audit Ledger Status</div>
-                <div className="flex items-center space-x-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                  <span className="text-slate-900 font-semibold">Cryptographic Genesis Chain Active</span>
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                <div className="font-bold text-slate-800">Audit Keten Status</div>
+                <div className="flex items-center space-x-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span className="text-slate-900 font-semibold text-xs">Cryptografische Genesis Keten Actief</span>
                 </div>
-                <p className="text-[11px] text-slate-500 pt-1">
-                  Total ledger entries: {auditChain.total_entries || auditChain.entries?.length || 0}
+                <p className="text-xs text-slate-500 pt-1">
+                  Totaal aantal registraties: {auditChain.total_entries || auditChain.entries?.length || 0}
                 </p>
               </div>
             </div>

@@ -1,17 +1,18 @@
 import React, { useState, useMemo } from 'react';
 import {
-  Search,
   X,
   Phone,
   Mail,
   User,
   RotateCcw,
+  Building2,
+  ChevronRight,
 } from 'lucide-react';
 
 export default function CustomerSearchModal({
   isOpen,
   onClose,
-  customers,
+  customers = [],
   selectedCustomerId,
   onSelectCustomer,
 }) {
@@ -71,193 +72,180 @@ export default function CustomerSearchModal({
   const hasActiveFilters = query || pcInput || managerInput || locationInput;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl max-w-3xl w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in fade-in zoom-in-95 duration-150">
-        {/* Header & Filter inputs */}
-        <div className="p-4 border-b border-slate-200 bg-slate-50/60">
-          <div className="flex items-center justify-between mb-2.5">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="customer-search-modal-title"
+      className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4"
+    >
+      <div className="bg-white rounded-xl max-w-3xl w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+        {/* Kopbalk */}
+        <div className="p-6 border-b border-slate-200 bg-slate-50/70 space-y-4">
+          <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-bold text-slate-900">Customer Case Search & Lookup</h3>
-              <p className="text-[11px] text-slate-500">
-                Search by company name, VAT/KBO, Joint Committee (PC), account manager, or city
+              <h2 id="customer-search-modal-title" className="text-base font-bold text-slate-900">
+                Klantendossier Selecteren &amp; Zoeken
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Zoek op bedrijfsnaam, KBO-ondernemingsnummer, contactpersoon of paritair comité
               </p>
             </div>
             <button
               onClick={onClose}
-              className="text-slate-400 hover:text-slate-700 p-1 rounded-md"
+              className="text-slate-400 hover:text-slate-700 p-2 rounded-lg hover:bg-slate-200/50 transition-colors focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+              aria-label="Sluit zoekvenster"
             >
-              <X className="w-4 h-4" />
+              <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Primary Search bar */}
-          <div className="relative mb-2.5">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              autoFocus
-              placeholder="Search company name, enterprise number (BE 0459...), phone (+32...), contact..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="w-full pl-9 pr-8 py-2 text-xs bg-white border border-slate-300 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#005FB8]"
-            />
-            {query && (
-              <button
-                onClick={() => setQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Specific filter fields */}
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 pt-1">
-            <div>
-              <label className="block text-[10px] font-semibold uppercase text-slate-500 mb-0.5">
-                Joint Committee (PC)
-              </label>
+          {/* Zoekinvoer zonder placeholder */}
+          <div className="space-y-1.5">
+            <label htmlFor="search-modal-query" className="block text-xs font-semibold text-slate-700">
+              Zoekterm (Bedrijf, KBO, Contact of Telefoon)
+            </label>
+            <div className="relative">
               <input
+                id="search-modal-query"
                 type="text"
-                placeholder="e.g. 200, 124, 207..."
-                value={pcInput}
-                onChange={(e) => setPcInput(e.target.value)}
-                className="w-full px-2 py-1 text-xs bg-white border border-slate-300 rounded-md text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#005FB8]"
+                autoFocus
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="w-full min-h-[44px] px-3.5 py-2 text-base bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8] focus:border-transparent transition-colors"
               />
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-semibold uppercase text-slate-500 mb-0.5">
-                Account Manager
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Sarah, Tom, Emma..."
-                value={managerInput}
-                onChange={(e) => setManagerInput(e.target.value)}
-                className="w-full px-2 py-1 text-xs bg-white border border-slate-300 rounded-md text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#005FB8]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-semibold uppercase text-slate-500 mb-0.5">
-                Location / City
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Antwerp, Ghent..."
-                value={locationInput}
-                onChange={(e) => setLocationInput(e.target.value)}
-                className="w-full px-2 py-1 text-xs bg-white border border-slate-300 rounded-md text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-[#005FB8]"
-              />
-            </div>
-
-            <div className="flex items-end">
-              {hasActiveFilters ? (
+              {query && (
                 <button
                   type="button"
-                  onClick={handleResetFilters}
-                  className="w-full py-1 text-xs text-slate-600 hover:text-slate-900 border border-slate-200 hover:bg-slate-100 rounded-md flex items-center justify-center space-x-1"
+                  onClick={() => setQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
                 >
-                  <RotateCcw className="w-3 h-3" />
-                  <span>Reset Filters</span>
+                  <X className="w-4 h-4" />
                 </button>
-              ) : (
-                <div className="text-[10px] text-slate-400 py-1.5 px-1">
-                  Type to filter results
-                </div>
               )}
             </div>
           </div>
-        </div>
 
-        {/* Customer Results List */}
-        <div className="flex-1 overflow-y-auto divide-y divide-slate-100 p-2">
-          {filteredCustomers.length === 0 ? (
-            <div className="text-center py-10 text-slate-500 text-xs">
-              No customer cases found matching these filters.
+          {/* Extra filtervelden met duidelijke labels boven velden */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+            <div className="space-y-1">
+              <label htmlFor="filter-pc" className="block text-xs font-medium text-slate-700">
+                Paritair Comité (PC)
+              </label>
+              <input
+                id="filter-pc"
+                type="text"
+                value={pcInput}
+                onChange={(e) => setPcInput(e.target.value)}
+                className="w-full min-h-[38px] px-3 py-1.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+              />
             </div>
-          ) : (
-            filteredCustomers.map((cust) => {
-              const isSelected = cust.id === selectedCustomerId;
-              return (
-                <div
-                  key={cust.id}
-                  onClick={() => handleSelect(cust)}
-                  className={`p-3 rounded-lg cursor-pointer transition-colors flex items-start justify-between gap-3 ${
-                    isSelected
-                      ? 'bg-blue-50/70 border border-blue-200'
-                      : 'hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs font-bold text-slate-900 truncate">
-                        {cust.name}
-                      </span>
-                      <span className="text-[11px] font-mono text-slate-400">
-                        {cust.enterprise_number}
-                      </span>
-                    </div>
 
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-600 mt-1">
-                      <span className="flex items-center space-x-1 font-medium text-slate-800">
-                        <User className="w-3 h-3 text-slate-400" />
-                        <span>{cust.primary_contact}</span>
-                      </span>
+            <div className="space-y-1">
+              <label htmlFor="filter-manager" className="block text-xs font-medium text-slate-700">
+                Dossierbeheerder
+              </label>
+              <input
+                id="filter-manager"
+                type="text"
+                value={managerInput}
+                onChange={(e) => setManagerInput(e.target.value)}
+                className="w-full min-h-[38px] px-3 py-1.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+              />
+            </div>
 
-                      {cust.contact_phone && (
-                        <span className="flex items-center space-x-1 text-slate-700">
-                          <Phone className="w-3 h-3 text-slate-400" />
-                          <span className="font-mono font-medium">{cust.contact_phone}</span>
-                        </span>
-                      )}
+            <div className="space-y-1">
+              <label htmlFor="filter-location" className="block text-xs font-medium text-slate-700">
+                Locatie / Stad
+              </label>
+              <input
+                id="filter-location"
+                type="text"
+                value={locationInput}
+                onChange={(e) => setLocationInput(e.target.value)}
+                className="w-full min-h-[38px] px-3 py-1.5 text-sm bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+              />
+            </div>
+          </div>
 
-                      <span className="flex items-center space-x-1 text-slate-500">
-                        <Mail className="w-3 h-3 text-slate-400" />
-                        <span>{cust.contact_email}</span>
-                      </span>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-x-2 text-[11px] text-slate-400 mt-1">
-                      <span className="text-slate-700 font-medium">{cust.joint_committee}</span>
-                      <span>•</span>
-                      <span>{cust.employee_count} employees</span>
-                      <span>•</span>
-                      <span>{cust.location}</span>
-                      {cust.sdworx_account_manager && (
-                        <>
-                          <span>•</span>
-                          <span className="text-[#005FB8] font-medium">
-                            Manager: {cust.sdworx_account_manager}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="shrink-0 self-center">
-                    <button
-                      type="button"
-                      className={`text-xs px-2.5 py-1 rounded-lg font-medium transition-colors ${
-                        isSelected
-                          ? 'bg-slate-900 text-white'
-                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                      }`}
-                    >
-                      {isSelected ? 'Active Case' : 'Open Case'}
-                    </button>
-                  </div>
-                </div>
-              );
-            })
+          {hasActiveFilters && (
+            <div className="flex justify-end pt-1">
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="text-xs font-semibold text-slate-600 hover:text-slate-900 flex items-center space-x-1 py-1 px-2 rounded hover:bg-slate-200/50"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Filters herstellen</span>
+              </button>
+            </div>
           )}
         </div>
 
-        {/* Footer summary */}
-        <div className="px-4 py-2 bg-slate-50 border-t border-slate-200 text-[11px] text-slate-500 flex items-center justify-between">
-          <span>Showing {filteredCustomers.length} of {customers.length} cases</span>
-          <span>Click on any case to open it immediately</span>
+        {/* Resultatenlijst */}
+        <div className="p-6 overflow-y-auto flex-1 space-y-3">
+          <div className="text-xs font-semibold text-slate-500">
+            {filteredCustomers.length} {filteredCustomers.length === 1 ? 'dossier gevonden' : 'dossiers gevonden'}
+          </div>
+
+          {filteredCustomers.map((c) => {
+            const isCurrent = c.id === selectedCustomerId;
+            return (
+              <div
+                key={c.id}
+                onClick={() => handleSelect(c)}
+                tabIndex={0}
+                role="button"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleSelect(c);
+                  }
+                }}
+                className={`p-4 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-4 focus:outline-none focus:ring-2 focus:ring-[#005FB8] ${
+                  isCurrent
+                    ? 'border-[#005FB8] bg-blue-50/40'
+                    : 'border-slate-200 hover:border-[#005FB8] hover:bg-slate-50'
+                }`}
+              >
+                <div className="space-y-1 min-w-0">
+                  <div className="flex items-center space-x-2">
+                    <h3 className="text-sm font-bold text-slate-900 truncate">
+                      {c.name}
+                    </h3>
+                    <span className="font-mono text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                      {c.enterprise_number}
+                    </span>
+                    {isCurrent && (
+                      <span className="text-xs font-semibold text-[#005FB8] bg-blue-100 px-2 py-0.5 rounded">
+                        Huidig geselecteerd
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
+                    <span className="font-medium text-slate-800">{c.primary_contact}</span>
+                    <span>•</span>
+                    <span>{c.joint_committee?.split(' - ')[0] || 'PC 200'}</span>
+                    <span>•</span>
+                    <span>{c.location}</span>
+                    <span>•</span>
+                    <span className="text-[#005FB8]">Beheerder: {c.sdworx_account_manager}</span>
+                  </div>
+                </div>
+
+                <div className="shrink-0 flex items-center text-xs font-semibold text-[#005FB8]">
+                  <span>Open dossier</span>
+                  <ChevronRight className="w-4 h-4 ml-1" />
+                </div>
+              </div>
+            );
+          })}
+
+          {filteredCustomers.length === 0 && (
+            <div className="text-center py-12 text-sm text-slate-500">
+              Geen klantendossiers gevonden die voldoen aan de zoekparameters.
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -204,7 +204,7 @@ impl Database {
 
     pub fn get_user_by_username(&self, username: &str) -> Result<Option<UserAccount>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, username, name, email, password_hash, role, clearance_level, employee_id FROM users WHERE LOWER(username) = LOWER(?1)",
+            "SELECT id, username, name, email, password_hash, role, clearance_level, employee_id FROM users WHERE LOWER(username) = LOWER(?1) OR LOWER(email) = LOWER(?1)",
         )?;
         let mut rows = stmt.query_map(params![username], |row: &Row| {
             let role_str: String = row.get(5)?;

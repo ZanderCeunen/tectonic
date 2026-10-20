@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import ConflictBanner from './ConflictBanner';
 import DocumentCard from './DocumentCard';
-import { Search, Phone, Mail, User, PhoneCall, ArrowLeft, Building2 } from 'lucide-react';
+import { Phone, Mail, User, PhoneCall, ArrowLeft, Building2 } from 'lucide-react';
 
 export default function CustomerHub({
   customer,
-  documents,
-  conflicts,
+  documents = [],
+  conflicts = [],
   activeUser,
   onFeedback,
   onResolveConflict,
@@ -17,7 +17,16 @@ export default function CustomerHub({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState('ALL');
 
-  const allTags = ['ALL', 'Contract', 'Working Hours', 'PC 200', 'Telework', 'SD Worx Template', 'CRM', 'Ticket'];
+  const allTags = [
+    { id: 'ALL', label: 'Alle documenten' },
+    { id: 'Contract', label: 'Arbeidsovereenkomst' },
+    { id: 'Working Hours', label: 'Arbeidsduur' },
+    { id: 'PC 200', label: 'PC 200' },
+    { id: 'Telework', label: 'Telewerk' },
+    { id: 'SD Worx Template', label: 'SD Worx Model' },
+    { id: 'CRM', label: 'CRM Notitie' },
+    { id: 'Ticket', label: 'Servicedesk Ticket' },
+  ];
 
   const filteredDocs = documents.filter((doc) => {
     const matchesSearch =
@@ -30,44 +39,48 @@ export default function CustomerHub({
   });
 
   return (
-    <div className="space-y-4 animate-in fade-in duration-150">
-      {/* Customer File Header Bar */}
-      <div className="bg-white rounded-xl p-4 sm:p-5 border border-slate-200 shadow-2xs">
+    <div className="space-y-6">
+      {/* 1. Dossier Kopsectie */}
+      <section className="bg-white rounded-xl p-5 sm:p-6 border border-slate-200 shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            {/* Back to all cases overview */}
+          <div className="space-y-2">
+            {/* Terug naar alle dossiers */}
             <button
               onClick={onBackToHome}
-              className="text-[11px] font-semibold text-slate-500 hover:text-[#005FB8] inline-flex items-center space-x-1 mb-1 transition-colors"
+              className="text-xs font-semibold text-slate-500 hover:text-[#005FB8] inline-flex items-center space-x-1.5 transition-colors focus:outline-none focus:ring-2 focus:ring-[#005FB8] rounded px-1 py-0.5"
             >
-              <ArrowLeft className="w-3 h-3" />
-              <span>All Customer Cases</span>
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Terug naar mijn dossiers</span>
             </button>
 
-            <div className="flex items-center space-x-2.5">
-              <h1 className="text-base font-bold text-slate-900 tracking-tight">{customer?.name}</h1>
-              <span className="text-xs text-slate-500 font-mono">({customer?.enterprise_number})</span>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+                {customer?.name}
+              </h1>
+              <span className="text-xs text-slate-500 font-mono bg-slate-100 px-2 py-0.5 rounded">
+                {customer?.enterprise_number}
+              </span>
               <button
                 onClick={onOpenCustomerSearch}
-                className="text-[11px] text-[#005FB8] hover:underline font-medium ml-1"
+                className="text-xs text-[#005FB8] hover:underline font-semibold focus:outline-none focus:ring-2 focus:ring-[#005FB8] rounded px-1 py-0.5"
               >
-                (Switch Case)
+                (Wissel van dossier)
               </button>
             </div>
 
-            {/* Contact details & Assigned Manager */}
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
-              <span className="flex items-center space-x-1 font-semibold text-slate-800">
-                <User className="w-3.5 h-3.5 text-slate-400" />
-                <span>{customer?.primary_contact}</span>
+            {/* Klantgegevens & Toegewezen beheerder */}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-600 pt-1">
+              <span className="flex items-center space-x-1.5 font-medium text-slate-800">
+                <User className="w-4 h-4 text-slate-400" />
+                <span>{customer?.primary_contact || 'Contactpersoon onbekend'}</span>
               </span>
 
               {customer?.contact_phone && (
-                <span className="flex items-center space-x-1 text-slate-700">
+                <span className="flex items-center space-x-1.5">
                   <Phone className="w-3.5 h-3.5 text-slate-400" />
                   <a
                     href={`tel:${customer.contact_phone}`}
-                    className="font-mono hover:text-[#005FB8] hover:underline font-medium"
+                    className="font-mono text-slate-700 hover:text-[#005FB8] hover:underline font-medium"
                   >
                     {customer.contact_phone}
                   </a>
@@ -75,11 +88,11 @@ export default function CustomerHub({
               )}
 
               {customer?.contact_email && (
-                <span className="flex items-center space-x-1 text-slate-500">
+                <span className="flex items-center space-x-1.5">
                   <Mail className="w-3.5 h-3.5 text-slate-400" />
                   <a
                     href={`mailto:${customer.contact_email}`}
-                    className="hover:text-[#005FB8] hover:underline"
+                    className="text-slate-700 hover:text-[#005FB8] hover:underline"
                   >
                     {customer.contact_email}
                   </a>
@@ -89,67 +102,70 @@ export default function CustomerHub({
               <span className="text-slate-300">•</span>
               <span className="text-slate-700 font-medium">{customer?.joint_committee}</span>
               <span className="text-slate-300">•</span>
-              <span className="text-[#005FB8] font-semibold">
-                Manager: {customer?.sdworx_account_manager || 'Sarah Vermeulen'}
+              <span className="text-[#005FB8] font-medium">
+                Dossierbeheerder: {customer?.sdworx_account_manager || 'Sarah Vermeulen'}
               </span>
             </div>
           </div>
 
-          {/* Primary Action: Call Expert Colleague */}
-          <div className="shrink-0 flex items-center space-x-2">
+          {/* Primaire Actie: Raadpleeg een interne collega / expert */}
+          <div className="shrink-0">
             <button
               onClick={onOpenRouter}
-              className="inline-flex items-center space-x-2 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg shadow-2xs transition-colors"
+              className="min-h-[44px] px-5 py-2.5 bg-[#005FB8] hover:bg-[#004b93] active:bg-[#003c75] text-white text-sm font-medium rounded-lg transition-colors flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-[#005FB8] focus:ring-offset-2"
             >
-              <PhoneCall className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Call Expert for this Case</span>
+              <PhoneCall className="w-4 h-4" />
+              <span>Raadpleeg expert voor dit dossier</span>
             </button>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Contradiction / Conflict Banner with Resolver */}
+      {/* 2. Conflicten & Tegenstrijdigheden Banner */}
       <ConflictBanner
         conflicts={conflicts}
         customerId={customer?.id}
         onResolveConflict={onResolveConflict}
       />
 
-      {/* Search & Tag Filter Bar */}
-      <div className="bg-white rounded-xl p-2.5 border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2.5 shadow-2xs">
-        <div className="relative w-full sm:w-80">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+      {/* 3. Documenten Zoeken & Filteren (volledig zonder placeholders) */}
+      <section className="bg-white rounded-xl p-5 border border-slate-200 shadow-xs space-y-4">
+        <div>
+          <label htmlFor="doc-search" className="block text-sm font-medium text-slate-700 mb-1.5">
+            Zoek document op titel, samenvatting of brontype
+          </label>
           <input
+            id="doc-search"
             type="text"
-            placeholder="Search documents for this client..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#005FB8]"
+            className="w-full min-h-[44px] px-3.5 py-2 text-base bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8] focus:border-transparent transition-colors"
           />
         </div>
 
-        <div className="flex items-center space-x-1 overflow-x-auto w-full sm:w-auto text-xs">
+        {/* Filterknoppen per categorie */}
+        <div className="flex items-center space-x-1.5 overflow-x-auto pb-1">
           {allTags.map((tag) => (
             <button
-              key={tag}
-              onClick={() => setSelectedTag(tag)}
-              className={`px-2.5 py-1 rounded-lg transition-colors shrink-0 text-xs font-medium ${
-                selectedTag === tag
+              key={tag.id}
+              onClick={() => setSelectedTag(tag.id)}
+              className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shrink-0 focus:outline-none focus:ring-2 focus:ring-[#005FB8] ${
+                selectedTag === tag.id
                   ? 'bg-slate-900 text-white'
-                  : 'text-slate-600 hover:bg-slate-100'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
               }`}
             >
-              {tag === 'ALL' ? 'All Documents' : tag}
+              {tag.label}
             </button>
           ))}
         </div>
-      </div>
+      </section>
 
-      {/* Document Feed */}
-      <div className="space-y-2.5">
+      {/* 4. Documentenlijst gerangschikt op betrouwbaarheidsscore */}
+      <section className="space-y-4">
         <div className="flex items-center justify-between text-xs text-slate-500 px-1">
-          <span>Source Documents (Ranked by Trust Score)</span>
-          <span>{filteredDocs.length} files found</span>
+          <span className="font-semibold text-slate-700">Brondocumenten (Gerangschikt op Betrouwbaarheidsscore)</span>
+          <span>{filteredDocs.length} {filteredDocs.length === 1 ? 'document gevonden' : 'documenten gevonden'}</span>
         </div>
 
         {filteredDocs.map((doc) => (
@@ -162,11 +178,11 @@ export default function CustomerHub({
         ))}
 
         {filteredDocs.length === 0 && (
-          <div className="text-center py-8 bg-white rounded-xl border border-slate-200 text-slate-500 text-xs">
-            No documents found matching your search criteria.
+          <div className="text-center py-12 bg-white rounded-xl border border-slate-200 text-slate-600 text-sm">
+            Er zijn geen documenten gevonden die voldoen aan de zoekcriteria.
           </div>
         )}
-      </div>
+      </section>
     </div>
   );
 }

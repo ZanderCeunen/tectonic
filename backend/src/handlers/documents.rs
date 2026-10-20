@@ -258,6 +258,16 @@ pub async fn download_document_file(
     let bytes = std::fs::read(&canonical_file).map_err(|_| StatusCode::NOT_FOUND)?;
     let raw_file_name = sanitize_filename(doc.file_name.as_deref().unwrap_or("document.bin"));
     let safe_file_name = raw_file_name.replace(['"', '\r', '\n', '\0'], "");
+
+    let entry = state.audit_chain.append(
+        &auth.username,
+        auth.role_label(),
+        "DOWNLOAD_DOCUMENT_FILE",
+        &doc.id,
+        &format!("Documentbestand '{}' gedownload voor klant {}", safe_file_name, doc.customer_id),
+    );
+    db.insert_audit_entry(&entry).ok();
+
     let mut headers = HeaderMap::new();
     headers.insert(
         header::CONTENT_TYPE,

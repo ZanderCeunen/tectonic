@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, UserPlus, Save, Phone, Briefcase, Award } from 'lucide-react';
+import { X, UserPlus, Save } from 'lucide-react';
 
 export default function EmployeeManagerModal({ isOpen, onClose, employeeToEdit, onSaveEmployee, authToken }) {
   if (!isOpen) return null;
@@ -77,7 +77,7 @@ export default function EmployeeManagerModal({ isOpen, onClose, employeeToEdit, 
         'CAO 200 & Bediendenstatuut': formData.domain_cao200,
         'Werkregime & Arbeidstijd': formData.domain_time,
       },
-      recent_activity: employeeToEdit?.recent_activity || 'Nieuw profiel aangemaakt in het kennisportaal.',
+      recent_activity: employeeToEdit?.recent_activity || 'Nieuw expertprofiel aangemaakt in het kennisportaal.',
     };
 
     try {
@@ -101,7 +101,7 @@ export default function EmployeeManagerModal({ isOpen, onClose, employeeToEdit, 
         onSaveEmployee(payload);
         onClose();
       }
-    } catch (err) {
+    } catch {
       onSaveEmployee(payload);
       onClose();
     } finally {
@@ -110,157 +110,184 @@ export default function EmployeeManagerModal({ isOpen, onClose, employeeToEdit, 
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden">
-        {/* Header */}
-        <div className="bg-slate-900 text-white px-5 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <UserPlus className="w-5 h-5 text-[#005FB8]" />
-            <h3 className="text-sm font-bold tracking-tight">
-              {isEdit ? `Edit Expert: ${formData.name}` : 'Add New SD Worx Expert'}
-            </h3>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="emp-modal-title"
+      className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4"
+    >
+      <div className="bg-white rounded-xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        {/* Kopbalk */}
+        <div className="bg-[#005FB8] text-white px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center space-x-2.5">
+            <UserPlus className="w-5 h-5 text-white" />
+            <h2 id="emp-modal-title" className="text-base font-bold text-white">
+              {isEdit ? `Expert bewerken: ${formData.name}` : 'Nieuwe SD Worx expert toevoegen'}
+            </h2>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white p-1 rounded-md">
-            <X className="w-4 h-4" />
+          <button
+            onClick={onClose}
+            className="text-blue-100 hover:text-white p-2 rounded-lg hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-white"
+            aria-label="Sluit formulier"
+          >
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-3.5 text-xs">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Full Name *</label>
-              <input
-                type="text"
-                required
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full py-1.5 px-3 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:border-[#005FB8]"
-                placeholder="e.g. Sarah Vermeulen"
-              />
-            </div>
-
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Job Title *</label>
-              <input
-                type="text"
-                required
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                className="w-full py-1.5 px-3 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:border-[#005FB8]"
-                placeholder="e.g. Senior Payroll Officer"
-              />
-            </div>
+        {/* Formulier in 1 kolom volgens ontwerprichtlijn */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 text-sm overflow-y-auto flex-1">
+          <div className="space-y-1">
+            <label htmlFor="emp-name" className="block text-xs font-semibold text-slate-700">
+              Volledige naam van de expert *
+            </label>
+            <input
+              id="emp-name"
+              type="text"
+              required
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full min-h-[44px] px-3.5 py-2 text-base bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+            />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Department / Team</label>
-              <input
-                type="text"
-                value={formData.department}
-                onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                className="w-full py-1.5 px-3 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:border-[#005FB8]"
-              />
-            </div>
-
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Availability Status</label>
-              <select
-                value={formData.availability}
-                onChange={(e) => setFormData({ ...formData, availability: e.target.value })}
-                className="w-full py-1.5 px-3 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:border-[#005FB8]"
-              >
-                <option value="Available">🟢 Available</option>
-                <option value="InCall">🟡 In Call</option>
-                <option value="Busy">🟠 Busy</option>
-                <option value="Away">⚪ Away</option>
-              </select>
-            </div>
+          <div className="space-y-1">
+            <label htmlFor="emp-title" className="block text-xs font-semibold text-slate-700">
+              Functietitel binnen SD Worx *
+            </label>
+            <input
+              id="emp-title"
+              type="text"
+              required
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              className="w-full min-h-[44px] px-3.5 py-2 text-base bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+            />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Extension (Internal Phone)</label>
-              <input
-                type="text"
-                value={formData.extension}
-                onChange={(e) => setFormData({ ...formData, extension: e.target.value })}
-                className="w-full py-1.5 px-3 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:border-[#005FB8]"
-                placeholder="4102"
-              />
-            </div>
-
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Direct Phone Number</label>
-              <input
-                type="text"
-                value={formData.direct_phone}
-                onChange={(e) => setFormData({ ...formData, direct_phone: e.target.value })}
-                className="w-full py-1.5 px-3 bg-slate-50 border border-slate-200 rounded-md focus:outline-none focus:border-[#005FB8]"
-                placeholder="+32 3 220 41 02"
-              />
-            </div>
+          <div className="space-y-1">
+            <label htmlFor="emp-dept" className="block text-xs font-semibold text-slate-700">
+              Afdeling of praktijkgroep *
+            </label>
+            <input
+              id="emp-dept"
+              type="text"
+              required
+              value={formData.department}
+              onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+              className="w-full min-h-[44px] px-3.5 py-2 text-base bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+            />
           </div>
 
-          <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
-            <span className="font-semibold text-slate-800 text-[11px] block uppercase tracking-wider">
-              Domain Expertise Scores (0 - 100%):
+          <div className="space-y-1">
+            <label htmlFor="emp-ext" className="block text-xs font-semibold text-slate-700">
+              Intern toestelnummer *
+            </label>
+            <input
+              id="emp-ext"
+              type="text"
+              required
+              value={formData.extension}
+              onChange={(e) => setFormData({ ...formData, extension: e.target.value })}
+              className="w-full min-h-[44px] px-3.5 py-2 text-base font-mono bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label htmlFor="emp-phone" className="block text-xs font-semibold text-slate-700">
+              Direct extern telefoonnummer
+            </label>
+            <input
+              id="emp-phone"
+              type="text"
+              value={formData.direct_phone}
+              onChange={(e) => setFormData({ ...formData, direct_phone: e.target.value })}
+              className="w-full min-h-[44px] px-3.5 py-2 text-base font-mono bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label htmlFor="emp-availability" className="block text-xs font-semibold text-slate-700">
+              Beschikbaarheid voor telefonische routering
+            </label>
+            <select
+              id="emp-availability"
+              value={formData.availability}
+              onChange={(e) => setFormData({ ...formData, availability: e.target.value })}
+              className="w-full min-h-[44px] px-3.5 py-2 text-base bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+            >
+              <option value="Available">Beschikbaar</option>
+              <option value="InCall">In gesprek</option>
+              <option value="Busy">Bezet / Niet storen</option>
+              <option value="Away">Afwezig</option>
+            </select>
+          </div>
+
+          <div className="pt-2 border-t border-slate-200 space-y-3">
+            <span className="block text-xs font-bold uppercase tracking-wider text-slate-500">
+              Domeinexpertise Scores (0 - 100)
             </span>
-            <div className="grid grid-cols-3 gap-2">
-              <div>
-                <label className="block text-[10px] text-slate-600 mb-0.5">Expat & Int. ({formData.domain_expat}%)</label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={formData.domain_expat}
-                  onChange={(e) => setFormData({ ...formData, domain_expat: parseInt(e.target.value) })}
-                  className="w-full accent-[#005FB8]"
-                />
-              </div>
 
-              <div>
-                <label className="block text-[10px] text-slate-600 mb-0.5">JC 200 ({formData.domain_cao200}%)</label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={formData.domain_cao200}
-                  onChange={(e) => setFormData({ ...formData, domain_cao200: parseInt(e.target.value) })}
-                  className="w-full accent-[#005FB8]"
-                />
-              </div>
+            <div className="space-y-1">
+              <label htmlFor="emp-expat" className="block text-xs font-medium text-slate-700">
+                Internationale Detachering &amp; Expat: {formData.domain_expat}%
+              </label>
+              <input
+                id="emp-expat"
+                type="range"
+                min="0"
+                max="100"
+                value={formData.domain_expat}
+                onChange={(e) => setFormData({ ...formData, domain_expat: Number(e.target.value) })}
+                className="w-full accent-[#005FB8]"
+              />
+            </div>
 
-              <div>
-                <label className="block text-[10px] text-slate-600 mb-0.5">Working Time ({formData.domain_time}%)</label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={formData.domain_time}
-                  onChange={(e) => setFormData({ ...formData, domain_time: parseInt(e.target.value) })}
-                  className="w-full accent-[#005FB8]"
-                />
-              </div>
+            <div className="space-y-1">
+              <label htmlFor="emp-cao" className="block text-xs font-medium text-slate-700">
+                CAO 200 &amp; Bediendenstatuut: {formData.domain_cao200}%
+              </label>
+              <input
+                id="emp-cao"
+                type="range"
+                min="0"
+                max="100"
+                value={formData.domain_cao200}
+                onChange={(e) => setFormData({ ...formData, domain_cao200: Number(e.target.value) })}
+                className="w-full accent-[#005FB8]"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label htmlFor="emp-time" className="block text-xs font-medium text-slate-700">
+                Werkregime &amp; Arbeidstijd: {formData.domain_time}%
+              </label>
+              <input
+                id="emp-time"
+                type="range"
+                min="0"
+                max="100"
+                value={formData.domain_time}
+                onChange={(e) => setFormData({ ...formData, domain_time: Number(e.target.value) })}
+                className="w-full accent-[#005FB8]"
+              />
             </div>
           </div>
 
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-end space-x-2">
+          <div className="pt-4 border-t border-slate-200 flex items-center justify-end space-x-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 text-slate-600 hover:bg-slate-100 rounded-md font-medium"
+              className="min-h-[44px] px-5 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
             >
-              Cancel
+              Annuleren
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-4 py-1.5 bg-[#005FB8] hover:bg-[#004b93] text-white font-semibold rounded-md shadow-xs transition-colors inline-flex items-center space-x-1"
+              className="min-h-[44px] px-6 py-2 bg-[#005FB8] hover:bg-[#004b93] active:bg-[#003c75] text-white text-sm font-medium rounded-lg transition-colors flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-[#005FB8] focus:ring-offset-2 disabled:opacity-60"
             >
-              <Save className="w-3.5 h-3.5" />
-              <span>{isSubmitting ? 'Saving...' : isEdit ? 'Save Expert' : 'Add Expert'}</span>
+              <Save className="w-4 h-4" />
+              <span>{isSubmitting ? 'Bezig met opslaan...' : 'Expert opslaan'}</span>
             </button>
           </div>
         </form>

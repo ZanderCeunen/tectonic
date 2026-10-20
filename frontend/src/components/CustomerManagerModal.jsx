@@ -12,7 +12,7 @@ export default function CustomerManagerModal({ isOpen, onClose, customerToEdit, 
     enterprise_number: '',
     customer_code: '',
     industry: '',
-    joint_committee: 'PC 200 - White-Collar Employees',
+    joint_committee: 'PC 200 - Bedienden',
     joint_committee_code: '200',
     primary_contact: '',
     contact_email: '',
@@ -51,14 +51,14 @@ export default function CustomerManagerModal({ isOpen, onClose, customerToEdit, 
         name: '',
         enterprise_number: 'BE 0',
         customer_code: 'SDW-',
-        industry: 'Services & IT',
-        joint_committee: 'PC 200 - White-Collar Employees',
+        industry: 'Dienstverlening & IT',
+        joint_committee: 'PC 200 - Bedienden',
         joint_committee_code: '200',
         primary_contact: '',
         contact_email: '',
         contact_phone: '+32 ',
         employee_count: 25,
-        location: 'Antwerp',
+        location: 'Antwerpen',
         sdworx_account_manager: 'Sarah Vermeulen',
       });
     }
@@ -100,7 +100,7 @@ export default function CustomerManagerModal({ isOpen, onClose, customerToEdit, 
         onSaveCustomer(formData);
         onClose();
       }
-    } catch (err) {
+    } catch {
       onSaveCustomer(formData);
       onClose();
     } finally {
@@ -109,151 +109,156 @@ export default function CustomerManagerModal({ isOpen, onClose, customerToEdit, 
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden">
-        {/* Header */}
-        <div className="bg-slate-900 text-white px-5 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Building2 className="w-5 h-5 text-[#005FB8]" />
-            <h3 className="text-sm font-bold tracking-tight">
-              {isEdit ? `Edit Customer: ${formData.name}` : 'Register New Customer File'}
-            </h3>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="customer-modal-title"
+      className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4"
+    >
+      <div className="bg-white rounded-xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        {/* Kopbalk */}
+        <div className="bg-[#005FB8] text-white px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center space-x-2.5">
+            <Building2 className="w-5 h-5 text-white" />
+            <h2 id="customer-modal-title" className="text-base font-bold text-white">
+              {isEdit ? `Klant bewerken: ${formData.name}` : 'Nieuw klantendossier registreren'}
+            </h2>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white p-1 rounded-md">
-            <X className="w-4 h-4" />
+          <button
+            onClick={onClose}
+            className="text-blue-100 hover:text-white p-2 rounded-lg hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-white"
+            aria-label="Sluit formulier"
+          >
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-5 space-y-3.5 text-xs">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Company Name *</label>
-              <input
-                type="text"
-                required
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#005FB8]"
-                placeholder="e.g. Acme Logistics BV"
-              />
-            </div>
-
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Enterprise / VAT Number *</label>
-              <input
-                type="text"
-                required
-                value={formData.enterprise_number}
-                onChange={(e) => setFormData({ ...formData, enterprise_number: e.target.value })}
-                className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#005FB8]"
-                placeholder="BE 0459.832.901"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            {/* Joint Committee (PC) entered by number */}
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Joint Committee / PC (Number) *</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  required
-                  value={pcInput}
-                  onChange={(e) => handlePcChange(e.target.value)}
-                  className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#005FB8] font-mono font-medium"
-                  placeholder="e.g. 200 (or 124, 207, 302...)"
-                />
-              </div>
-              <p className="text-[10px] text-slate-400 mt-1">Formats automatically to: <strong className="text-slate-600">{formData.joint_committee}</strong></p>
-            </div>
-
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Number of Employees</label>
-              <input
-                type="number"
-                value={formData.employee_count}
-                onChange={(e) => setFormData({ ...formData, employee_count: parseInt(e.target.value) || 0 })}
-                className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#005FB8]"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Primary Contact Person</label>
-              <input
-                type="text"
-                required
-                value={formData.primary_contact}
-                onChange={(e) => setFormData({ ...formData, primary_contact: e.target.value })}
-                className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#005FB8]"
-                placeholder="e.g. Marc Vanhove (HR Director)"
-              />
-            </div>
-
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Contact Email</label>
-              <input
-                type="email"
-                required
-                value={formData.contact_email}
-                onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
-                className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#005FB8]"
-                placeholder="hr@company.be"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Phone Number</label>
-              <input
-                type="text"
-                value={formData.contact_phone}
-                onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
-                className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#005FB8]"
-              />
-            </div>
-
-            <div>
-              <label className="block font-semibold text-slate-700 mb-1">Location / Office</label>
-              <input
-                type="text"
-                value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#005FB8]"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block font-semibold text-slate-700 mb-1">Dedicated SD Worx Account Manager</label>
+        {/* Formulier in 1 kolom volgens ontwerprichtlijn */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 text-sm overflow-y-auto flex-1">
+          <div className="space-y-1">
+            <label htmlFor="cust-name" className="block text-xs font-semibold text-slate-700">
+              Bedrijfsnaam *
+            </label>
             <input
+              id="cust-name"
               type="text"
-              value={formData.sdworx_account_manager}
-              onChange={(e) => setFormData({ ...formData, sdworx_account_manager: e.target.value })}
-              className="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#005FB8]"
-              placeholder="e.g. Sarah Vermeulen"
+              required
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full min-h-[44px] px-3.5 py-2 text-base bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
             />
           </div>
 
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-end space-x-2">
+          <div className="space-y-1">
+            <label htmlFor="cust-enterprise-nr" className="block text-xs font-semibold text-slate-700">
+              KBO-ondernemingsnummer (bv. BE 0459.123.456) *
+            </label>
+            <input
+              id="cust-enterprise-nr"
+              type="text"
+              required
+              value={formData.enterprise_number}
+              onChange={(e) => setFormData({ ...formData, enterprise_number: e.target.value })}
+              className="w-full min-h-[44px] px-3.5 py-2 text-base font-mono bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label htmlFor="cust-pc" className="block text-xs font-semibold text-slate-700">
+              Paritair Comité Code (bv. 200, 124, 302, 207) *
+            </label>
+            <input
+              id="cust-pc"
+              type="text"
+              required
+              value={pcInput}
+              onChange={(e) => handlePcChange(e.target.value)}
+              className="w-full min-h-[44px] px-3.5 py-2 text-base font-mono bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label htmlFor="cust-contact" className="block text-xs font-semibold text-slate-700">
+              Primaire contactpersoon (HR Manager / Zaakvoerder) *
+            </label>
+            <input
+              id="cust-contact"
+              type="text"
+              required
+              value={formData.primary_contact}
+              onChange={(e) => setFormData({ ...formData, primary_contact: e.target.value })}
+              className="w-full min-h-[44px] px-3.5 py-2 text-base bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label htmlFor="cust-email" className="block text-xs font-semibold text-slate-700">
+              E-mailadres contactpersoon *
+            </label>
+            <input
+              id="cust-email"
+              type="email"
+              required
+              value={formData.contact_email}
+              onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
+              className="w-full min-h-[44px] px-3.5 py-2 text-base bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label htmlFor="cust-phone" className="block text-xs font-semibold text-slate-700">
+              Telefoonnummer contactpersoon
+            </label>
+            <input
+              id="cust-phone"
+              type="text"
+              value={formData.contact_phone}
+              onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
+              className="w-full min-h-[44px] px-3.5 py-2 text-base font-mono bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label htmlFor="cust-location" className="block text-xs font-semibold text-slate-700">
+              Vestigingsplaats / Stad
+            </label>
+            <input
+              id="cust-location"
+              type="text"
+              value={formData.location}
+              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+              className="w-full min-h-[44px] px-3.5 py-2 text-base bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label htmlFor="cust-manager" className="block text-xs font-semibold text-slate-700">
+              Toegewezen SD Worx dossierbeheerder
+            </label>
+            <input
+              id="cust-manager"
+              type="text"
+              value={formData.sdworx_account_manager}
+              onChange={(e) => setFormData({ ...formData, sdworx_account_manager: e.target.value })}
+              className="w-full min-h-[44px] px-3.5 py-2 text-base bg-white border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
+            />
+          </div>
+
+          <div className="pt-4 border-t border-slate-200 flex items-center justify-end space-x-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 text-slate-600 hover:bg-slate-100 rounded-lg font-medium"
+              className="min-h-[44px] px-5 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
             >
-              Cancel
+              Annuleren
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-4 py-1.5 bg-[#005FB8] hover:bg-[#004b93] text-white font-semibold rounded-lg shadow-2xs transition-colors inline-flex items-center space-x-1"
+              className="min-h-[44px] px-6 py-2 bg-[#005FB8] hover:bg-[#004b93] active:bg-[#003c75] text-white text-sm font-medium rounded-lg transition-colors flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-[#005FB8] focus:ring-offset-2 disabled:opacity-60"
             >
-              <Save className="w-3.5 h-3.5" />
-              <span>{isSubmitting ? 'Saving...' : isEdit ? 'Save Changes' : 'Create Customer File'}</span>
+              <Save className="w-4 h-4" />
+              <span>{isSubmitting ? 'Bezig met opslaan...' : 'Klantendossier opslaan'}</span>
             </button>
           </div>
         </form>

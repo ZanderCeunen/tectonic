@@ -8,7 +8,7 @@ mod rbac;
 mod security;
 mod trust_engine;
 
-use auth::{login_user, get_current_user_profile, LoginLimiter};
+use auth::{login_user, logout_user, get_current_user_profile, LoginLimiter};
 use db::Database;
 use handlers::{admin, customers, documents, routing};
 use security::AuditChain;
@@ -132,8 +132,9 @@ async fn main() {
         .route("/api/auth/login", post(login_user));
 
     let protected_routes = Router::new()
-        // Auth profile
+        // Auth profile & logout
         .route("/api/auth/me", get(get_current_user_profile))
+        .route("/api/auth/logout", post(logout_user))
         // Customers & Dossiers
         .route(
             "/api/customers",

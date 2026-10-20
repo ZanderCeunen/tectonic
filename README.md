@@ -56,8 +56,14 @@ npm run dev
 
 ## 🔐 Default Test Accounts
 
-| Username | Password | Role | Access Level |
-| :--- | :--- | :--- | :--- |
-| `admin` | `Admin123!` | System Administrator 👑 | Full Admin & Audit Chain |
-| `sarah.vermeulen` | `Payroll123!` | Senior Payroll Officer ⭐ | Senior Clearance & Unmasked PII |
-| `tom.desmet` | `Payroll123!` | Payroll Consultant 👤 | Standard Case Management |
+| Username / Email | Password | Role | Clearance | Description & Scope |
+| :--- | :--- | :--- | :--- | :--- |
+| `admin` / `admin@sdworx.com` | `Admin123!` | Admin | Admin | Administrative maintenance & security oversight surface, user & employee CRUD, audit chain verification. |
+| `sarah.vermeulen` / `sarah.vermeulen@sdworx.com` | `Payroll123!` | SeniorPayrollOfficer | Senior | Senior clearance with server-side unmasked legal text & salary/PII figures. Assigned to Acme Logistics, BioHealth, Flanders Food, and Sint-Elisabeth. |
+| `emma.wouters` / `emma.wouters@sdworx.com` | `Payroll123!` | LegalAdvisor | Senior | Legal advisor status, conflict resolution authority & full legal text access. Assigned to Acme Logistics, BioHealth, and Metaalconstructies. |
+| `tom.desmet` / `tom.desmet@sdworx.com` | `Payroll123!` | Consultant | Standard | Consultant work surface with auto-redacted PII/salaries. Assigned to Acme Logistics, Nexus Digital, and Vanderstraeten Construction. |
+| `kevin.peeters` / `kevin.peeters@sdworx.com` | `Payroll123!` | Consultant | Standard | Consultant work surface with auto-redacted PII/salaries. Assigned to Acme Logistics and Grand Palace Hotel. |
+| `auditor` / `auditor@sdworx.com` | `Payroll123!` | Auditor | Standard | Compliance auditor account with global read-only audit ledger and dossier inspection privileges. |
+
+> *Note: Seed passwords can be customized via `TECTONIC_ADMIN_PASSWORD` and `TECTONIC_CONSULTANT_PASSWORD`. Both username or email can be entered on the login screen.*
+

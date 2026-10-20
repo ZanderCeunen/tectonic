@@ -4,7 +4,6 @@ import HomeDashboard from './components/HomeDashboard';
 import CustomerHub from './components/CustomerHub';
 import SmartRouterModal from './components/SmartRouterModal';
 import CustomerSearchModal from './components/CustomerSearchModal';
-import LoginModal from './components/LoginModal';
 import LoginScreen from './components/LoginScreen';
 import CustomerManagerModal from './components/CustomerManagerModal';
 import EmployeeManagerModal from './components/EmployeeManagerModal';
@@ -29,7 +28,6 @@ export default function App() {
   // Modals state
   const [isRouterOpen, setIsRouterOpen] = useState(false);
   const [isCustomerSearchOpen, setIsCustomerSearchOpen] = useState(false);
-  const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isCustomerManagerOpen, setIsCustomerManagerOpen] = useState(false);
   const [isEmployeeManagerOpen, setIsEmployeeManagerOpen] = useState(false);
 
@@ -37,7 +35,17 @@ export default function App() {
   const [employeeToEdit, setEmployeeToEdit] = useState(null);
 
   // Logout handler
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      if (authToken) {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+      }
+    } catch {
+      // Continue client-side logout even if server unreachable
+    }
     localStorage.removeItem('tectonic_jwt');
     setAuthToken('');
     setActiveUser(null);
@@ -293,26 +301,26 @@ export default function App() {
   if (backendError) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl max-w-md w-full p-6 border border-slate-300 shadow-lg text-center space-y-4">
-          <div className="w-12 h-12 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mx-auto">
+        <div className="bg-white rounded-xl max-w-md w-full p-6 sm:p-8 border border-slate-200 shadow-sm text-center space-y-4">
+          <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-700 flex items-center justify-center mx-auto border border-amber-200">
             <AlertTriangle className="w-6 h-6" />
           </div>
-          <div>
-            <h2 className="text-base font-bold text-slate-900">Backend API Connection Required</h2>
-            <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-              The TECTONIC Dashboard connects to SQLite through the Rust Backend on <code className="font-mono bg-slate-100 px-1 py-0.5 rounded">http://127.0.0.1:8080</code>.
+          <div className="space-y-1">
+            <h2 className="text-base font-bold text-slate-900">Verbinding met API Server Vereist</h2>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Het TECTONIC portaal communiceert met de lokale backend server op <code className="font-mono bg-slate-100 px-1 py-0.5 rounded">http://127.0.0.1:8080</code>.
             </p>
           </div>
-          <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-[11px] font-mono text-slate-700 text-left">
+          <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs font-mono text-slate-700 text-left">
             cd backend<br />
             cargo run
           </div>
           <button
             onClick={loadInitialData}
-            className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl flex items-center justify-center space-x-1.5 transition-colors"
+            className="w-full min-h-[44px] bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-lg flex items-center justify-center space-x-2 transition-colors focus:outline-none focus:ring-2 focus:ring-[#005FB8]"
           >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Try Again</span>
+            <RefreshCw className="w-4 h-4" />
+            <span>Opnieuw proberen</span>
           </button>
         </div>
       </div>
@@ -346,11 +354,11 @@ export default function App() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-5">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
         {isLoading ? (
-          <div className="py-20 text-center text-slate-500 text-xs flex items-center justify-center space-x-2">
-            <RefreshCw className="w-4 h-4 animate-spin text-[#005FB8]" />
-            <span>Loading verified dossiers and security policies...</span>
+          <div className="py-24 text-center text-slate-500 text-sm flex items-center justify-center space-x-2.5">
+            <RefreshCw className="w-5 h-5 animate-spin text-[#005FB8]" />
+            <span>Klantendossiers en beveiligingsbeleid laden...</span>
           </div>
         ) : isAdminView ? (
           /* Admin Control Surface */
@@ -430,12 +438,14 @@ export default function App() {
       />
 
       {/* SD Worx Footer */}
-      <footer className="border-t border-slate-200 bg-white py-3 text-center text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 flex items-center justify-between">
-          <span className="font-medium text-slate-600">
-            SD Worx Knowledge Portal & Case Assistant
+      <footer className="border-t border-slate-200 bg-white py-4 text-xs text-slate-500">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2">
+          <span className="font-medium text-slate-700">
+            SD Worx TECTONIC • Kennisportaal &amp; Dossierbeheer
           </span>
-          <span>Security & Compliance Engine Active (SHA-256 Ledger)</span>
+          <span className="text-slate-500">
+            Beveiliging &amp; Compliance Actief (SHA-256 Cryptografische Audit Ledger)
+          </span>
         </div>
       </footer>
     </div>
